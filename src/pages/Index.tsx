@@ -131,95 +131,53 @@ export default function Index() {
     <Layout>
       {/* Hero Section */}
       <section className="relative bg-background overflow-hidden">
-        {/* Decorative elements */}
+        {/* Subtle decorative elements */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-secondary/10 rounded-full blur-3xl" />
           <div className="absolute top-20 -left-20 w-60 h-60 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
         </div>
         
-        <div className="container relative py-20 md:py-32 lg:py-40">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 border border-primary/10">
-                <Shield className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium text-primary">African Halal Institute</span>
-              </div>
-              
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-[1.1] tracking-tight">
-                Setting the Standard for{" "}
-                <span className="text-primary">Halal Excellence</span>{" "}
-                <span className="text-secondary">in Africa</span>
-              </h1>
-              
-              <p className="text-lg md:text-xl text-muted-foreground max-w-xl leading-relaxed">
-                Trusted certification authority ensuring integrity, compliance, and leadership 
-                in Halal standards across the continent.
-              </p>
-              
-              <div className="flex flex-wrap gap-4 pt-2">
-                <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
-                  Start Certification
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                <Button size="lg" variant="outline" className="border-border hover:bg-accent" asChild>
-                  <Link to="/verify">Verify Certificate</Link>
-                </Button>
-              </div>
-              
-              {/* Trust indicators */}
-              <div className="flex flex-wrap gap-8 pt-6 border-t border-border">
-                <div>
-                  <p className="text-3xl font-bold text-foreground">500+</p>
-                  <p className="text-sm text-muted-foreground">Certified Businesses</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-foreground">15+</p>
-                  <p className="text-sm text-muted-foreground">African Countries</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-foreground">10+</p>
-                  <p className="text-sm text-muted-foreground">Years of Excellence</p>
-                </div>
-              </div>
+        <div className="container relative py-16 md:py-24 lg:py-32">
+          <div className="max-w-4xl mx-auto text-center space-y-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 border border-primary/10">
+              <BadgeCheck className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-primary">Trusted Halal Certification Authority</span>
             </div>
             
-            {/* Hero visual */}
-            <div className="relative hidden lg:block">
-              <div className="relative aspect-square">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-secondary/10 to-primary/5 rounded-3xl" />
-                <div className="absolute inset-4 bg-card rounded-2xl shadow-2xl border flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-primary/10 mb-6">
-                      <BadgeCheck className="h-12 w-12 text-primary" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-foreground mb-2">Halal Certified</h3>
-                    <p className="text-muted-foreground text-sm">Trusted by businesses across Africa</p>
-                  </div>
-                </div>
-                {/* Floating badges */}
-                <div className="absolute -left-4 top-1/4 bg-card rounded-xl shadow-lg border p-4 animate-fade-in">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                      <Check className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">ISO Accredited</p>
-                      <p className="text-xs text-muted-foreground">International Standards</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="absolute -right-4 bottom-1/4 bg-card rounded-xl shadow-lg border p-4 animate-fade-in" style={{ animationDelay: "0.2s" }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center">
-                      <Award className="h-5 w-5 text-secondary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Shariah Compliant</p>
-                      <p className="text-xs text-muted-foreground">Verified by Scholars</p>
-                    </div>
-                  </div>
-                </div>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-[1.1] tracking-tight">
+              Your Partner for{" "}
+              <span className="text-primary">Halal Certification</span>{" "}
+              in Africa
+            </h1>
+            
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              We certify businesses across food, meat processing, hospitality, and more. 
+              Get internationally recognized Halal certification with integrity and compliance.
+            </p>
+            
+            <div className="flex flex-wrap justify-center gap-4 pt-2">
+              <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
+                Apply for Certification
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button size="lg" variant="outline" className="border-border hover:bg-accent" asChild>
+                <Link to="/verify">Verify a Certificate</Link>
+              </Button>
+            </div>
+            
+            {/* Trust badges - compact */}
+            <div className="flex flex-wrap justify-center gap-6 pt-8">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border shadow-sm">
+                <Check className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium">ISO Accredited</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border shadow-sm">
+                <Shield className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Shariah Compliant</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border shadow-sm">
+                <Award className="h-4 w-4 text-secondary" />
+                <span className="text-sm font-medium">500+ Certified Businesses</span>
               </div>
             </div>
           </div>
