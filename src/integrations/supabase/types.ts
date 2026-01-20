@@ -752,6 +752,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_admin_role: {
+        Args: {
+          _email: string
+          _role: Database["public"]["Enums"]["admin_role"]
+        }
+        Returns: string
+      }
       generate_application_number: { Args: never; Returns: string }
       generate_certificate_number: { Args: never; Returns: string }
       generate_ncn_number: { Args: never; Returns: string }
