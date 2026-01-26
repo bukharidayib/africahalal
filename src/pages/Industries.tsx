@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { 
-  Utensils, 
-  Factory, 
+import {
+  Utensils,
+  Factory,
   Hotel,
   Beef,
   Coffee,
@@ -190,7 +190,7 @@ export default function Industries() {
             <div>
               <SectionHeader
                 subtitle="Why Get Certified"
-                title="Benefits of AHIS Certification"
+                title="Benefits of AHI Certification"
                 align="left"
               />
               <ul className="space-y-4">
@@ -211,12 +211,12 @@ export default function Industries() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-primary-foreground/90">
-                  Each industry has unique Halal compliance requirements. Our certification 
-                  programs are specifically designed to address the particular challenges and 
+                  Each industry has unique Halal compliance requirements. Our certification
+                  programs are specifically designed to address the particular challenges and
                   standards relevant to your sector.
                 </p>
                 <p className="text-primary-foreground/90">
-                  From slaughter procedures in abattoirs to kitchen protocols in restaurants, 
+                  From slaughter procedures in abattoirs to kitchen protocols in restaurants,
                   we provide comprehensive guidance and verification tailored to your operations.
                 </p>
                 <Button className="mt-4 bg-secondary text-secondary-foreground hover:bg-secondary/90" asChild>
@@ -237,7 +237,7 @@ export default function Industries() {
             Sector Not Listed?
           </h2>
           <p className="text-secondary-foreground/80 mb-8 max-w-xl mx-auto">
-            We're continuously expanding our certification scope. Contact us to discuss 
+            We're continuously expanding our certification scope. Contact us to discuss
             your specific industry requirements.
           </p>
           <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90" asChild>

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { 
-  Search, 
-  MapPin, 
-  Calendar, 
+import {
+  Search,
+  MapPin,
+  Calendar,
   ExternalLink,
   CheckCircle2,
   Filter,
@@ -24,7 +24,7 @@ import { HeroSection } from "@/components/sections/HeroSection";
 
 const certifiedInstitutions = [
   {
-    id: "AHIS-2023-0001",
+    id: "AHI-2023-0001",
     name: "Fresh Foods Manufacturing Ltd",
     location: "Johannesburg, South Africa",
     sector: "Food & Beverage",
@@ -33,7 +33,7 @@ const certifiedInstitutions = [
     scope: "Processed foods, beverages",
   },
   {
-    id: "AHIS-2023-0002",
+    id: "AHI-2023-0002",
     name: "Sahara Halal Meats",
     location: "Nairobi, Kenya",
     sector: "Abattoirs & Meat",
@@ -42,7 +42,7 @@ const certifiedInstitutions = [
     scope: "Poultry slaughter and processing",
   },
   {
-    id: "AHIS-2023-0003",
+    id: "AHI-2023-0003",
     name: "Golden Crescent Hotel",
     location: "Cairo, Egypt",
     sector: "Hospitality",
@@ -51,7 +51,7 @@ const certifiedInstitutions = [
     scope: "Hotel F&B operations",
   },
   {
-    id: "AHIS-2023-0004",
+    id: "AHI-2023-0004",
     name: "Nile Valley Foods",
     location: "Lagos, Nigeria",
     sector: "Food & Beverage",
@@ -60,7 +60,7 @@ const certifiedInstitutions = [
     scope: "Dairy products, confectionery",
   },
   {
-    id: "AHIS-2023-0005",
+    id: "AHI-2023-0005",
     name: "Cape Halal Abattoir",
     location: "Cape Town, South Africa",
     sector: "Abattoirs & Meat",
@@ -69,7 +69,7 @@ const certifiedInstitutions = [
     scope: "Cattle and sheep slaughter",
   },
   {
-    id: "AHIS-2023-0006",
+    id: "AHI-2023-0006",
     name: "Medina Restaurant Group",
     location: "Casablanca, Morocco",
     sector: "Hospitality",
@@ -78,7 +78,7 @@ const certifiedInstitutions = [
     scope: "Restaurant chain operations",
   },
   {
-    id: "AHIS-2022-0007",
+    id: "AHI-2022-0007",
     name: "Atlas Pharmaceuticals",
     location: "Accra, Ghana",
     sector: "Pharmaceuticals",
@@ -87,7 +87,7 @@ const certifiedInstitutions = [
     scope: "Oral medications, supplements",
   },
   {
-    id: "AHIS-2022-0008",
+    id: "AHI-2022-0008",
     name: "Zambezi Logistics",
     location: "Lusaka, Zambia",
     sector: "Logistics",
@@ -107,8 +107,8 @@ export default function Directory() {
 
   const filteredInstitutions = certifiedInstitutions.filter((inst) => {
     const matchesSearch = inst.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         inst.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         inst.id.toLowerCase().includes(searchQuery.toLowerCase());
+      inst.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inst.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSector = selectedSector === "All Sectors" || inst.sector === selectedSector;
     const matchesStatus = selectedStatus === "All Status" || inst.status === selectedStatus;
     return matchesSearch && matchesSector && matchesStatus;
@@ -233,7 +233,7 @@ export default function Directory() {
             <CardContent className="p-8 text-center">
               <h3 className="text-xl font-bold mb-2">Want to be listed in our directory?</h3>
               <p className="text-primary-foreground/80 mb-4">
-                Get certified by AHIS and join our network of trusted Halal-certified businesses.
+                Get certified by AHI and join our network of trusted Halal-certified businesses.
               </p>
               <Button className="bg-secondary text-secondary-foreground hover:bg-secondary/90" asChild>
                 <a href="/contact">Apply for Certification</a>

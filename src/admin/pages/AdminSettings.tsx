@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { 
-  Settings, 
+import {
+  Settings,
   Shield,
   Bell,
   Globe,
@@ -32,19 +32,19 @@ import { toast } from 'sonner';
 export default function AdminSettings() {
   const { permissions } = useAdminAuthContext();
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // General settings
   const [organizationName, setOrganizationName] = useState('African Halal Institute & Standards');
   const [timezone, setTimezone] = useState('Africa/Nairobi');
   const [dateFormat, setDateFormat] = useState('dd/MM/yyyy');
-  
+
   // Notification settings
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [applicationAlerts, setApplicationAlerts] = useState(true);
   const [ncnAlerts, setNCNAlerts] = useState(true);
   const [expiryReminders, setExpiryReminders] = useState(true);
   const [reminderDays, setReminderDays] = useState('30');
-  
+
   // Security settings
   const [requireMFA, setRequireMFA] = useState(true);
   const [sessionTimeout, setSessionTimeout] = useState('60');
@@ -126,7 +126,7 @@ export default function AdminSettings() {
                     onChange={(e) => setOrganizationName(e.target.value)}
                   />
                 </div>
-                
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="timezone">Timezone</Label>
@@ -142,7 +142,7 @@ export default function AdminSettings() {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="date-format">Date Format</Label>
                     <Select value={dateFormat} onValueChange={setDateFormat}>
@@ -178,7 +178,7 @@ export default function AdminSettings() {
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Version</Label>
-                    <p className="font-medium">AHIS v1.0.0</p>
+                    <p className="font-medium">AHI v1.0.0</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Environment</Label>
@@ -218,9 +218,9 @@ export default function AdminSettings() {
                     onCheckedChange={setEmailNotifications}
                   />
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
@@ -235,7 +235,7 @@ export default function AdminSettings() {
                       disabled={!emailNotifications}
                     />
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label>NCN Alerts</Label>
@@ -249,7 +249,7 @@ export default function AdminSettings() {
                       disabled={!emailNotifications}
                     />
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label>Certificate Expiry Reminders</Label>
@@ -264,7 +264,7 @@ export default function AdminSettings() {
                     />
                   </div>
                 </div>
-                
+
                 {expiryReminders && (
                   <>
                     <Separator />
@@ -314,9 +314,9 @@ export default function AdminSettings() {
                     onCheckedChange={setRequireMFA}
                   />
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="session-timeout">Session Timeout (minutes)</Label>
                   <Select value={sessionTimeout} onValueChange={setSessionTimeout}>

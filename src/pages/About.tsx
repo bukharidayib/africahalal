@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
-import { 
-  Shield, 
-  Award, 
-  Eye, 
+import {
+  Shield,
+  Award,
+  Eye,
   Globe,
   Target,
   Lightbulb,
@@ -39,7 +39,7 @@ const sectors = [
 ];
 
 const timeline = [
-  { year: "2012", title: "Foundation", description: "AHIS established in Johannesburg, South Africa" },
+  { year: "2012", title: "Foundation", description: "AHI established in Johannesburg, South Africa" },
   { year: "2014", title: "Regional Expansion", description: "Extended operations to East African countries" },
   { year: "2016", title: "International Recognition", description: "Achieved international accreditation" },
   { year: "2018", title: "Digital Transformation", description: "Launched online verification platform" },
@@ -59,7 +59,7 @@ export default function About() {
     <Layout>
       {/* Hero */}
       <HeroSection
-        subtitle="About AHIS"
+        subtitle="About AHI"
         title="Pioneering Halal Excellence Across Africa"
         description="The African Halal Institute sets the benchmark for Halal certification, combining rigorous Shariah compliance with modern certification practices."
         size="lg"
@@ -77,13 +77,13 @@ export default function About() {
                 Beyond Boundaries
               </h2>
               <p className="text-muted-foreground mb-6 text-lg">
-                From humble beginnings in South Africa, AHIS has grown to become the leading 
-                Halal certification authority across the African continent. Our commitment to 
+                From humble beginnings in South Africa, AHI has grown to become the leading
+                Halal certification authority across the African continent. Our commitment to
                 excellence and integrity has earned us trust from businesses and consumers alike.
               </p>
               <p className="text-muted-foreground mb-8">
-                We understand the unique challenges and opportunities in African markets, combining 
-                international best practices with local expertise to deliver certification services 
+                We understand the unique challenges and opportunities in African markets, combining
+                international best practices with local expertise to deliver certification services
                 that truly serve our communities.
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
@@ -147,7 +147,7 @@ export default function About() {
               Institutional Authority & Compliance
             </h2>
             <p className="text-primary-foreground/80 text-lg mb-8">
-              AHIS operates under strict governance frameworks, ensuring every certification 
+              AHI operates under strict governance frameworks, ensuring every certification
               decision is made with integrity and in accordance with international Halal standards.
             </p>
             <div className="grid sm:grid-cols-3 gap-6">
@@ -181,9 +181,8 @@ export default function About() {
             {timeline.map((item, index) => (
               <div
                 key={item.year}
-                className={`relative flex items-start gap-8 mb-8 ${
-                  index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"
-                }`}
+                className={`relative flex items-start gap-8 mb-8 ${index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"
+                  }`}
               >
                 <div className={`flex-1 ${index % 2 === 0 ? "md:text-right" : ""} hidden md:block`}>
                   <div className={`p-4 ${index % 2 === 0 ? "md:pr-8" : "md:pl-8"}`}>
@@ -220,8 +219,8 @@ export default function About() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground text-lg">
-                  To be the foremost authority in Halal certification across Africa, 
-                  fostering consumer confidence and enabling businesses to thrive in 
+                  To be the foremost authority in Halal certification across Africa,
+                  fostering consumer confidence and enabling businesses to thrive in
                   global Halal markets.
                 </p>
               </CardContent>
@@ -235,8 +234,8 @@ export default function About() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground text-lg">
-                  To provide rigorous, transparent, and accessible Halal certification 
-                  services that uphold Shariah principles while supporting the growth 
+                  To provide rigorous, transparent, and accessible Halal certification
+                  services that uphold Shariah principles while supporting the growth
                   of African businesses in the global economy.
                 </p>
               </CardContent>
@@ -274,12 +273,12 @@ export default function About() {
       <section className="py-20 bg-secondary">
         <div className="container max-w-4xl text-center">
           <blockquote className="text-2xl md:text-3xl font-serif italic text-secondary-foreground mb-6">
-            "Excellence in Halal certification is not just about compliance—it's about 
-            building trust, fostering integrity, and empowering African businesses to 
+            "Excellence in Halal certification is not just about compliance—it's about
+            building trust, fostering integrity, and empowering African businesses to
             reach their full potential."
           </blockquote>
           <p className="text-secondary-foreground/80">
-            — AHIS Founding Principles
+            — AHI Founding Principles
           </p>
         </div>
       </section>
@@ -291,7 +290,7 @@ export default function About() {
             Ready to Partner with Us?
           </h2>
           <p className="text-primary-foreground/80 mb-8 max-w-xl mx-auto">
-            Join the growing network of businesses that trust AHIS for their Halal certification needs.
+            Join the growing network of businesses that trust AHI for their Halal certification needs.
           </p>
           <Button size="lg" className="bg-secondary text-secondary-foreground hover:bg-secondary/90" asChild>
             <Link to="/contact">

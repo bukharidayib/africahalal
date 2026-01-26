@@ -30,16 +30,14 @@ export function Footer() {
           {/* Brand Column */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary">
-                <span className="text-lg font-bold text-secondary-foreground">A</span>
-              </div>
+              <img src="/logo.png" alt="African Halal Institute" className="h-12 w-auto brightness-0 invert" />
               <div>
-                <p className="font-bold">African Halal Institute</p>
-                <p className="text-xs text-primary-foreground/70">AHIS</p>
+                <p className="font-bold text-white">African Halal Institute</p>
+                <p className="text-xs text-primary-foreground/70 text-white">AHI</p>
               </div>
             </div>
             <p className="text-sm text-primary-foreground/80">
-              Setting the standard for Halal excellence across Africa and beyond. 
+              Setting the standard for Halal excellence across Africa and beyond.
               Integrity, compliance, and leadership in every certification.
             </p>
             <div className="flex gap-4">

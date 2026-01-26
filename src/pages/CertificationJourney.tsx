@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
-import { 
-  FileText, 
-  FolderOpen, 
-  Search, 
-  ClipboardCheck, 
+import {
+  FileText,
+  FolderOpen,
+  Search,
+  ClipboardCheck,
   BadgeCheck,
   Eye,
   ArrowRight,
@@ -75,7 +75,7 @@ const journeySteps = [
     step: 5,
     icon: BadgeCheck,
     title: "Certificate Issuance",
-    description: "Upon approval, receive your official AHIS Halal certificate.",
+    description: "Upon approval, receive your official AHI Halal certificate.",
     duration: "2-3 days",
     milestones: [
       "Certificate preparation",
@@ -137,7 +137,7 @@ export default function CertificationJourney() {
             title="Six Steps to Certification"
             description="Each step is designed for transparency and efficiency."
           />
-          
+
           <div className="space-y-8">
             {journeySteps.map((step, index) => (
               <div key={step.step} className="relative">
@@ -145,7 +145,7 @@ export default function CertificationJourney() {
                 {index < journeySteps.length - 1 && (
                   <div className="absolute left-8 top-24 bottom-0 w-0.5 bg-border hidden md:block" />
                 )}
-                
+
                 <Card className="border-none shadow-lg overflow-hidden">
                   <div className="grid md:grid-cols-3">
                     {/* Step Header */}
@@ -163,7 +163,7 @@ export default function CertificationJourney() {
                         <span className="text-sm font-medium">{step.duration}</span>
                       </div>
                     </div>
-                    
+
                     {/* Milestones */}
                     <div className="md:col-span-2 p-6 md:p-8">
                       <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-4">

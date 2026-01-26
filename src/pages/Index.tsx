@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
-import { 
-  Shield, 
-  Award, 
-  Users, 
-  Building2, 
-  Utensils, 
-  Factory, 
+import {
+  Shield,
+  Award,
+  Users,
+  Building2,
+  Utensils,
+  Factory,
   Hotel,
   Pill,
   Shirt,
@@ -92,8 +92,8 @@ const faqs = [
     answer: "The certification timeline varies based on the complexity of your operation. Typically, it ranges from 4-12 weeks, including documentation review, on-site inspection, and Shariah board evaluation.",
   },
   {
-    question: "Is AHIS certification internationally recognized?",
-    answer: "Yes, AHIS certification is recognized across Africa and by major international Halal accreditation bodies. Our standards align with global Halal requirements, facilitating international trade.",
+    question: "Is AHI certification internationally recognized?",
+    answer: "Yes, AHI certification is recognized across Africa and by major international Halal accreditation bodies. Our standards align with global Halal requirements, facilitating international trade.",
   },
   {
     question: "What industries can apply for certification?",
@@ -101,13 +101,13 @@ const faqs = [
   },
   {
     question: "How do I verify a certificate's authenticity?",
-    answer: "You can verify any AHIS certificate using our online verification portal. Simply enter the certificate number or scan the QR code on the certificate to confirm its validity.",
+    answer: "You can verify any AHI certificate using our online verification portal. Simply enter the certificate number or scan the QR code on the certificate to confirm its validity.",
   },
 ];
 
 const testimonials = [
   {
-    quote: "AHIS certification opened doors to new markets across Africa. Their professional team made the process seamless.",
+    quote: "AHI certification opened doors to new markets across Africa. Their professional team made the process seamless.",
     author: "Ahmed Hassan",
     company: "Fresh Foods Ltd",
     role: "CEO",
@@ -119,7 +119,7 @@ const testimonials = [
     role: "Operations Director",
   },
   {
-    quote: "Outstanding support throughout the certification journey. AHIS truly understands the needs of African businesses.",
+    quote: "Outstanding support throughout the certification journey. AHI truly understands the needs of African businesses.",
     author: "Ibrahim Mensah",
     company: "Golden Harvest Hotels",
     role: "Managing Director",
@@ -136,25 +136,25 @@ export default function Index() {
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-secondary/10 rounded-full blur-3xl" />
           <div className="absolute top-20 -left-20 w-60 h-60 bg-primary/5 rounded-full blur-3xl" />
         </div>
-        
+
         <div className="container relative py-16 md:py-24 lg:py-32">
           <div className="max-w-4xl mx-auto text-center space-y-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 border border-primary/10">
               <BadgeCheck className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium text-primary">Trusted Halal Certification Authority</span>
             </div>
-            
+
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-[1.1] tracking-tight">
               Your Partner for{" "}
               <span className="text-primary">Halal Certification</span>{" "}
               in Africa
             </h1>
-            
+
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              We certify businesses across food, meat processing, hospitality, and more. 
+              We certify businesses across food, meat processing, hospitality, and more.
               Get internationally recognized Halal certification with integrity and compliance.
             </p>
-            
+
             <div className="flex flex-wrap justify-center gap-4 pt-2">
               <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
                 Apply for Certification
@@ -164,7 +164,7 @@ export default function Index() {
                 <Link to="/verify">Verify a Certificate</Link>
               </Button>
             </div>
-            
+
             {/* Trust badges - compact */}
             <div className="flex flex-wrap justify-center gap-6 pt-8">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border shadow-sm">
@@ -318,7 +318,7 @@ export default function Index() {
           <SectionHeader
             subtitle="Success Stories"
             title="What Our Clients Say"
-            description="Hear from businesses that have achieved Halal excellence with AHIS."
+            description="Hear from businesses that have achieved Halal excellence with AHI."
           />
           <div className="grid md:grid-cols-3 gap-8">
             {testimonials.map((testimonial) => (
@@ -375,7 +375,7 @@ export default function Index() {
             Ready to Get Certified?
           </h2>
           <p className="text-secondary-foreground/80 mb-8 max-w-xl mx-auto">
-            Join hundreds of businesses across Africa that trust AHIS for their Halal certification needs.
+            Join hundreds of businesses across Africa that trust AHI for their Halal certification needs.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90" asChild>

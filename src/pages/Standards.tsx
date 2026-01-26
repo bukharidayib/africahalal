@@ -1,7 +1,7 @@
-import { 
-  FileCheck, 
-  Search, 
-  ClipboardCheck, 
+import {
+  FileCheck,
+  Search,
+  ClipboardCheck,
   BadgeCheck,
   Eye,
   RefreshCw,
@@ -48,7 +48,7 @@ const lifecycle = [
   },
   {
     title: "Surveillance Audits",
-    content: "During the certification period, AHIS conducts regular surveillance audits to ensure ongoing compliance. These may be announced or unannounced, and focus on maintaining the integrity of certified operations."
+    content: "During the certification period, AHI conducts regular surveillance audits to ensure ongoing compliance. These may be announced or unannounced, and focus on maintaining the integrity of certified operations."
   },
   {
     title: "Annual Renewal",
@@ -56,11 +56,11 @@ const lifecycle = [
   },
   {
     title: "Scope Changes",
-    content: "If your operations change—new products, processes, or facilities—you must notify AHIS. Scope extensions or modifications require additional assessment and may incur separate fees."
+    content: "If your operations change—new products, processes, or facilities—you must notify AHI. Scope extensions or modifications require additional assessment and may incur separate fees."
   },
   {
     title: "Suspension & Withdrawal",
-    content: "Non-compliance may result in certificate suspension or withdrawal. AHIS maintains a clear process for addressing violations, including corrective action requirements and appeal procedures."
+    content: "Non-compliance may result in certificate suspension or withdrawal. AHI maintains a clear process for addressing violations, including corrective action requirements and appeal procedures."
   },
 ];
 
@@ -138,13 +138,13 @@ export default function Standards() {
                 </CardHeader>
                 <CardContent className="space-y-4 text-primary-foreground/90">
                   <p>
-                    AHIS certification focuses on Halal compliance for tangible products 
-                    and food service operations. Our scope is limited to areas where 
-                    Halal principles can be objectively verified through physical inspection 
+                    AHI certification focuses on Halal compliance for tangible products
+                    and food service operations. Our scope is limited to areas where
+                    Halal principles can be objectively verified through physical inspection
                     and documentation review.
                   </p>
                   <p>
-                    For industries outside our scope, we recommend contacting specialized 
+                    For industries outside our scope, we recommend contacting specialized
                     certification bodies or consulting with our team for referrals.
                   </p>
                 </CardContent>
@@ -223,28 +223,28 @@ export default function Standards() {
             <div className="p-6 rounded-lg bg-card border">
               <h3 className="font-semibold text-lg mb-3 text-primary">Objectivity</h3>
               <p className="text-muted-foreground text-sm">
-                All assessments are based on documented evidence and objective criteria, 
+                All assessments are based on documented evidence and objective criteria,
                 ensuring consistent and fair certification decisions.
               </p>
             </div>
             <div className="p-6 rounded-lg bg-card border">
               <h3 className="font-semibold text-lg mb-3 text-primary">Traceability</h3>
               <p className="text-muted-foreground text-sm">
-                Complete documentation trail from raw materials to finished products, 
+                Complete documentation trail from raw materials to finished products,
                 enabling full supply chain verification.
               </p>
             </div>
             <div className="p-6 rounded-lg bg-card border">
               <h3 className="font-semibold text-lg mb-3 text-primary">Competence</h3>
               <p className="text-muted-foreground text-sm">
-                All auditors and inspectors maintain relevant qualifications and 
+                All auditors and inspectors maintain relevant qualifications and
                 undergo continuous professional development.
               </p>
             </div>
             <div className="p-6 rounded-lg bg-card border">
               <h3 className="font-semibold text-lg mb-3 text-primary">Confidentiality</h3>
               <p className="text-muted-foreground text-sm">
-                All client information is treated with strict confidentiality, 
+                All client information is treated with strict confidentiality,
                 protected by robust data security measures.
               </p>
             </div>

@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* AHIS Design System - African Halal Institute */
+/* AHI Design System - African Halal Institute */
 
 @layer base {
   :root {
@@ -53,7 +53,7 @@
     --sidebar-border: 152 40% 20%;
     --sidebar-ring: 43 65% 47%;
 
-    /* Custom AHIS tokens */
+    /* Custom AHI tokens */
     --gold: 43 65% 47%;
     --gold-light: 43 65% 60%;
     --gold-dark: 43 70% 35%;

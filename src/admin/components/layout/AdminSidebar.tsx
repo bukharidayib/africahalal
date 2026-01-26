@@ -96,11 +96,9 @@ export function AdminSidebar() {
     <aside className="fixed left-0 top-0 z-50 h-screen w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-bold">
-          AH
-        </div>
+        <img src="/logo.png" alt="AHI" className="h-8 w-auto" />
         <div>
-          <h1 className="text-sm font-bold">AHIS Admin</h1>
+          <h1 className="text-sm font-bold">AHI Admin</h1>
           <p className="text-xs text-sidebar-foreground/70">Certification Portal</p>
         </div>
       </div>
@@ -108,9 +106,9 @@ export function AdminSidebar() {
       {/* Navigation */}
       <nav className="flex flex-col gap-1 p-4">
         {filteredNavItems.map((item) => {
-          const isActive = location.pathname === item.href || 
+          const isActive = location.pathname === item.href ||
             (item.href !== '/admin/dashboard' && location.pathname.startsWith(item.href));
-          
+
           return (
             <NavLink
               key={item.href}
@@ -133,7 +131,7 @@ export function AdminSidebar() {
       <div className="absolute bottom-0 left-0 right-0 border-t border-sidebar-border p-4">
         <div className="text-xs text-sidebar-foreground/60">
           <p>African Halal Institute</p>
-          <p>© 2024 All rights reserved</p>
+          <p>© {new Date().getFullYear()} All rights reserved</p>
         </div>
       </div>
     </aside>

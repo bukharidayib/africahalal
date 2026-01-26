@@ -45,9 +45,7 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
-            <span className="text-lg font-bold text-primary-foreground">A</span>
-          </div>
+          <img src="/logo.png" alt="African Halal Institute" className="h-12 w-auto" />
           <div className="hidden sm:block">
             <p className="text-sm font-bold text-primary">African Halal Institute</p>
             <p className="text-xs text-muted-foreground">Integrity • Compliance • Leadership</p>

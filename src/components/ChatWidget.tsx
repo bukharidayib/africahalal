@@ -10,7 +10,7 @@ export function ChatWidget() {
       {isOpen && (
         <div className="mb-4 w-80 rounded-lg bg-card shadow-xl border animate-fade-in">
           <div className="flex items-center justify-between p-4 border-b bg-primary text-primary-foreground rounded-t-lg">
-            <span className="font-semibold">Chat with AHIS</span>
+            <span className="font-semibold">Chat with AHI</span>
             <Button
               variant="ghost"
               size="icon"
@@ -22,7 +22,7 @@ export function ChatWidget() {
           </div>
           <div className="p-4 h-64 overflow-y-auto">
             <div className="bg-muted rounded-lg p-3 text-sm">
-              <p className="font-medium text-primary">Welcome to AHIS!</p>
+              <p className="font-medium text-primary">Welcome to AHI!</p>
               <p className="mt-1 text-muted-foreground">
                 How can we assist you with Halal certification today?
               </p>

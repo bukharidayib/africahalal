@@ -38,10 +38,10 @@ export default function AdminLogin() {
       <div className="w-full max-w-md space-y-6">
         {/* Logo & Header */}
         <div className="flex flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary text-primary-foreground mb-4">
-            <Shield className="h-8 w-8" />
+          <div className="mb-4">
+            <img src="/logo.png" alt="African Halal Institute" className="h-20 w-auto" />
           </div>
-          <h1 className="text-2xl font-bold font-serif">AHIS Admin Portal</h1>
+          <h1 className="text-2xl font-bold font-serif">AHI Admin Portal</h1>
           <p className="text-muted-foreground">
             African Halal Institute Certification System
           </p>
@@ -71,7 +71,7 @@ export default function AdminLogin() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@ahis.org"
+                    placeholder="admin@ahi.org"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-9"
@@ -98,8 +98,8 @@ export default function AdminLogin() {
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full"
                 disabled={isSubmitting}
               >

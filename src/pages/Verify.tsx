@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { 
-  Search, 
-  QrCode, 
-  Shield, 
-  CheckCircle2, 
+import {
+  Search,
+  QrCode,
+  Shield,
+  CheckCircle2,
   XCircle,
   AlertCircle,
   Building2,
@@ -30,8 +30,8 @@ const mockCertificates: Record<string, {
   expiryDate: string;
   status: "valid" | "expired" | "suspended";
 }> = {
-  "AHIS-2023-0001": {
-    id: "AHIS-2023-0001",
+  "AHI-2023-0001": {
+    id: "AHI-2023-0001",
     company: "Fresh Foods Manufacturing Ltd",
     location: "Johannesburg, South Africa",
     sector: "Food & Beverage",
@@ -40,8 +40,8 @@ const mockCertificates: Record<string, {
     expiryDate: "2024-03-14",
     status: "valid"
   },
-  "AHIS-2023-0002": {
-    id: "AHIS-2023-0002",
+  "AHI-2023-0002": {
+    id: "AHI-2023-0002",
     company: "Sahara Halal Meats",
     location: "Nairobi, Kenya",
     sector: "Abattoirs & Meat",
@@ -59,9 +59,9 @@ export default function Verify() {
 
   const handleVerify = () => {
     if (!certificateId.trim()) return;
-    
+
     setVerificationResult("searching");
-    
+
     // Simulate API call
     setTimeout(() => {
       const found = mockCertificates[certificateId.toUpperCase()];
@@ -87,7 +87,7 @@ export default function Verify() {
       <HeroSection
         subtitle="Certificate Verification"
         title="Verify Halal Certificate Authenticity"
-        description="Instantly verify the validity of any AHIS-issued Halal certificate using the certificate ID or QR code."
+        description="Instantly verify the validity of any AHI-issued Halal certificate using the certificate ID or QR code."
         size="md"
         variant="centered"
       />
@@ -112,20 +112,20 @@ export default function Verify() {
                 <CardHeader>
                   <CardTitle>Enter Certificate ID</CardTitle>
                   <CardDescription>
-                    Enter the certificate number found on the Halal certificate (e.g., AHIS-2023-0001)
+                    Enter the certificate number found on the Halal certificate (e.g., AHI-2023-0001)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex gap-2">
                     <Input
-                      placeholder="AHIS-XXXX-XXXX"
+                      placeholder="AHI-XXXX-XXXX"
                       value={certificateId}
                       onChange={(e) => setCertificateId(e.target.value)}
                       onKeyDown={handleKeyDown}
                       className="text-lg"
                     />
-                    <Button 
-                      onClick={handleVerify} 
+                    <Button
+                      onClick={handleVerify}
                       className="bg-primary"
                       disabled={verificationResult === "searching"}
                     >
@@ -133,7 +133,7 @@ export default function Verify() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Try: AHIS-2023-0001 or AHIS-2023-0002 for demo
+                    Try: AHI-2023-0001 or AHI-2023-0002 for demo
                   </p>
                 </CardContent>
               </Card>
@@ -161,9 +161,8 @@ export default function Verify() {
 
           {/* Verification Result */}
           {verificationResult !== "idle" && verificationResult !== "searching" && (
-            <Card className={`mt-8 border-2 ${
-              verificationResult === "valid" ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-red-500 bg-red-50 dark:bg-red-950/20"
-            }`}>
+            <Card className={`mt-8 border-2 ${verificationResult === "valid" ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-red-500 bg-red-50 dark:bg-red-950/20"
+              }`}>
               <CardContent className="p-6">
                 {verificationResult === "valid" && certificate ? (
                   <div className="space-y-4">
@@ -236,8 +235,8 @@ export default function Verify() {
                 <div>
                   <h3 className="font-bold text-lg mb-2">Blockchain-Secured Verification</h3>
                   <p className="text-muted-foreground text-sm">
-                    All AHIS certificates are secured using blockchain technology, ensuring tamper-proof 
-                    verification and complete transparency. Each certificate's authenticity can be 
+                    All AHI certificates are secured using blockchain technology, ensuring tamper-proof
+                    verification and complete transparency. Each certificate's authenticity can be
                     independently verified through our decentralized verification system.
                   </p>
                 </div>
