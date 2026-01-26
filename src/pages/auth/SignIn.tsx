@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, Loader2, Chrome, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +9,16 @@ import { Separator } from "@/components/ui/separator";
 
 export default function SignIn() {
     const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         // Simulate login
-        setTimeout(() => setIsLoading(false), 2000);
+        setTimeout(() => {
+            setIsLoading(false);
+            navigate("/client/dashboard");
+        }, 1500);
     };
 
     return (
