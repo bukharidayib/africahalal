@@ -95,25 +95,12 @@ export function Header() {
             {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="hidden sm:flex bg-secondary text-secondary-foreground hover:bg-secondary/90">
-                Apply Now
-                <ChevronDown className="ml-1 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem asChild>
-                <Link to="/contact">New Certification</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/contact">Renewal</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/contact">Scope Extension</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            asChild
+            className="hidden sm:flex bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-all active:scale-95"
+          >
+            <Link to="/auth/signin">Client Portal</Link>
+          </Button>
 
           {/* Mobile Menu */}
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -144,16 +131,19 @@ export function Header() {
                       key={item.path}
                       to={item.path!}
                       onClick={() => setIsOpen(false)}
-                      className={`font-medium hover:text-secondary transition-colors ${
-                        isActive(item.path!) ? "text-secondary" : ""
-                      }`}
+                      className={`font-medium hover:text-secondary transition-colors ${isActive(item.path!) ? "text-secondary" : ""
+                        }`}
                     >
                       {item.name}
                     </Link>
                   )
                 )}
-                <Button className="mt-4 bg-secondary text-secondary-foreground hover:bg-secondary/90">
-                  Apply Now
+                <Button
+                  asChild
+                  className="mt-4 bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <Link to="/auth/signin">Client Portal</Link>
                 </Button>
               </div>
             </SheetContent>

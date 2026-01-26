@@ -15,6 +15,11 @@ import Verify from "./pages/Verify";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 
+// Client Auth
+import SignIn from "./pages/auth/SignIn";
+import SignUp from "./pages/auth/SignUp";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+
 // Admin Portal
 import { AdminAuthProvider } from "./admin/contexts/AdminAuthContext";
 import AdminLogin from "./admin/pages/AdminLogin";
@@ -49,6 +54,11 @@ const App = () => (
           <Route path="/directory" element={<Directory />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/contact" element={<Contact />} />
+
+          {/* Client Auth Routes */}
+          <Route path="/auth/signin" element={<SignIn />} />
+          <Route path="/auth/signup" element={<SignUp />} />
+          <Route path="/auth/forgot-password" element={<ForgotPassword />} />
 
           {/* Admin Portal Routes */}
           <Route path="/admin/login" element={
