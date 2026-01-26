@@ -20,6 +20,14 @@ import SignIn from "./pages/auth/SignIn";
 import SignUp from "./pages/auth/SignUp";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 
+// Client Portal
+import ClientDashboard from "./pages/client/ClientDashboard";
+import CertificationApplication from "./pages/client/CertificationApplication";
+import DocumentVault from "./pages/client/DocumentVault";
+import ComplianceCenter from "./pages/client/ComplianceCenter";
+import CertificateVault from "./pages/client/CertificateVault";
+import VerifyPublic from "./pages/VerifyPublic";
+
 // Admin Portal
 import { AdminAuthProvider } from "./admin/contexts/AdminAuthContext";
 import AdminLogin from "./admin/pages/AdminLogin";
@@ -59,6 +67,14 @@ const App = () => (
           <Route path="/auth/signin" element={<SignIn />} />
           <Route path="/auth/signup" element={<SignUp />} />
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+          <Route path="/verify-certificate" element={<VerifyPublic />} />
+
+          {/* Client Portal Protected Routes (Placeholder for auth) */}
+          <Route path="/client/dashboard" element={<ClientDashboard />} />
+          <Route path="/client/apply" element={<CertificationApplication />} />
+          <Route path="/client/documents" element={<DocumentVault />} />
+          <Route path="/client/inspections" element={<ComplianceCenter />} />
+          <Route path="/client/certificates" element={<CertificateVault />} />
 
           {/* Admin Portal Routes */}
           <Route path="/admin/login" element={
