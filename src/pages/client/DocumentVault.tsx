@@ -124,7 +124,17 @@ export default function DocumentVault() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Not authenticated");
 
-            // 1. Upload to Storage
+            // 1. Get user's profile to find their organization_id
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('organization_id')
+                .eq('id', user.id)
+                .single();
+
+            if (profileError) throw new Error("Could not retrieve your profile");
+            if (!profile?.organization_id) throw new Error("No organization linked to your account. Please submit an application first.");
+
+            // 2. Upload to Storage
             const fileExt = file.name.split('.').pop();
             const fileName = `${Math.random()}.${fileExt}`;
             const filePath = `${user.id}/${fileName}`;
@@ -135,24 +145,24 @@ export default function DocumentVault() {
 
             if (uploadError) throw uploadError;
 
-            // 2. Get latest application for this user (Simplified)
+            // 3. Get latest application for this user's organization
             const { data: appData, error: appError } = await supabase
                 .from('certification_applications')
                 .select('id')
-                .eq('organization_id', user.id) // This assumes org_id = user_id for simplicity or requires join
+                .eq('organization_id', profile.organization_id)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .single();
 
-            // Note: In real app, we should probably let user select the application or 
-            // have a better way to link it. For now, we use a placeholder application or 
-            // the latest one if it exists.
+            if (appError || !appData) {
+                throw new Error("No application found. Please submit a certification application first.");
+            }
 
-            // 3. Insert record
+            // 4. Insert document record
             const { error: dbError } = await supabase
                 .from('application_documents')
                 .insert({
-                    application_id: appData?.id || '00000000-0000-0000-0000-000000000000', // Handle if no app found
+                    application_id: appData.id,
                     document_type: 'Evidence',
                     file_name: file.name,
                     file_path: filePath,
