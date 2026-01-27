@@ -68,8 +68,18 @@ export default function ComplianceCenter() {
             // Fetch CARs
             const { data: cars, error: carError } = await supabase
                 .from('corrective_actions')
-                .select('*')
-                .order('created_at', { ascending: false });
+                .select(`
+                    *,
+                    ncn:non_conformance_notices(
+                        ncn_number,
+                        description,
+                        category,
+                        severity,
+                        due_date,
+                        status
+                    )
+                `)
+                .order('submitted_at', { ascending: false });
 
             if (carError) throw carError;
             setCarItems(cars || []);
@@ -153,9 +163,9 @@ export default function ComplianceCenter() {
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm font-bold">
                                         <span>Overall Resolution</span>
-                                        <span>{carItems.length > 0 ? Math.round((carItems.filter(c => c.status === 'completed').length / carItems.length) * 100) : 0}%</span>
+                                        <span>{carItems.length > 0 ? Math.round((carItems.filter(c => c.status === 'accepted').length / carItems.length) * 100) : 0}%</span>
                                     </div>
-                                    <Progress value={carItems.length > 0 ? (carItems.filter(c => c.status === 'completed').length / carItems.length) * 100 : 0} className="h-2" />
+                                    <Progress value={carItems.length > 0 ? (carItems.filter(c => c.status === 'accepted').length / carItems.length) * 100 : 0} className="h-2" />
                                 </div>
                             </CardContent>
                         </Card>
@@ -184,35 +194,35 @@ export default function ComplianceCenter() {
                             <Card key={car.id} className="border-none shadow-sm hover:shadow-md transition-all group overflow-hidden">
                                 <CardContent className="p-0">
                                     <div className="flex flex-col md:flex-row">
-                                        <div className={`w-full md:w-2 ${car.severity === 'major' ? 'bg-destructive' : 'bg-amber-500'
+                                        <div className={`w-full md:w-2 ${car.ncn?.severity === 'major' || car.ncn?.severity === 'critical' ? 'bg-destructive' : 'bg-amber-500'
                                             }`} />
                                         <div className="flex-1 p-6">
                                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                                                 <div className="space-y-1">
                                                     <div className="flex items-center gap-2">
-                                                        <Badge variant={car.severity === 'major' ? 'destructive' : 'secondary'} className="text-[9px] uppercase tracking-widest">
-                                                            {car.severity}
+                                                        <Badge variant={car.ncn?.severity === 'major' || car.ncn?.severity === 'critical' ? 'destructive' : 'secondary'} className="text-[9px] uppercase tracking-widest">
+                                                            {car.ncn?.severity || 'unknown'}
                                                         </Badge>
-                                                        <span className="text-xs font-mono text-muted-foreground">{car.id.split('-')[0]}</span>
+                                                        <span className="text-xs font-mono text-muted-foreground">{car.ncn?.ncn_number || car.id.split('-')[0]}</span>
                                                     </div>
-                                                    <h3 className="text-lg font-bold mt-1 group-hover:text-primary transition-colors">{car.description}</h3>
+                                                    <h3 className="text-lg font-bold mt-1 group-hover:text-primary transition-colors">{car.ncn?.description || 'No description'}</h3>
                                                     <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-2">
                                                         <ArrowRight className="h-3.5 w-3.5 text-secondary" />
-                                                        <span className="font-semibold text-foreground">Action required:</span> {car.required_action}
+                                                        <span className="font-semibold text-foreground">Response:</span> {car.response || 'No response yet'}
                                                     </p>
                                                 </div>
                                                 <div className="text-right flex flex-col items-end gap-3 min-w-[140px]">
-                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${car.status === 'completed' ? 'bg-green-500/10 text-green-600' :
-                                                        car.status === 'in_progress' ? 'bg-blue-500/10 text-blue-600' :
+                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${car.status === 'accepted' ? 'bg-green-500/10 text-green-600' :
+                                                        car.status === 'under_review' ? 'bg-blue-500/10 text-blue-600' :
                                                             'bg-amber-500/10 text-amber-600'
                                                         }`}>
-                                                        {car.status === 'completed' ? <CheckCircle2 className="mr-1.5 h-3 h-3" /> : <Clock className="mr-1.5 h-3 h-3" />}
+                                                        {car.status === 'accepted' ? <CheckCircle2 className="mr-1.5 h-3 h-3" /> : <Clock className="mr-1.5 h-3 h-3" />}
                                                         {car.status.replace('_', ' ')}
                                                     </span>
                                                     <div className="text-xs font-mono text-muted-foreground">
-                                                        DUE: <span className="font-bold text-foreground">{new Date(car.due_date).toLocaleDateString()}</span>
+                                                        DUE: <span className="font-bold text-foreground">{car.ncn?.due_date ? new Date(car.ncn.due_date).toLocaleDateString() : 'N/A'}</span>
                                                     </div>
-                                                    {car.status === 'open' ? (
+                                                    {car.status === 'pending' ? (
                                                         <Button size="sm" className="bg-primary text-white hover:bg-primary/90 shadow h-8" asChild>
                                                             <Link to="/client/documents">
                                                                 <Upload className="mr-2 h-3.5 w-3.5" />
