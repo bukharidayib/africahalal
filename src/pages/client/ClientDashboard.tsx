@@ -5,7 +5,6 @@ import {
     AlertTriangle,
     FileText,
     ArrowRight,
-    ChevronRight,
     Calendar,
     ShieldCheck,
     CheckCircle2,
@@ -16,14 +15,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { ApplicationTracker } from "@/components/ApplicationTracker";
 
 interface Alert {
-    id: number;
+    id: string;
     type: "warning" | "critical";
     title: string;
     message: string;
@@ -32,30 +31,18 @@ interface Alert {
     icon: typeof ClockIcon;
 }
 
-const staticAlerts: Alert[] = [
-    {
-        id: 1,
-        type: "warning",
-        title: "Document Expiry",
-        message: "Your 'Supplier Halal Declaration' for Raw Meat is expiring in 15 days.",
-        cta: "Renew Now",
-        ctaLink: "/client/documents",
-        icon: ClockIcon,
-    },
-    {
-        id: 2,
-        type: "critical",
-        title: "Corrective Action Required",
-        message: "Inspection on 20 Jan revealed non-compliance in Sanitation Protocol (NCN-001).",
-        cta: "View Issues",
-        ctaLink: "/client/inspections",
-        icon: AlertTriangle,
-    },
-];
+interface DocumentItem {
+    id: string;
+    document_type: string;
+    file_name: string;
+    uploaded_at: string;
+}
 
 export default function ClientDashboard() {
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [organizationName, setOrganizationName] = useState<string | null>(null);
+    const [userName, setUserName] = useState<string | null>(null);
     const [stats, setStats] = useState({
         active: 0,
         pending: 0,
@@ -64,7 +51,8 @@ export default function ClientDashboard() {
     });
     const [apps, setApps] = useState<any[]>([]);
     const [activeCert, setActiveCert] = useState<any>(null);
-    const [alerts, setAlerts] = useState<Alert[]>(staticAlerts);
+    const [alerts, setAlerts] = useState<Alert[]>([]);
+    const [recentDocs, setRecentDocs] = useState<DocumentItem[]>([]);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -88,10 +76,36 @@ export default function ClientDashboard() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Fetch Apps
+            // Fetch user profile and organization
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('full_name, organization_id')
+                .eq('id', user.id)
+                .single();
+
+            if (profile) {
+                setUserName(profile.full_name);
+                
+                if (profile.organization_id) {
+                    const { data: org } = await supabase
+                        .from('organizations')
+                        .select('name')
+                        .eq('id', profile.organization_id)
+                        .single();
+                    
+                    if (org) {
+                        setOrganizationName(org.name);
+                    }
+                }
+            }
+
+            // Fetch Applications with organization data
             const { data: applications, error: appError } = await supabase
                 .from('certification_applications')
-                .select('*')
+                .select(`
+                    *,
+                    organizations (name)
+                `)
                 .order('created_at', { ascending: false });
 
             if (appError) throw appError;
@@ -120,6 +134,41 @@ export default function ClientDashboard() {
                 total: certs?.length || 0
             });
 
+            // Fetch real alerts from NCNs
+            const dynamicAlerts: Alert[] = [];
+
+            // Open NCNs as critical alerts
+            const { data: ncns } = await supabase
+                .from('non_conformance_notices')
+                .select('id, ncn_number, description, severity')
+                .eq('status', 'open')
+                .limit(3);
+
+            if (ncns && ncns.length > 0) {
+                ncns.forEach(ncn => {
+                    dynamicAlerts.push({
+                        id: ncn.id,
+                        type: ncn.severity === 'critical' ? 'critical' : 'warning',
+                        title: `NCN ${ncn.ncn_number}`,
+                        message: ncn.description.substring(0, 100) + (ncn.description.length > 100 ? '...' : ''),
+                        cta: 'View Details',
+                        ctaLink: '/client/inspections',
+                        icon: AlertTriangle,
+                    });
+                });
+            }
+
+            setAlerts(dynamicAlerts);
+
+            // Fetch recent documents
+            const { data: docs } = await supabase
+                .from('application_documents')
+                .select('id, document_type, file_name, uploaded_at')
+                .order('uploaded_at', { ascending: false })
+                .limit(4);
+
+            setRecentDocs(docs || []);
+
         } catch (error: any) {
             toast({
                 variant: "destructive",
@@ -130,6 +179,7 @@ export default function ClientDashboard() {
             setIsLoading(false);
         }
     };
+
     return (
         <ClientLayout>
             <div className="space-y-8 animate-in fade-in duration-500">
@@ -137,7 +187,7 @@ export default function ClientDashboard() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold font-serif tracking-tight text-foreground">
-                            Marhaban, African Halal
+                            Marhaban, {organizationName || userName || 'Welcome'}
                         </h1>
                         <p className="text-muted-foreground mt-1 text-sm">
                             Here is what's happening with your certification journey today.
@@ -268,127 +318,51 @@ export default function ClientDashboard() {
                     </Card>
                 </div>
 
-                {/* Bottom Section: Active Applications & Recent Docs */}
+                {/* Bottom Section: Application Tracker & Recent Docs */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Ongoing Applications */}
+                    {/* Application Tracker */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-bold font-serif text-foreground">Ongoing Applications</h3>
+                            <h3 className="text-xl font-bold font-serif text-foreground">Application Tracker</h3>
                             <Button variant="link" size="sm" className="text-primary font-bold" asChild>
-                                <Link to="/client/documents">View History</Link>
+                                <Link to="/client/apply">New Application</Link>
                             </Button>
                         </div>
-                        <div className="space-y-4">
-                            {isLoading ? (
-                                <div className="text-center py-8 text-muted-foreground">
-                                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                                    <p className="text-xs">Loading applications...</p>
-                                </div>
-                            ) : apps.length === 0 ? (
-                                <div className="text-center py-8 border-2 border-dashed rounded-xl bg-card">
-                                    <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                                    <p className="text-muted-foreground text-sm">No active applications.</p>
-                                    <Button variant="link" size="sm" className="mt-2" asChild>
-                                        <Link to="/client/apply">Start New Application</Link>
-                                    </Button>
-                                </div>
-                            ) : apps.slice(0, 3).map((app) => (
-                                <Card 
-                                    key={app.id} 
-                                    className="overflow-hidden border shadow-md hover:shadow-lg transition-all group cursor-pointer"
-                                    onClick={() => {
-                                        toast({
-                                            title: `Application ${app.application_number}`,
-                                            description: `Status: ${app.status} • Scope: ${app.scope}`,
-                                        });
-                                    }}
-                                >
-                                    <div className="h-1 bg-muted">
-                                        <Progress 
-                                            value={
-                                                app.status === 'draft' ? 20 :
-                                                app.status === 'submitted' ? 40 :
-                                                app.status === 'under_review' ? 60 :
-                                                app.status === 'awaiting_inspection' ? 70 :
-                                                app.status === 'inspection_complete' ? 80 :
-                                                app.status === 'pending_decision' ? 90 :
-                                                app.status === 'approved' ? 100 : 50
-                                            } 
-                                            className="h-full rounded-none" 
-                                        />
-                                    </div>
-                                    <CardContent className="p-5">
-                                        <div className="flex items-start justify-between">
-                                            <div>
-                                                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded uppercase font-bold">{app.application_number}</span>
-                                                <h4 className="font-bold text-foreground mt-2 group-hover:text-primary transition-colors">{app.application_type}</h4>
-                                                <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                                                    <Calendar className="h-3.5 w-3.5" />
-                                                    {new Date(app.created_at).toLocaleDateString()}
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                                                    app.status === 'approved' ? 'bg-green-500/10 text-green-600' :
-                                                    app.status === 'rejected' ? 'bg-destructive/10 text-destructive' :
-                                                    'bg-primary/10 text-primary'
-                                                }`}>
-                                                    {app.status?.replace(/_/g, ' ')}
-                                                </span>
-                                                <div className="flex items-center justify-end mt-4 text-xs font-bold text-muted-foreground group-hover:text-primary transition-colors">
-                                                    Details
-                                                    <ChevronRight className="ml-1 h-4 w-4" />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
+                        <ApplicationTracker applications={apps.slice(0, 3)} isLoading={isLoading} />
                     </div>
 
                     {/* Quick Documents View */}
                     <div className="space-y-4">
                         <h3 className="text-xl font-bold font-serif">Compliance Snapshot</h3>
                         <Card className="border-none shadow-md overflow-hidden">
-                            <div className="divide-y border-t border-border/50">
-                                <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 rounded bg-green-500/10 text-green-600">
-                                            <CheckCircle2 className="h-4 w-4" />
-                                        </div>
-                                        <span className="text-sm font-medium">Process Flow Diagrams</span>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground font-mono">VERIFIED</span>
+                            {isLoading ? (
+                                <div className="p-8 text-center">
+                                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                 </div>
-                                <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 rounded bg-green-500/10 text-green-600">
-                                            <CheckCircle2 className="h-4 w-4" />
-                                        </div>
-                                        <span className="text-sm font-medium">Ingredient Manifest</span>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground font-mono">VERIFIED</span>
+                            ) : recentDocs.length === 0 ? (
+                                <div className="p-8 text-center text-muted-foreground">
+                                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                                    <p className="text-sm">No documents uploaded yet.</p>
                                 </div>
-                                <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 rounded bg-amber-500/10 text-amber-600">
-                                            <ClockIcon className="h-4 w-4" />
+                            ) : (
+                                <div className="divide-y border-t border-border/50">
+                                    {recentDocs.map((doc) => (
+                                        <div key={doc.id} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 rounded bg-primary/10 text-primary">
+                                                    <CheckCircle2 className="h-4 w-4" />
+                                                </div>
+                                                <span className="text-sm font-medium">{doc.document_type || doc.file_name}</span>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground font-mono">
+                                                {new Date(doc.uploaded_at).toLocaleDateString('en-GB', { 
+                                                    day: '2-digit', month: 'short' 
+                                                })}
+                                            </span>
                                         </div>
-                                        <span className="text-sm font-medium">Cleaning Logs - Q1 2026</span>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground font-mono">UNDER REVIEW</span>
+                                    ))}
                                 </div>
-                                <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 rounded bg-destructive/10 text-destructive">
-                                            <XCircle className="h-4 w-4" />
-                                        </div>
-                                        <span className="text-sm font-medium">Supplier Audit (External)</span>
-                                    </div>
-                                    <span className="text-xs text-destructive font-bold font-mono">EXPIRED</span>
-                                </div>
-                            </div>
+                            )}
                             <div className="p-4 bg-muted/20 text-center">
                                 <Button variant="outline" className="w-full text-xs font-bold" asChild>
                                     <Link to="/client/documents">Manage All Documents</Link>
