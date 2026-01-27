@@ -9,7 +9,10 @@ import {
     Building2,
     FileBadge,
     BadgeCheck,
-    ClipboardList
+    ClipboardList,
+    Plus,
+    Trash2,
+    Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,6 +30,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 const steps = [
     { id: 1, name: "Establishment Details", icon: Building2 },
@@ -35,9 +46,17 @@ const steps = [
     { id: 4, name: "Declaration", icon: BadgeCheck },
 ];
 
+interface ProductItem {
+    id: string;
+    name: string;
+    brand: string;
+    category: string;
+}
+
 export default function CertificationApplication() {
     const [currentStep, setCurrentStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
+    const [isAddItemOpen, setIsAddItemOpen] = useState(false);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -49,12 +68,22 @@ export default function CertificationApplication() {
         employees: "",
         country: "",
         categories: [] as string[],
-        products: [] as { name: string, brand: string }[],
+        products: [] as ProductItem[],
         declaration_confirmed: false,
+        declaration_compliance: false,
         signature: ""
     });
 
+    // New product form state
+    const [newProduct, setNewProduct] = useState({
+        name: "",
+        brand: "",
+        category: ""
+    });
+
     const handleNext = () => {
+        // Validate current step before proceeding
+        if (!validateStep(currentStep)) return;
         if (currentStep < steps.length) setCurrentStep(currentStep + 1);
     };
 
@@ -62,16 +91,95 @@ export default function CertificationApplication() {
         if (currentStep > 1) setCurrentStep(currentStep - 1);
     };
 
+    const validateStep = (step: number): boolean => {
+        switch (step) {
+            case 1:
+                if (!formData.entity_name || !formData.registration_number || !formData.address || !formData.country) {
+                    toast({
+                        variant: "destructive",
+                        title: "Missing Information",
+                        description: "Please fill in all required fields before proceeding.",
+                    });
+                    return false;
+                }
+                return true;
+            case 2:
+                if (formData.categories.length === 0) {
+                    toast({
+                        variant: "destructive",
+                        title: "Certification Scope Required",
+                        description: "Please select at least one certification category.",
+                    });
+                    return false;
+                }
+                return true;
+            case 3:
+                if (formData.products.length === 0) {
+                    toast({
+                        variant: "destructive",
+                        title: "Products Required",
+                        description: "Please add at least one product or service to certify.",
+                    });
+                    return false;
+                }
+                return true;
+            default:
+                return true;
+        }
+    };
+
     const updateFormData = (field: string, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
+    const handleAddProduct = () => {
+        if (!newProduct.name || !newProduct.brand) {
+            toast({
+                variant: "destructive",
+                title: "Missing Information",
+                description: "Please enter product name and brand.",
+            });
+            return;
+        }
+
+        const product: ProductItem = {
+            id: crypto.randomUUID(),
+            name: newProduct.name,
+            brand: newProduct.brand,
+            category: newProduct.category || "General"
+        };
+
+        setFormData(prev => ({
+            ...prev,
+            products: [...prev.products, product]
+        }));
+
+        setNewProduct({ name: "", brand: "", category: "" });
+        setIsAddItemOpen(false);
+
+        toast({
+            title: "Product Added",
+            description: `${product.name} has been added to your application.`,
+        });
+    };
+
+    const handleRemoveProduct = (productId: string) => {
+        setFormData(prev => ({
+            ...prev,
+            products: prev.products.filter(p => p.id !== productId)
+        }));
+        toast({
+            title: "Product Removed",
+            description: "The product has been removed from your application.",
+        });
+    };
+
     const handleSubmit = async () => {
-        if (!formData.declaration_confirmed || !formData.signature) {
+        if (!formData.declaration_confirmed || !formData.declaration_compliance || !formData.signature) {
             toast({
                 variant: "destructive",
                 title: "Declaration Required",
-                description: "Please confirm the declaration and sign before submitting.",
+                description: "Please confirm both declarations and sign before submitting.",
             });
             return;
         }
@@ -81,36 +189,57 @@ export default function CertificationApplication() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not authenticated");
 
-            // 1. Get organization (or create/find)
-            const { data: orgData, error: orgError } = await supabase
-                .from('organizations')
-                .select('id')
-                .eq('registration_number', formData.registration_number)
+            // Get user's profile to check for organization
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('organization_id')
+                .eq('id', user.id)
                 .single();
 
-            let organization_id = orgData?.id;
+            let organization_id = profile?.organization_id;
 
-            if (orgError && orgError.code === 'PGRST116') {
-                // Create org if doesn't exist
-                const { data: newOrg, error: createError } = await supabase
+            // If no organization, try to find or create one
+            if (!organization_id) {
+                const { data: orgData, error: orgError } = await supabase
                     .from('organizations')
-                    .insert({
-                        name: formData.entity_name,
-                        registration_number: formData.registration_number,
-                        sector: formData.categories[0] || "General",
-                        address: formData.address,
-                        country: formData.country
-                    })
                     .select('id')
+                    .eq('registration_number', formData.registration_number)
                     .single();
 
-                if (createError) throw createError;
-                organization_id = newOrg.id;
-            } else if (orgError) {
-                throw orgError;
+                if (orgError && orgError.code === 'PGRST116') {
+                    // Create org if doesn't exist
+                    const { data: newOrg, error: createError } = await supabase
+                        .from('organizations')
+                        .insert({
+                            name: formData.entity_name,
+                            registration_number: formData.registration_number,
+                            sector: formData.categories[0] || "General",
+                            address: formData.address,
+                            country: formData.country
+                        })
+                        .select('id')
+                        .single();
+
+                    if (createError) throw createError;
+                    organization_id = newOrg.id;
+
+                    // Link user to organization
+                    await supabase
+                        .from('profiles')
+                        .update({ organization_id })
+                        .eq('id', user.id);
+                } else if (orgError) {
+                    throw orgError;
+                } else {
+                    organization_id = orgData.id;
+                }
             }
 
-            // 2. Insert Application
+            // Generate application number
+            const { data: appNumberData } = await supabase.rpc('generate_application_number');
+            const applicationNumber = appNumberData || `APP-${Date.now()}`;
+
+            // Insert Application
             const { data: appData, error: appError } = await supabase
                 .from('certification_applications')
                 .insert({
@@ -118,28 +247,34 @@ export default function CertificationApplication() {
                     application_type: "Full Certification",
                     sector: formData.categories[0] || "General",
                     scope: formData.categories.join(', '),
-                    application_number: `APP-${Math.floor(1000 + Math.random() * 9000)}`,
-                    status: 'submitted'
+                    application_number: applicationNumber,
+                    status: 'submitted',
+                    submitted_at: new Date().toISOString()
                 })
                 .select('id')
                 .single();
 
             if (appError) throw appError;
 
-            // 3. Log Audit
+            // Log Audit
             await supabase.rpc('log_audit', {
                 _action: 'application_submitted',
                 _resource_type: 'certification_applications',
                 _resource_id: appData.id,
-                _metadata: { step: 'submission' }
+                _metadata: { 
+                    step: 'submission',
+                    products_count: formData.products.length,
+                    categories: formData.categories
+                }
             });
 
             toast({
                 title: "Application Submitted Successfully",
-                description: "Your application has been locked and sent to AHI for review.",
+                description: `Application ${applicationNumber} has been sent for review.`,
             });
             navigate("/client/dashboard");
         } catch (error: any) {
+            console.error('Submission error:', error);
             toast({
                 variant: "destructive",
                 title: "Submission Failed",
@@ -155,7 +290,7 @@ export default function CertificationApplication() {
             <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {/* Header */}
                 <div>
-                    <h1 className="text-3xl font-bold font-serif tracking-tight">Certification Application</h1>
+                    <h1 className="text-3xl font-bold font-serif tracking-tight text-foreground">Certification Application</h1>
                     <p className="text-muted-foreground mt-1">Please provide accurate information. This application is legally binding.</p>
                 </div>
 
@@ -170,7 +305,7 @@ export default function CertificationApplication() {
                                 <div className="group relative flex flex-col items-center">
                                     <span className="flex h-10 items-center justify-center">
                                         <span className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300 ${currentStep > step.id
-                                            ? "bg-primary border-primary text-white"
+                                            ? "bg-primary border-primary text-primary-foreground"
                                             : currentStep === step.id
                                                 ? "bg-card border-secondary text-secondary ring-4 ring-secondary/10"
                                                 : "bg-card border-muted text-muted-foreground"
@@ -178,7 +313,7 @@ export default function CertificationApplication() {
                                             {currentStep > step.id ? <Check className="h-6 w-6" /> : <step.icon className="h-5 w-5" />}
                                         </span>
                                     </span>
-                                    <span className="mt-2 text-[10px] font-bold uppercase tracking-widest text-center">
+                                    <span className="mt-2 text-[10px] font-bold uppercase tracking-widest text-center text-foreground">
                                         {step.name}
                                     </span>
                                 </div>
@@ -188,13 +323,14 @@ export default function CertificationApplication() {
                 </nav>
 
                 {/* Content */}
-                <Card className="border-none shadow-xl">
+                <Card className="border shadow-xl bg-card">
                     <CardContent className="p-8">
+                        {/* Step 1: Establishment Details */}
                         {currentStep === 1 && (
                             <div className="space-y-6 animate-in fade-in duration-300">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <Label htmlFor="entity">Registered Entity Name</Label>
+                                        <Label htmlFor="entity" className="text-foreground">Registered Entity Name *</Label>
                                         <Input
                                             id="entity"
                                             placeholder="Full Legal Name"
@@ -205,7 +341,7 @@ export default function CertificationApplication() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="reg">Business Registration No.</Label>
+                                        <Label htmlFor="reg" className="text-foreground">Business Registration No. *</Label>
                                         <Input
                                             id="reg"
                                             placeholder="e.g. REG-12345"
@@ -216,7 +352,7 @@ export default function CertificationApplication() {
                                         />
                                     </div>
                                     <div className="space-y-2 md:col-span-2">
-                                        <Label htmlFor="address">Physical Address of establishment</Label>
+                                        <Label htmlFor="address" className="text-foreground">Physical Address of Establishment *</Label>
                                         <Textarea
                                             id="address"
                                             placeholder="Factory / Facility Location"
@@ -227,18 +363,19 @@ export default function CertificationApplication() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="employees">Total Employees</Label>
+                                        <Label htmlFor="employees" className="text-foreground">Total Employees</Label>
                                         <Input
                                             id="employees"
                                             type="number"
                                             className="h-11"
+                                            placeholder="e.g. 50"
                                             value={formData.employees}
                                             onChange={(e) => updateFormData('employees', e.target.value)}
                                             disabled={isLoading}
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="country">Operating Country</Label>
+                                        <Label htmlFor="country" className="text-foreground">Operating Country *</Label>
                                         <Select
                                             value={formData.country}
                                             onValueChange={(v) => updateFormData('country', v)}
@@ -248,10 +385,15 @@ export default function CertificationApplication() {
                                                 <SelectValue placeholder="Select Country" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="ghana">Ghana</SelectItem>
-                                                <SelectItem value="nigeria">Nigeria</SelectItem>
-                                                <SelectItem value="southafrica">South Africa</SelectItem>
-                                                <SelectItem value="kenya">Kenya</SelectItem>
+                                                <SelectItem value="South Africa">South Africa</SelectItem>
+                                                <SelectItem value="Ghana">Ghana</SelectItem>
+                                                <SelectItem value="Nigeria">Nigeria</SelectItem>
+                                                <SelectItem value="Kenya">Kenya</SelectItem>
+                                                <SelectItem value="Tanzania">Tanzania</SelectItem>
+                                                <SelectItem value="Uganda">Uganda</SelectItem>
+                                                <SelectItem value="Ethiopia">Ethiopia</SelectItem>
+                                                <SelectItem value="Egypt">Egypt</SelectItem>
+                                                <SelectItem value="Morocco">Morocco</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -259,16 +401,17 @@ export default function CertificationApplication() {
                             </div>
                         )}
 
+                        {/* Step 2: Certification Scope */}
                         {currentStep === 2 && (
                             <div className="space-y-6 animate-in fade-in duration-300">
                                 <div className="bg-primary/5 p-4 rounded-lg flex gap-3 items-start border border-primary/10">
-                                    <Info className="h-5 w-5 text-primary mt-0.5" />
+                                    <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                                     <p className="text-sm text-primary/80">
                                         The scope determines the inspection criteria and technical requirements for your entity.
                                     </p>
                                 </div>
                                 <div className="space-y-4">
-                                    <Label>Select Certification Category</Label>
+                                    <Label className="text-foreground">Select Certification Category (select all that apply) *</Label>
                                     {[
                                         "Food Processing / Manufacturing",
                                         "Meat & Poultry Abattoir",
@@ -278,7 +421,9 @@ export default function CertificationApplication() {
                                     ].map((cat) => (
                                         <div
                                             key={cat}
-                                            className="flex items-center space-x-3 p-3 border rounded-lg hover:border-primary/50 transition-colors cursor-pointer group"
+                                            className={`flex items-center space-x-3 p-4 border rounded-lg hover:border-primary/50 transition-colors cursor-pointer group ${
+                                                formData.categories.includes(cat) ? 'border-primary bg-primary/5' : 'border-border'
+                                            }`}
                                             onClick={() => {
                                                 const current = formData.categories;
                                                 const next = current.includes(cat)
@@ -289,22 +434,35 @@ export default function CertificationApplication() {
                                         >
                                             <Checkbox
                                                 id={cat}
-                                                className="data-[state=checked]:bg-primary"
+                                                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                                                 checked={formData.categories.includes(cat)}
+                                                onCheckedChange={() => {}}
                                             />
-                                            <label htmlFor={cat} className="text-sm font-medium leading-none cursor-pointer flex-1">{cat}</label>
+                                            <label htmlFor={cat} className="text-sm font-medium leading-none cursor-pointer flex-1 text-foreground">{cat}</label>
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         )}
 
+                        {/* Step 3: Product Information */}
                         {currentStep === 3 && (
                             <div className="space-y-6 animate-in fade-in duration-300">
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
-                                        <Label>Product/Service List</Label>
-                                        <Button variant="outline" size="sm" className="text-xs">Add Item +</Button>
+                                        <div>
+                                            <Label className="text-foreground text-base">Product/Service List *</Label>
+                                            <p className="text-sm text-muted-foreground mt-1">Add all products or services to be covered under this certification.</p>
+                                        </div>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="gap-2"
+                                            onClick={() => setIsAddItemOpen(true)}
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                            Add Item
+                                        </Button>
                                     </div>
                                     <div className="border rounded-lg overflow-hidden">
                                         <table className="w-full text-sm">
@@ -312,55 +470,93 @@ export default function CertificationApplication() {
                                                 <tr>
                                                     <th className="px-4 py-3 text-left font-semibold">Product Name</th>
                                                     <th className="px-4 py-3 text-left font-semibold">Brand</th>
+                                                    <th className="px-4 py-3 text-left font-semibold">Category</th>
                                                     <th className="px-4 py-3 text-right font-semibold">Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <tr className="border-t">
-                                                    <td className="px-4 py-3">Frozen Beef Patties</td>
-                                                    <td className="px-4 py-3">Sarah Foods</td>
-                                                    <td className="px-4 py-3 text-right">
-                                                        <Button variant="ghost" size="sm" className="text-red-500">Remove</Button>
-                                                    </td>
-                                                </tr>
-                                                <tr className="border-t bg-muted/5">
-                                                    <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground italic">
-                                                        Add more products to complete your certification scope.
-                                                    </td>
-                                                </tr>
+                                                {formData.products.length === 0 ? (
+                                                    <tr className="border-t bg-muted/20">
+                                                        <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                                                            <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                                            <p className="italic">No products added yet.</p>
+                                                            <p className="text-xs mt-1">Click "Add Item" to add products to your certification scope.</p>
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    formData.products.map((product) => (
+                                                        <tr key={product.id} className="border-t hover:bg-muted/30 transition-colors">
+                                                            <td className="px-4 py-3 font-medium text-foreground">{product.name}</td>
+                                                            <td className="px-4 py-3 text-muted-foreground">{product.brand}</td>
+                                                            <td className="px-4 py-3 text-muted-foreground">{product.category}</td>
+                                                            <td className="px-4 py-3 text-right">
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="sm" 
+                                                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                                    onClick={() => handleRemoveProduct(product.id)}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4 mr-1" />
+                                                                    Remove
+                                                                </Button>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>
+                                    {formData.products.length > 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {formData.products.length} product(s) added to certification scope.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         )}
 
+                        {/* Step 4: Declaration */}
                         {currentStep === 4 && (
                             <div className="space-y-6 animate-in fade-in duration-300">
                                 <div className="space-y-4 border rounded-xl p-6 bg-muted/20">
-                                    <h3 className="font-bold text-lg font-serif">Legal Declaration</h3>
+                                    <h3 className="font-bold text-lg font-serif text-foreground">Legal Declaration</h3>
                                     <div className="space-y-4">
-                                        <div className="flex items-start space-x-3">
+                                        <div 
+                                            className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                                                formData.declaration_confirmed ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                                            }`}
+                                            onClick={() => updateFormData('declaration_confirmed', !formData.declaration_confirmed)}
+                                        >
                                             <Checkbox
                                                 id="dec1"
-                                                className="mt-1"
+                                                className="mt-1 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                                                 checked={formData.declaration_confirmed}
                                                 onCheckedChange={(checked) => updateFormData('declaration_confirmed', checked === true)}
                                             />
-                                            <label htmlFor="dec1" className="text-sm leading-relaxed cursor-pointer">
-                                                I hereby declare that all information provided in this application is true and correct to the best of my knowledge.
+                                            <label htmlFor="dec1" className="text-sm leading-relaxed cursor-pointer text-foreground">
+                                                I hereby declare that all information provided in this application is true and correct to the best of my knowledge. I understand that providing false information may result in rejection or revocation of certification.
                                             </label>
                                         </div>
-                                        <div className="flex items-start space-x-3">
-                                            <Checkbox id="dec2" className="mt-1" defaultChecked />
-                                            <label htmlFor="dec2" className="text-sm leading-relaxed cursor-pointer">
-                                                I agree to comply with the AHI Halal Standards and allow inspection visits as per the certification procedure.
+                                        <div 
+                                            className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                                                formData.declaration_compliance ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                                            }`}
+                                            onClick={() => updateFormData('declaration_compliance', !formData.declaration_compliance)}
+                                        >
+                                            <Checkbox 
+                                                id="dec2" 
+                                                className="mt-1 data-[state=checked]:bg-primary data-[state=checked]:border-primary" 
+                                                checked={formData.declaration_compliance}
+                                                onCheckedChange={(checked) => updateFormData('declaration_compliance', checked === true)}
+                                            />
+                                            <label htmlFor="dec2" className="text-sm leading-relaxed cursor-pointer text-foreground">
+                                                I agree to comply with the AHI Halal Standards and allow inspection visits as per the certification procedure. I understand that certification is subject to ongoing compliance.
                                             </label>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Electronic Signature (Full Name)</Label>
+                                    <Label className="text-foreground">Electronic Signature (Full Name) *</Label>
                                     <Input
                                         placeholder="Type your full legal name"
                                         className="h-11 font-serif text-lg italic"
@@ -368,6 +564,26 @@ export default function CertificationApplication() {
                                         onChange={(e) => updateFormData('signature', e.target.value)}
                                         disabled={isLoading}
                                     />
+                                    <p className="text-xs text-muted-foreground">
+                                        By typing your name above, you acknowledge this as your electronic signature.
+                                    </p>
+                                </div>
+
+                                {/* Summary */}
+                                <div className="mt-6 p-4 bg-muted/30 rounded-lg border">
+                                    <h4 className="font-semibold text-sm mb-3 text-foreground">Application Summary</h4>
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                        <span className="text-muted-foreground">Entity:</span>
+                                        <span className="text-foreground">{formData.entity_name || "Not provided"}</span>
+                                        <span className="text-muted-foreground">Registration:</span>
+                                        <span className="text-foreground">{formData.registration_number || "Not provided"}</span>
+                                        <span className="text-muted-foreground">Country:</span>
+                                        <span className="text-foreground">{formData.country || "Not provided"}</span>
+                                        <span className="text-muted-foreground">Categories:</span>
+                                        <span className="text-foreground">{formData.categories.length} selected</span>
+                                        <span className="text-muted-foreground">Products:</span>
+                                        <span className="text-foreground">{formData.products.length} items</span>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -377,7 +593,7 @@ export default function CertificationApplication() {
                             <Button
                                 variant="ghost"
                                 onClick={handleBack}
-                                disabled={currentStep === 1}
+                                disabled={currentStep === 1 || isLoading}
                                 className="h-11 font-bold group"
                             >
                                 <ChevronLeft className="mr-2 h-5 w-5 group-hover:-translate-x-1 transition-transform" />
@@ -387,7 +603,8 @@ export default function CertificationApplication() {
                             {currentStep < steps.length ? (
                                 <Button
                                     onClick={handleNext}
-                                    className="h-11 bg-primary text-white hover:bg-primary/90 font-bold group"
+                                    disabled={isLoading}
+                                    className="h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-bold group"
                                 >
                                     Continue
                                     <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
@@ -395,10 +612,20 @@ export default function CertificationApplication() {
                             ) : (
                                 <Button
                                     onClick={handleSubmit}
+                                    disabled={isLoading}
                                     className="h-11 bg-secondary text-secondary-foreground hover:bg-secondary/90 font-bold px-8 shadow-lg shadow-secondary/20"
                                 >
-                                    Final Submit & Lock
-                                    <Upload className="ml-2 h-4 w-4" />
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Submitting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            Final Submit & Lock
+                                            <Upload className="ml-2 h-4 w-4" />
+                                        </>
+                                    )}
                                 </Button>
                             )}
                         </div>
@@ -410,6 +637,68 @@ export default function CertificationApplication() {
                     ⚠️ Notice: Once submitted, applications cannot be edited without formal written request.
                 </p>
             </div>
+
+            {/* Add Item Dialog */}
+            <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Add Product/Service</DialogTitle>
+                        <DialogDescription>
+                            Enter the details of the product or service to be certified.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="product-name">Product/Service Name *</Label>
+                            <Input
+                                id="product-name"
+                                placeholder="e.g. Frozen Beef Patties"
+                                value={newProduct.name}
+                                onChange={(e) => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="product-brand">Brand Name *</Label>
+                            <Input
+                                id="product-brand"
+                                placeholder="e.g. Sarah Foods"
+                                value={newProduct.brand}
+                                onChange={(e) => setNewProduct(prev => ({ ...prev, brand: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="product-category">Category</Label>
+                            <Select
+                                value={newProduct.category}
+                                onValueChange={(v) => setNewProduct(prev => ({ ...prev, category: v }))}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Food & Beverages">Food & Beverages</SelectItem>
+                                    <SelectItem value="Meat & Poultry">Meat & Poultry</SelectItem>
+                                    <SelectItem value="Dairy Products">Dairy Products</SelectItem>
+                                    <SelectItem value="Processed Foods">Processed Foods</SelectItem>
+                                    <SelectItem value="Cosmetics">Cosmetics</SelectItem>
+                                    <SelectItem value="Pharmaceuticals">Pharmaceuticals</SelectItem>
+                                    <SelectItem value="Services">Services</SelectItem>
+                                    <SelectItem value="Other">Other</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setIsAddItemOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleAddProduct}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Product
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </ClientLayout>
     );
 }
