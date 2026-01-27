@@ -1,7 +1,7 @@
 import { ClientLayout } from "@/components/layout/ClientLayout";
 import {
     BadgeCheck,
-    Clock,
+    Clock as ClockIcon,
     AlertTriangle,
     FileText,
     ArrowRight,
@@ -10,7 +10,7 @@ import {
     ShieldCheck,
     CheckCircle2,
     XCircle,
-    History
+    History as HistoryIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -24,7 +24,7 @@ const alerts = [
         title: "Document Expiry",
         message: "Your 'Supplier Halal Declaration' for Raw Meat is expiring in 15 days.",
         cta: "Renew Now",
-        icon: Clock,
+        icon: ClockIcon,
     },
     {
         id: 2,
@@ -143,7 +143,7 @@ export default function ClientDashboard() {
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Active</span>
                             </div>
                             <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-muted/30 border border-border/50">
-                                <Clock className="h-6 w-6 text-secondary mb-2" />
+                                <ClockIcon className="h-6 w-6 text-secondary mb-2" />
                                 <span className="text-2xl font-bold">02</span>
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Pending</span>
                             </div>
@@ -153,7 +153,7 @@ export default function ClientDashboard() {
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Action Req.</span>
                             </div>
                             <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-muted/30 border border-border/50">
-                                <History className="h-6 w-6 text-muted-foreground mb-2" />
+                                <HistoryIcon className="h-6 w-6 text-muted-foreground mb-2" />
                                 <span className="text-2xl font-bold">12</span>
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Total Issued</span>
                             </div>
@@ -227,7 +227,7 @@ export default function ClientDashboard() {
                                 <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
                                     <div className="flex items-center gap-3">
                                         <div className="p-2 rounded bg-amber-500/10 text-amber-600">
-                                            <Clock className="h-4 w-4" />
+                                            <ClockIcon className="h-4 w-4" />
                                         </div>
                                         <span className="text-sm font-medium">Cleaning Logs - Q1 2026</span>
                                     </div>

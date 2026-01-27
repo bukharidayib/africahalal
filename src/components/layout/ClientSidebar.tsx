@@ -4,7 +4,7 @@ import {
     FileText,
     Files,
     ClipboardCheck,
-    History,
+    Award,
     LogOut,
     ChevronRight,
     ShieldCheck
@@ -16,7 +16,7 @@ const navigation = [
     { name: "Apply Now", href: "/client/apply", icon: FileText },
     { name: "My Documents", href: "/client/documents", icon: Files },
     { name: "Inspections", href: "/client/inspections", icon: ClipboardCheck },
-    { name: "Certificate Vault", href: "/client/certificates", icon: History },
+    { name: "Certificate Vault", href: "/client/certificates", icon: Award },
 ];
 
 export function ClientSidebar() {

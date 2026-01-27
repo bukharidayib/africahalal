@@ -4,11 +4,11 @@ import {
     Bell,
     Search,
     User,
-    Settings,
     HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface ClientLayoutProps {
     children: ReactNode;
@@ -37,6 +37,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <ThemeToggle />
                         <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
                             <HelpCircle className="h-5 w-5" />
                         </Button>
