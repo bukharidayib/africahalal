@@ -165,9 +165,9 @@ export default function ClientDashboard() {
                                     <h4 className="font-bold text-sm text-foreground">{alert.title}</h4>
                                     <p className="text-sm text-muted-foreground mt-0.5">{alert.message}</p>
                                 </div>
-                                <Button variant="outline" size="sm" className="bg-white/50 border-none shadow-sm text-xs font-semibold">
+                                <Button variant="outline" size="sm" className="bg-card border-border shadow-sm text-xs font-semibold text-foreground hover:bg-accent">
                                     {alert.cta}
-                                    <ArrowRight className="ml-2 h-3.3 w-3.3" />
+                                    <ArrowRight className="ml-2 h-3 w-3" />
                                 </Button>
                             </div>
                         ))}

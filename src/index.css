@@ -7,39 +7,39 @@
 @layer base {
   :root {
     /* Primary: Deep Forest Green - institutional, trustworthy */
-    --primary: 152 51% 17%;
-    --primary-foreground: 45 100% 96%;
+    --primary: 152 51% 25%;
+    --primary-foreground: 0 0% 100%;
 
     /* Secondary: Warm Gold - prestige, excellence */
     --secondary: 43 65% 47%;
     --secondary-foreground: 152 51% 12%;
 
     /* Background & Surfaces */
-    --background: 45 20% 98%;
-    --foreground: 152 40% 12%;
+    --background: 45 20% 97%;
+    --foreground: 152 40% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 152 40% 12%;
+    --card-foreground: 152 40% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 152 40% 12%;
+    --popover-foreground: 152 40% 15%;
 
     /* Muted for subtle backgrounds */
-    --muted: 45 15% 94%;
-    --muted-foreground: 152 20% 40%;
+    --muted: 45 15% 92%;
+    --muted-foreground: 152 25% 35%;
 
     /* Accent: Lighter green for highlights */
-    --accent: 152 35% 92%;
-    --accent-foreground: 152 51% 17%;
+    --accent: 152 25% 90%;
+    --accent-foreground: 152 51% 20%;
 
     /* Destructive */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     /* Border & Input */
-    --border: 152 20% 85%;
-    --input: 152 20% 85%;
-    --ring: 152 51% 17%;
+    --border: 152 15% 80%;
+    --input: 152 15% 80%;
+    --ring: 152 51% 25%;
 
     --radius: 0.5rem;
 
@@ -57,9 +57,9 @@
     --gold: 43 65% 47%;
     --gold-light: 43 65% 60%;
     --gold-dark: 43 70% 35%;
-    --forest: 152 51% 17%;
-    --forest-light: 152 40% 25%;
-    --forest-dark: 152 55% 12%;
+    --forest: 152 51% 25%;
+    --forest-light: 152 40% 35%;
+    --forest-dark: 152 55% 15%;
     --cream: 45 20% 96%;
     --cream-dark: 45 15% 90%;
   }
