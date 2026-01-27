@@ -1,153 +1,230 @@
 
 
-## Fix Summary: Client Portal Light Mode, Zambian Cities, RLS, and Upload Functionality
+## Implementation Plan: Application Tracker, Admin Application Management, and Real Data Integration
 
-This plan addresses four issues you've reported:
-1. Light mode styling issues across the client portal
-2. Changing "Operating Country" to a list of Zambian cities
-3. Submit & Lock button failing due to organizations table RLS
-4. Upload evidence functionality not working
+This plan addresses three key requirements:
+1. A visual "In-Process Application Tracker" on the client dashboard
+2. Admin portal ability to view and update individual applications
+3. Replace static/fake data with real database data
 
 ---
 
-## Issue 1: Light Mode Styling Problems
+## Issue 1: Application Tracker Widget
 
-### Problem
-The client portal has visibility issues in light mode because:
-- The sidebar uses hardcoded dark theme colors (`bg-sidebar-background`, `text-sidebar-foreground`)
-- The main content area uses `bg-slate-50/50` which doesn't respect theme variables
-- Some text colors don't have enough contrast in light mode
+### Current State
+The dashboard currently shows applications in a list format with basic status badges. You want a visual step-by-step tracker showing where each application is in the certification process.
 
 ### Solution
-Update the CSS variables and component styles to properly support both themes:
+Add a new "Application Tracker" component that displays the certification workflow as a visual progress tracker:
+
+```text
++-------------------------------------------------------------------+
+| APPLICATION TRACKER                                               |
++-------------------------------------------------------------------+
+|                                                                   |
+|  APP-1769524425600 - Full Certification                           |
+|  Global Foods Co.                                                 |
+|                                                                   |
+|  [STEP INDICATOR - Visual Progress]                               |
+|                                                                   |
+|  (1)-------(2)-------(3)-------(4)-------(5)-------(6)           |
+|  Draft   Submitted  Review  Inspection  Decision  Approved       |
+|           [ACTIVE]                                                |
+|                                                                   |
+|  Status: Submitted on 27 Jan 2026                                |
+|  Next Step: Awaiting officer review                              |
+|                                                                   |
++-------------------------------------------------------------------+
+```
+
+### Steps in the Tracker
+1. **Draft** - Application created but not submitted
+2. **Submitted** - Application submitted for review
+3. **Under Review** - Officer reviewing the application
+4. **Inspection** - Awaiting or undergoing inspection
+5. **Decision** - Pending final certification decision
+6. **Approved/Rejected** - Final status
+
+**File to create:**
+- `src/components/ApplicationTracker.tsx`
+
+**File to update:**
+- `src/pages/client/ClientDashboard.tsx` - Replace "Ongoing Applications" section with the new tracker
+
+---
+
+## Issue 2: Admin Application Detail Page
+
+### Current State
+The admin portal has an Applications list (`/admin/applications`) that links to `/admin/applications/:id`, but this page doesn't exist (returns 404).
+
+### Solution
+Create a comprehensive Application Detail page where admins can:
+- View all application details
+- Update application status
+- Assign officers
+- View/add notes
+- See status history
+- Schedule inspections
+- Record decisions
+
+**Files to create:**
+- `src/admin/pages/ApplicationDetail.tsx`
 
 **Files to update:**
-- `src/index.css` - Add proper light mode sidebar variables
-- `src/components/layout/ClientSidebar.tsx` - Update sidebar colors for light mode
-- `src/components/layout/ClientLayout.tsx` - Change `bg-slate-50/50` to `bg-muted/50`
+- `src/App.tsx` - Add route for `/admin/applications/:id`
 
-**Key changes:**
-- Light mode sidebar will use a light background with dark text
-- Navigation links will have proper contrast
-- Logout button styling will be visible in both modes
+### Application Detail Page Features
 
----
-
-## Issue 2: Change "Operating Country" to Zambian Cities
-
-### Problem
-The dropdown currently shows African countries, but you need it to show cities in Zambia.
-
-### Solution
-Replace the country options with a comprehensive list of Zambian cities (major cities and provincial capitals).
-
-**File to update:**
-- `src/pages/client/CertificationApplication.tsx`
-
-**Changes:**
-- Rename label from "Operating Country" to "Operating City (Zambia)"
-- Replace country options with: Lusaka, Ndola, Kitwe, Kabwe, Chingola, Mufulira, Livingstone, Luanshya, Kasama, Chipata, Solwezi, Mongu, Mansa, Choma, and more
-
----
-
-## Issue 3: Submit & Lock Button Failing (Organizations RLS)
-
-### Problem
-The current RLS policies on the `organizations` table only allow **admin users** to insert:
-```sql
-Admins can insert organizations: is_admin_user(auth.uid())
+```text
++-------------------------------------------------------------------+
+| APPLICATION DETAIL                                                |
++-------------------------------------------------------------------+
+|                                                                   |
+| APP-1769524425600                           [← Back to List]     |
+| Organization: Global Foods Co.                                    |
+| Submitted: 27 Jan 2026                                           |
+|                                                                   |
++-------------------------------------------------------------------+
+| [APPLICATION INFO]  [STATUS UPDATE]  [HISTORY]  [DOCUMENTS]      |
++-------------------------------------------------------------------+
+|                                                                   |
+| Current Status: [SUBMITTED ▼]                                    |
+|                                                                   |
+| Status Options:                                                   |
+| - Under Review                                                    |
+| - Awaiting Inspection                                            |
+| - Inspection Complete                                            |
+| - Pending Decision                                               |
+| - Approved / Rejected                                            |
+|                                                                   |
+| Notes/Reason: [_______________________]                          |
+|                                                                   |
+| [Update Status]                                                   |
+|                                                                   |
++-------------------------------------------------------------------+
 ```
 
-When a client submits an application, the code tries to create a new organization, but it fails because regular authenticated users cannot insert into this table.
-
-### Solution
-Add a new RLS policy that allows authenticated users to insert organizations for their own certification applications.
-
-**Database migration required:**
-```sql
--- Allow authenticated users to insert their own organization
-CREATE POLICY "Users can create their own organization"
-ON public.organizations FOR INSERT TO authenticated
-WITH CHECK (true);
-
--- Allow users to view their own organization
-CREATE POLICY "Users can view their own organization"
-ON public.organizations FOR SELECT TO authenticated
-USING (
-  id IN (SELECT organization_id FROM public.profiles WHERE id = auth.uid())
-);
-```
-
-This allows:
-- Any authenticated user to create an organization (for their business)
-- Users to only view organizations they belong to
-- Admins retain full access via existing policies
-
 ---
 
-## Issue 4: Upload Evidence Not Working
+## Issue 3: Replace Static Data with Real Database Queries
 
-### Problem
-The document upload functionality has two issues:
+### Current Static Data Identified
 
-1. **RLS Policy uses folder structure**: The storage RLS requires files to be in a folder named with the user's ID (`auth.uid()::text = storage.foldername(name)[1]`). This is already correctly implemented in `DocumentVault.tsx`.
+| Location | Static Data | Fix |
+|----------|-------------|-----|
+| Welcome Header | "Marhaban, African Halal" | Fetch user's organization name |
+| Urgent Alerts | Hardcoded document expiry + NCN alerts | Fetch from `application_documents` + `non_conformance_notices` |
+| Compliance Snapshot | Hardcoded "Process Flow Diagrams", "Ingredient Manifest" etc. | Fetch real documents from `application_documents` with their verification status |
 
-2. **Application linking is broken**: The code tries to find an application where `organization_id = user.id`, which is incorrect. It should find applications for the user's actual organization.
+### Data Sources
 
-### Solution
-Fix the `DocumentVault.tsx` file to properly link uploaded documents to the user's applications.
+**Welcome Header:**
+```sql
+-- Fetch user's profile and organization
+SELECT p.full_name, o.name as organization_name 
+FROM profiles p 
+LEFT JOIN organizations o ON p.organization_id = o.id 
+WHERE p.id = auth.uid()
+```
 
-**File to update:**
-- `src/pages/client/DocumentVault.tsx`
+**Urgent Alerts:**
+```sql
+-- Documents expiring within 30 days
+SELECT * FROM application_documents 
+WHERE expiry_date <= NOW() + INTERVAL '30 days'
+  AND application_id IN (SELECT id FROM certification_applications WHERE organization_id = ...)
 
-**Changes:**
-```typescript
-// Current (incorrect):
-.eq('organization_id', user.id)
+-- Open NCNs requiring action  
+SELECT * FROM non_conformance_notices
+WHERE status = 'open'
+  AND application_id IN (SELECT id FROM certification_applications WHERE organization_id = ...)
+```
 
-// Fixed (correct):
-// First get user's profile to find their organization_id
-// Then find applications for that organization
+**Compliance Snapshot:**
+```sql
+-- Recent documents with their status
+SELECT document_type, file_name, created_at, status 
+FROM application_documents 
+WHERE application_id IN (...)
+ORDER BY created_at DESC 
+LIMIT 5
 ```
 
 ---
 
 ## Technical Implementation Details
 
-### Database Migration
-A single migration will add the new RLS policies for organizations.
-
 ### File Changes Summary
 
 | File | Change |
 |------|--------|
-| `src/index.css` | Add light mode sidebar CSS variables |
-| `src/components/layout/ClientSidebar.tsx` | Update sidebar for theme-aware styling |
-| `src/components/layout/ClientLayout.tsx` | Use theme variables instead of hardcoded colors |
-| `src/pages/client/CertificationApplication.tsx` | Replace countries with Zambian cities |
-| `src/pages/client/DocumentVault.tsx` | Fix application lookup for document upload |
+| `src/components/ApplicationTracker.tsx` | **NEW** - Visual step tracker component |
+| `src/admin/pages/ApplicationDetail.tsx` | **NEW** - Admin application detail/edit page |
+| `src/App.tsx` | Add route for `/admin/applications/:id` |
+| `src/pages/client/ClientDashboard.tsx` | Replace static data with real queries, add tracker |
 
-### Zambian Cities List
-The following cities will be included:
-- **Copperbelt Province**: Ndola, Kitwe, Chingola, Mufulira, Luanshya, Kalulushi, Chililabombwe
-- **Lusaka Province**: Lusaka, Chongwe, Kafue
-- **Southern Province**: Livingstone, Choma, Mazabuka, Monze
-- **Central Province**: Kabwe, Kapiri Mposhi, Mkushi
-- **Eastern Province**: Chipata, Petauke, Katete
-- **Northern Province**: Kasama, Mbala, Mpika
-- **North-Western Province**: Solwezi, Mwinilunga
-- **Western Province**: Mongu, Senanga
-- **Luapula Province**: Mansa, Samfya
-- **Muchinga Province**: Chinsali, Nakonde
+### Database Changes
+No schema changes required. The existing tables support all needed queries:
+- `certification_applications` - Application data
+- `application_status_history` - Status change tracking (for audit)
+- `organizations` - Organization details
+- `profiles` - User profile and organization link
+- `application_documents` - Uploaded documents
+- `non_conformance_notices` - NCNs for alerts
+
+### Status Update Flow (Admin)
+
+When an admin updates an application status:
+
+1. Update `certification_applications.status`
+2. Insert record into `application_status_history` for audit trail
+3. Create audit log entry
+
+This ensures:
+- Client dashboard reflects the new status
+- Full audit trail of all status changes
+- Proper authorization checks via RLS
+
+---
+
+## UI/UX Details
+
+### Application Tracker Component
+
+The tracker will display:
+- Current step highlighted with primary color
+- Completed steps with checkmarks
+- Future steps in muted/outline style
+- Current status description with timestamp
+- "Next Step" guidance text
+
+### Admin Application Detail
+
+Organized with tabs:
+1. **Overview** - Application details, organization info, scope
+2. **Status** - Current status, update controls, reason field
+3. **History** - Timeline of all status changes
+4. **Documents** - Uploaded files linked to this application
+5. **Inspections** - Linked inspections (if any)
+6. **Decisions** - Certification decisions made
 
 ---
 
 ## Testing Checklist
 
 After implementation, verify:
-1. Toggle between light and dark mode - all pages should be readable
-2. Sidebar navigation is visible in both modes
-3. City dropdown shows Zambian cities
-4. Submit a test application - should complete successfully
-5. Upload a document in the Document Vault - should store and display correctly
+
+1. **Client Dashboard:**
+   - Application tracker shows correct step for each application
+   - Organization name displays in welcome header
+   - Alerts section shows real data (or empty state if none)
+   - Compliance snapshot shows real documents
+
+2. **Admin Application Detail:**
+   - Navigate from applications list to detail page
+   - View complete application information
+   - Update status and see it reflected
+   - Status history records the change
+   - Client dashboard reflects the new status
 
