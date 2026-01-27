@@ -4,14 +4,13 @@ import {
     Download,
     Search,
     ExternalLink,
-    ShieldCheck,
     QrCode,
     Info,
     Calendar,
-    History,
+    Clock as ClockIcon,
+    History as HistoryIcon,
     BadgeCheck,
-    Clock,
-    Eye
+    Eye as EyeIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,7 +84,7 @@ export default function CertificateVault() {
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" className="border-secondary text-secondary hover:bg-secondary/10">
-                            <History className="mr-2 h-4 w-4" />
+                            <HistoryIcon className="mr-2 h-4 w-4" />
                             Audit Log
                         </Button>
                         <Button className="bg-primary text-white hover:bg-primary/90">
@@ -106,10 +105,31 @@ export default function CertificateVault() {
                             <Award className="h-48 w-48 text-secondary" />
                         </div>
 
-                        <div className="relative z-10 md:flex items-center gap-12">
-                            <div className="p-4 bg-white/10 backdrop-blur rounded-xl border border-white/20 shadow-inner">
-                                <div className="bg-white p-3 rounded-lg shadow-lg">
-                                    <img src="/logo.png" alt="AHI" className="h-24 w-auto" />
+                        <div className="flex-1 space-y-4 mt-6 md:mt-0">
+                            <div className="flex items-center gap-2">
+                                <Badge className="bg-secondary text-secondary-foreground font-bold hover:bg-secondary">ACTIVE CERTIFICATION</Badge>
+                                <span className="text-xs font-mono text-white/60 tracking-widest uppercase">Valid Africawide</span>
+                            </div>
+                            <h2 className="text-3xl font-bold font-serif tracking-tight">Livestock Processing & Distribution</h2>
+                            <p className="text-white/80 max-w-xl leading-relaxed">
+                                This certifies that the processes at <span className="text-secondary font-bold">African Halal Large-Scale Facility</span> are in full compliance with Shariah and AHI standards.
+                            </p>
+                            <div className="flex flex-wrap gap-6 pt-2">
+                                <div className="space-y-1">
+                                    <span className="block text-[10px] uppercase tracking-widest text-white/50">Issue Date</span>
+                                    <span className="font-bold flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-secondary" /> 20 Jan 2025
+                                    </span>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="block text-[10px] uppercase tracking-widest text-white/50">Expiry Date</span>
+                                    <span className="font-bold flex items-center gap-2 text-secondary">
+                                        <ClockIcon className="h-4 w-4" /> 20 Jan 2026
+                                    </span>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="block text-[10px] uppercase tracking-widest text-white/50">Certificate No.</span>
+                                    <span className="font-mono font-bold">AHI-2025-0082</span>
                                 </div>
                             </div>
 
@@ -229,7 +249,7 @@ export default function CertificateVault() {
                                         <td className="px-6 py-5 text-right">
                                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary">
-                                                    <Eye className="h-4 w-4" />
+                                                    <EyeIcon className="h-4 w-4" />
                                                 </Button>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary">
                                                     <Download className="h-4 w-4" />
