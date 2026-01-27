@@ -43,6 +43,7 @@ import UserManagement from "./admin/pages/UserManagement";
 import Enforcement from "./admin/pages/Enforcement";
 import Inspectors from "./admin/pages/Inspectors";
 import AdminSettings from "./admin/pages/AdminSettings";
+import ApplicationDetail from "./admin/pages/ApplicationDetail";
 
 const queryClient = new QueryClient();
 
@@ -93,6 +94,11 @@ const App = () => (
           <Route path="/admin/applications" element={
             <AdminAuthProvider>
               <Applications />
+            </AdminAuthProvider>
+          } />
+          <Route path="/admin/applications/:id" element={
+            <AdminAuthProvider>
+              <ApplicationDetail />
             </AdminAuthProvider>
           } />
           <Route path="/admin/certificates" element={
