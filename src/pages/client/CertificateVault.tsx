@@ -4,14 +4,13 @@ import {
     Download,
     Search,
     ExternalLink,
-    ShieldCheck,
     QrCode,
     Info,
     Calendar,
-    History,
+    Clock as ClockIcon,
+    History as HistoryIcon,
     BadgeCheck,
-    Clock,
-    Eye
+    Eye as EyeIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +50,7 @@ export default function CertificateVault() {
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" className="border-secondary text-secondary hover:bg-secondary/10">
-                            <History className="mr-2 h-4 w-4" />
+                            <HistoryIcon className="mr-2 h-4 w-4" />
                             Audit Log
                         </Button>
                         <Button className="bg-primary text-white hover:bg-primary/90">
@@ -91,9 +90,9 @@ export default function CertificateVault() {
                                     </span>
                                 </div>
                                 <div className="space-y-1">
-                                    <span className="block text-[10px] uppercase tracking-widest text-white/50">Expiry Date</span>
-                                    <span className="font-bold flex items-center gap-2 text-secondary">
-                                        <Clock className="h-4 w-4" /> 20 Jan 2026
+                                                <span className="block text-[10px] uppercase tracking-widest text-white/50">Expiry Date</span>
+                                                    <span className="font-bold flex items-center gap-2 text-secondary">
+                                                        <ClockIcon className="h-4 w-4" /> 20 Jan 2026
                                     </span>
                                 </div>
                                 <div className="space-y-1">
@@ -170,7 +169,7 @@ export default function CertificateVault() {
                                         <td className="px-6 py-5 text-right">
                                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary">
-                                                    <Eye className="h-4 w-4" />
+                                                    <EyeIcon className="h-4 w-4" />
                                                 </Button>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary">
                                                     <Download className="h-4 w-4" />

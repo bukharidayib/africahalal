@@ -6,19 +6,79 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SignIn() {
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
+    const { toast } = useToast();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        // Simulate login
-        setTimeout(() => {
+
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) {
+                toast({
+                    title: "Sign in failed",
+                    description: error.message,
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            if (data.user) {
+                toast({
+                    title: "Welcome back!",
+                    description: "You have successfully signed in.",
+                });
+                navigate("/client/dashboard");
+            }
+        } catch (error: any) {
+            toast({
+                title: "Error",
+                description: "An unexpected error occurred. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
             setIsLoading(false);
-            navigate("/client/dashboard");
-        }, 1500);
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        setIsLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: "google",
+                options: {
+                    redirectTo: `${window.location.origin}/client/dashboard`,
+                },
+            });
+
+            if (error) {
+                toast({
+                    title: "Google sign in failed",
+                    description: error.message,
+                    variant: "destructive",
+                });
+            }
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "An unexpected error occurred. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -57,6 +117,8 @@ export default function SignIn() {
                                         type="email"
                                         placeholder="name@company.com"
                                         required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
                                         className="pl-10 h-11 border-border focus-visible:ring-primary"
                                         disabled={isLoading}
                                     />
@@ -80,6 +142,8 @@ export default function SignIn() {
                                         type="password"
                                         placeholder="••••••••"
                                         required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
                                         className="pl-10 h-11 border-border focus-visible:ring-primary"
                                         disabled={isLoading}
                                     />
@@ -109,7 +173,12 @@ export default function SignIn() {
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
-                            <Button variant="outline" className="w-full h-11 border-border hover:bg-accent transition-all font-medium" onClick={() => { }}>
+                            <Button 
+                                variant="outline" 
+                                className="w-full h-11 border-border hover:bg-accent transition-all font-medium" 
+                                onClick={handleGoogleSignIn}
+                                disabled={isLoading}
+                            >
                                 <Chrome className="mr-2 h-4 w-4 text-red-500" />
                                 Sign in with Google
                             </Button>
