@@ -702,6 +702,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          organization_id: string | null
           phone: string | null
           updated_at: string
         }
@@ -710,6 +711,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          organization_id?: string | null
           phone?: string | null
           updated_at?: string
         }
@@ -718,10 +720,19 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          organization_id?: string | null
           phone?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
