@@ -229,7 +229,7 @@ export default function ClientDashboard() {
                             </div>
                             <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-muted/30 border border-border/50">
                                 <ClockIcon className="h-6 w-6 text-secondary mb-2" />
-                                <span className="text-2xl font-bold">02</span>
+                                <span className="text-2xl font-bold">{isLoading ? "..." : stats.pending.toString().padStart(2, '0')}</span>
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Pending</span>
                             </div>
                             <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-muted/30 border border-border/50">
@@ -239,7 +239,7 @@ export default function ClientDashboard() {
                             </div>
                             <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-muted/30 border border-border/50">
                                 <HistoryIcon className="h-6 w-6 text-muted-foreground mb-2" />
-                                <span className="text-2xl font-bold">12</span>
+                                <span className="text-2xl font-bold">{isLoading ? "..." : stats.total.toString().padStart(2, '0')}</span>
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Total Issued</span>
                             </div>
                         </CardContent>

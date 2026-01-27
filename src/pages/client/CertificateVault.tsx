@@ -105,12 +105,12 @@ export default function CertificateVault() {
                             <Award className="h-48 w-48 text-secondary" />
                         </div>
 
-                        <div className="flex-1 space-y-4 mt-6 md:mt-0">
+                        <div className="relative z-10 space-y-4 mt-6 md:mt-0">
                             <div className="flex items-center gap-2">
                                 <Badge className="bg-secondary text-secondary-foreground font-bold hover:bg-secondary">ACTIVE CERTIFICATION</Badge>
                                 <span className="text-xs font-mono text-white/60 tracking-widest uppercase">Valid Africawide</span>
                             </div>
-                            <h2 className="text-3xl font-bold font-serif tracking-tight">Livestock Processing & Distribution</h2>
+                            <h2 className="text-3xl font-bold font-serif tracking-tight">{activeCert.scope}</h2>
                             <p className="text-white/80 max-w-xl leading-relaxed">
                                 This certifies that the processes at <span className="text-secondary font-bold">African Halal Large-Scale Facility</span> are in full compliance with Shariah and AHI standards.
                             </p>
@@ -118,59 +118,30 @@ export default function CertificateVault() {
                                 <div className="space-y-1">
                                     <span className="block text-[10px] uppercase tracking-widest text-white/50">Issue Date</span>
                                     <span className="font-bold flex items-center gap-2">
-                                        <Calendar className="h-4 w-4 text-secondary" /> 20 Jan 2025
+                                        <Calendar className="h-4 w-4 text-secondary" /> {new Date(activeCert.issue_date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
                                     </span>
                                 </div>
                                 <div className="space-y-1">
                                     <span className="block text-[10px] uppercase tracking-widest text-white/50">Expiry Date</span>
                                     <span className="font-bold flex items-center gap-2 text-secondary">
-                                        <ClockIcon className="h-4 w-4" /> 20 Jan 2026
+                                        <ClockIcon className="h-4 w-4" /> {new Date(activeCert.expiry_date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
                                     </span>
                                 </div>
                                 <div className="space-y-1">
                                     <span className="block text-[10px] uppercase tracking-widest text-white/50">Certificate No.</span>
-                                    <span className="font-mono font-bold">AHI-2025-0082</span>
+                                    <span className="font-mono font-bold">{activeCert.certificate_number}</span>
                                 </div>
                             </div>
 
-                            <div className="flex-1 space-y-4 mt-6 md:mt-0">
-                                <div className="flex items-center gap-2">
-                                    <Badge className="bg-secondary text-secondary-foreground font-bold hover:bg-secondary">ACTIVE CERTIFICATION</Badge>
-                                    <span className="text-xs font-mono text-white/60 tracking-widest uppercase">Valid Africawide</span>
-                                </div>
-                                <h2 className="text-3xl font-bold font-serif tracking-tight">{activeCert.scope}</h2>
-                                <p className="text-white/80 max-w-xl leading-relaxed">
-                                    This certifies that the processes at <span className="text-secondary font-bold">Your Registered Facility</span> are in full compliance with Shariah and AHI standards.
-                                </p>
-                                <div className="flex flex-wrap gap-6 pt-2">
-                                    <div className="space-y-1">
-                                        <span className="block text-[10px] uppercase tracking-widest text-white/50">Issue Date</span>
-                                        <span className="font-bold flex items-center gap-2">
-                                            <Calendar className="h-4 w-4 text-secondary" /> {new Date(activeCert.issue_date).toLocaleDateString()}
-                                        </span>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <span className="block text-[10px] uppercase tracking-widest text-white/50">Expiry Date</span>
-                                        <span className="font-bold flex items-center gap-2 text-secondary">
-                                            <Clock className="h-4 w-4" /> {new Date(activeCert.expiry_date).toLocaleDateString()}
-                                        </span>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <span className="block text-[10px] uppercase tracking-widest text-white/50">Certificate No.</span>
-                                        <span className="font-mono font-bold">{activeCert.certificate_number}</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4 pt-6">
-                                    <Button className="bg-white text-primary hover:bg-white/90 font-bold px-8 shadow-xl active:scale-95 transition-all">
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Download High-Res PDF
-                                    </Button>
-                                    <Button variant="ghost" className="text-white hover:bg-white/10 font-medium">
-                                        <ExternalLink className="mr-2 h-4 w-4" />
-                                        Verify Online
-                                    </Button>
-                                </div>
+                            <div className="flex gap-4 pt-6">
+                                <Button className="bg-white text-primary hover:bg-white/90 font-bold px-8 shadow-xl active:scale-95 transition-all">
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download High-Res PDF
+                                </Button>
+                                <Button variant="ghost" className="text-white hover:bg-white/10 font-medium">
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Verify Online
+                                </Button>
                             </div>
                         </div>
                     </div>
@@ -274,6 +245,6 @@ export default function CertificateVault() {
                     </div>
                 </div>
             </div>
-        </ClientLayout>
+        </ClientLayout >
     );
 }
