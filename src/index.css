@@ -43,14 +43,14 @@
 
     --radius: 0.5rem;
 
-    /* Sidebar */
-    --sidebar-background: 152 51% 12%;
-    --sidebar-foreground: 45 100% 96%;
+    /* Sidebar - Light Mode */
+    --sidebar-background: 45 20% 97%;
+    --sidebar-foreground: 152 40% 15%;
     --sidebar-primary: 43 65% 47%;
-    --sidebar-primary-foreground: 152 51% 12%;
-    --sidebar-accent: 152 40% 18%;
-    --sidebar-accent-foreground: 45 100% 96%;
-    --sidebar-border: 152 40% 20%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 152 25% 90%;
+    --sidebar-accent-foreground: 152 40% 15%;
+    --sidebar-border: 152 15% 85%;
     --sidebar-ring: 43 65% 47%;
 
     /* Custom AHI tokens */

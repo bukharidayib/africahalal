@@ -59,7 +59,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 </header>
 
                 {/* Page Content */}
-                <main className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar bg-slate-50/50">
+                <main className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar bg-muted/50">
                     <div className="max-w-7xl mx-auto h-full">
                         {children}
                     </div>

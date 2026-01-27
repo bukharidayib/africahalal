@@ -375,25 +375,57 @@ export default function CertificationApplication() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="country" className="text-foreground">Operating Country *</Label>
+                                        <Label htmlFor="country" className="text-foreground">Operating City (Zambia) *</Label>
                                         <Select
                                             value={formData.country}
                                             onValueChange={(v) => updateFormData('country', v)}
                                             disabled={isLoading}
                                         >
                                             <SelectTrigger className="h-11">
-                                                <SelectValue placeholder="Select Country" />
+                                                <SelectValue placeholder="Select City" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="South Africa">South Africa</SelectItem>
-                                                <SelectItem value="Ghana">Ghana</SelectItem>
-                                                <SelectItem value="Nigeria">Nigeria</SelectItem>
-                                                <SelectItem value="Kenya">Kenya</SelectItem>
-                                                <SelectItem value="Tanzania">Tanzania</SelectItem>
-                                                <SelectItem value="Uganda">Uganda</SelectItem>
-                                                <SelectItem value="Ethiopia">Ethiopia</SelectItem>
-                                                <SelectItem value="Egypt">Egypt</SelectItem>
-                                                <SelectItem value="Morocco">Morocco</SelectItem>
+                                                {/* Lusaka Province */}
+                                                <SelectItem value="Lusaka">Lusaka</SelectItem>
+                                                <SelectItem value="Chongwe">Chongwe</SelectItem>
+                                                <SelectItem value="Kafue">Kafue</SelectItem>
+                                                {/* Copperbelt Province */}
+                                                <SelectItem value="Ndola">Ndola</SelectItem>
+                                                <SelectItem value="Kitwe">Kitwe</SelectItem>
+                                                <SelectItem value="Chingola">Chingola</SelectItem>
+                                                <SelectItem value="Mufulira">Mufulira</SelectItem>
+                                                <SelectItem value="Luanshya">Luanshya</SelectItem>
+                                                <SelectItem value="Kalulushi">Kalulushi</SelectItem>
+                                                <SelectItem value="Chililabombwe">Chililabombwe</SelectItem>
+                                                {/* Central Province */}
+                                                <SelectItem value="Kabwe">Kabwe</SelectItem>
+                                                <SelectItem value="Kapiri Mposhi">Kapiri Mposhi</SelectItem>
+                                                <SelectItem value="Mkushi">Mkushi</SelectItem>
+                                                {/* Southern Province */}
+                                                <SelectItem value="Livingstone">Livingstone</SelectItem>
+                                                <SelectItem value="Choma">Choma</SelectItem>
+                                                <SelectItem value="Mazabuka">Mazabuka</SelectItem>
+                                                <SelectItem value="Monze">Monze</SelectItem>
+                                                {/* Eastern Province */}
+                                                <SelectItem value="Chipata">Chipata</SelectItem>
+                                                <SelectItem value="Petauke">Petauke</SelectItem>
+                                                <SelectItem value="Katete">Katete</SelectItem>
+                                                {/* Northern Province */}
+                                                <SelectItem value="Kasama">Kasama</SelectItem>
+                                                <SelectItem value="Mbala">Mbala</SelectItem>
+                                                <SelectItem value="Mpika">Mpika</SelectItem>
+                                                {/* North-Western Province */}
+                                                <SelectItem value="Solwezi">Solwezi</SelectItem>
+                                                <SelectItem value="Mwinilunga">Mwinilunga</SelectItem>
+                                                {/* Western Province */}
+                                                <SelectItem value="Mongu">Mongu</SelectItem>
+                                                <SelectItem value="Senanga">Senanga</SelectItem>
+                                                {/* Luapula Province */}
+                                                <SelectItem value="Mansa">Mansa</SelectItem>
+                                                <SelectItem value="Samfya">Samfya</SelectItem>
+                                                {/* Muchinga Province */}
+                                                <SelectItem value="Chinsali">Chinsali</SelectItem>
+                                                <SelectItem value="Nakonde">Nakonde</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
