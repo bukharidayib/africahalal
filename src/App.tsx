@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import SignIn from "./pages/auth/SignIn";
 import SignUp from "./pages/auth/SignUp";
 import ForgotPassword from "./pages/auth/ForgotPassword";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
 // Client Portal
 import ClientDashboard from "./pages/client/ClientDashboard";
@@ -71,12 +72,12 @@ const App = () => (
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
           <Route path="/verify-certificate" element={<VerifyPublic />} />
 
-          {/* Client Portal Protected Routes (Placeholder for auth) */}
-          <Route path="/client/dashboard" element={<ClientDashboard />} />
-          <Route path="/client/apply" element={<CertificationApplication />} />
-          <Route path="/client/documents" element={<DocumentVault />} />
-          <Route path="/client/inspections" element={<ComplianceCenter />} />
-          <Route path="/client/certificates" element={<CertificateVault />} />
+          {/* Client Portal Protected Routes */}
+          <Route path="/client/dashboard" element={<ProtectedRoute><ClientDashboard /></ProtectedRoute>} />
+          <Route path="/client/apply" element={<ProtectedRoute><CertificationApplication /></ProtectedRoute>} />
+          <Route path="/client/documents" element={<ProtectedRoute><DocumentVault /></ProtectedRoute>} />
+          <Route path="/client/inspections" element={<ProtectedRoute><ComplianceCenter /></ProtectedRoute>} />
+          <Route path="/client/certificates" element={<ProtectedRoute><CertificateVault /></ProtectedRoute>} />
 
           {/* Admin Portal Routes */}
           <Route path="/admin/login" element={

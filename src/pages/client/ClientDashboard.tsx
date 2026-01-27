@@ -10,24 +10,36 @@ import {
     ShieldCheck,
     CheckCircle2,
     XCircle,
-    History as HistoryIcon
+    History as HistoryIcon,
+    Loader2,
+    RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
 
-const alerts = [
+interface Alert {
+    id: number;
+    type: "warning" | "critical";
+    title: string;
+    message: string;
+    cta: string;
+    ctaLink: string;
+    icon: typeof ClockIcon;
+}
+
+const staticAlerts: Alert[] = [
     {
         id: 1,
         type: "warning",
         title: "Document Expiry",
         message: "Your 'Supplier Halal Declaration' for Raw Meat is expiring in 15 days.",
         cta: "Renew Now",
+        ctaLink: "/client/documents",
         icon: ClockIcon,
     },
     {
@@ -36,31 +48,14 @@ const alerts = [
         title: "Corrective Action Required",
         message: "Inspection on 20 Jan revealed non-compliance in Sanitation Protocol (NCN-001).",
         cta: "View Issues",
+        ctaLink: "/client/inspections",
         icon: AlertTriangle,
-    },
-];
-
-const applications = [
-    {
-        id: "APP-4492",
-        name: "Halal Certification - Main Kitchen",
-        status: "In Progress",
-        step: "Inspection Scheduled",
-        date: "Scheduled for Feb 5, 2026",
-        progress: 60,
-    },
-    {
-        id: "APP-4501",
-        name: "Product Certification - Sahara Spices",
-        status: "Review",
-        step: "Shariah Board Review",
-        date: "Submitted Jan 22, 2026",
-        progress: 85,
     },
 ];
 
 export default function ClientDashboard() {
     const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [stats, setStats] = useState({
         active: 0,
         pending: 0,
@@ -69,11 +64,23 @@ export default function ClientDashboard() {
     });
     const [apps, setApps] = useState<any[]>([]);
     const [activeCert, setActiveCert] = useState<any>(null);
+    const [alerts, setAlerts] = useState<Alert[]>(staticAlerts);
     const { toast } = useToast();
+    const navigate = useNavigate();
 
     useEffect(() => {
         fetchDashboardData();
     }, []);
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await fetchDashboardData();
+        setIsRefreshing(false);
+        toast({
+            title: "Dashboard Refreshed",
+            description: "Data has been updated.",
+        });
+    };
 
     const fetchDashboardData = async () => {
         setIsLoading(true);
@@ -137,7 +144,17 @@ export default function ClientDashboard() {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Button className="bg-primary text-white hover:bg-primary/90 shadow-md transition-all active:scale-95" asChild>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleRefresh}
+                            disabled={isRefreshing}
+                            className="gap-2"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            Refresh
+                        </Button>
+                        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md transition-all active:scale-95" asChild>
                             <Link to="/client/apply">
                                 New Application
                                 <FileText className="ml-2 h-4 w-4" />
@@ -165,7 +182,12 @@ export default function ClientDashboard() {
                                     <h4 className="font-bold text-sm text-foreground">{alert.title}</h4>
                                     <p className="text-sm text-muted-foreground mt-0.5">{alert.message}</p>
                                 </div>
-                                <Button variant="outline" size="sm" className="bg-card border-border shadow-sm text-xs font-semibold text-foreground hover:bg-accent">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="bg-card border-border shadow-sm text-xs font-semibold text-foreground hover:bg-accent"
+                                    onClick={() => navigate(alert.ctaLink)}
+                                >
                                     {alert.cta}
                                     <ArrowRight className="ml-2 h-3 w-3" />
                                 </Button>
@@ -251,8 +273,10 @@ export default function ClientDashboard() {
                     {/* Ongoing Applications */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-bold font-serif">Ongoing Applications</h3>
-                            <Button variant="link" size="sm" className="text-primary font-bold">View History</Button>
+                            <h3 className="text-xl font-bold font-serif text-foreground">Ongoing Applications</h3>
+                            <Button variant="link" size="sm" className="text-primary font-bold" asChild>
+                                <Link to="/client/documents">View History</Link>
+                            </Button>
                         </div>
                         <div className="space-y-4">
                             {isLoading ? (
@@ -261,13 +285,37 @@ export default function ClientDashboard() {
                                     <p className="text-xs">Loading applications...</p>
                                 </div>
                             ) : apps.length === 0 ? (
-                                <div className="text-center py-8 border-2 border-dashed rounded-xl">
+                                <div className="text-center py-8 border-2 border-dashed rounded-xl bg-card">
+                                    <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
                                     <p className="text-muted-foreground text-sm">No active applications.</p>
+                                    <Button variant="link" size="sm" className="mt-2" asChild>
+                                        <Link to="/client/apply">Start New Application</Link>
+                                    </Button>
                                 </div>
                             ) : apps.slice(0, 3).map((app) => (
-                                <Card key={app.id} className="overflow-hidden border-none shadow-md hover:shadow-lg transition-all group">
+                                <Card 
+                                    key={app.id} 
+                                    className="overflow-hidden border shadow-md hover:shadow-lg transition-all group cursor-pointer"
+                                    onClick={() => {
+                                        toast({
+                                            title: `Application ${app.application_number}`,
+                                            description: `Status: ${app.status} • Scope: ${app.scope}`,
+                                        });
+                                    }}
+                                >
                                     <div className="h-1 bg-muted">
-                                        <Progress value={app.status === 'submitted' ? 60 : 100} className="h-full rounded-none" />
+                                        <Progress 
+                                            value={
+                                                app.status === 'draft' ? 20 :
+                                                app.status === 'submitted' ? 40 :
+                                                app.status === 'under_review' ? 60 :
+                                                app.status === 'awaiting_inspection' ? 70 :
+                                                app.status === 'inspection_complete' ? 80 :
+                                                app.status === 'pending_decision' ? 90 :
+                                                app.status === 'approved' ? 100 : 50
+                                            } 
+                                            className="h-full rounded-none" 
+                                        />
                                     </div>
                                     <CardContent className="p-5">
                                         <div className="flex items-start justify-between">
@@ -280,10 +328,14 @@ export default function ClientDashboard() {
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
-                                                    {app.status}
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                                    app.status === 'approved' ? 'bg-green-500/10 text-green-600' :
+                                                    app.status === 'rejected' ? 'bg-destructive/10 text-destructive' :
+                                                    'bg-primary/10 text-primary'
+                                                }`}>
+                                                    {app.status?.replace(/_/g, ' ')}
                                                 </span>
-                                                <div className="flex items-center justify-end mt-4 text-xs font-bold text-muted-foreground">
+                                                <div className="flex items-center justify-end mt-4 text-xs font-bold text-muted-foreground group-hover:text-primary transition-colors">
                                                     Details
                                                     <ChevronRight className="ml-1 h-4 w-4" />
                                                 </div>
