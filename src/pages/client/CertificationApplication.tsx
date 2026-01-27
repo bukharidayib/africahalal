@@ -207,21 +207,21 @@ export default function CertificationApplication() {
                     .single();
 
                 if (orgError && orgError.code === 'PGRST116') {
-                    // Create org if doesn't exist
-                    const { data: newOrg, error: createError } = await supabase
+                    // Create org if doesn't exist - generate UUID client-side to avoid SELECT permission issues
+                    const newOrgId = crypto.randomUUID();
+                    const { error: createError } = await supabase
                         .from('organizations')
                         .insert({
+                            id: newOrgId,
                             name: formData.entity_name,
                             registration_number: formData.registration_number,
                             sector: formData.categories[0] || "General",
                             address: formData.address,
                             country: formData.country
-                        })
-                        .select('id')
-                        .single();
+                        });
 
                     if (createError) throw createError;
-                    organization_id = newOrg.id;
+                    organization_id = newOrgId;
 
                     // Link user to organization
                     await supabase
