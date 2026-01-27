@@ -5,15 +5,75 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 export default function SignUp() {
     const [isLoading, setIsLoading] = useState(false);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [fullName, setFullName] = useState("");
+    const [companyName, setCompanyName] = useState("");
+    const navigate = useNavigate();
+    const { toast } = useToast();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        // Simulate signup
-        setTimeout(() => setIsLoading(false), 2000);
+
+        try {
+            // 1. Sign up user
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: fullName,
+                        company_name: companyName,
+                    }
+                }
+            });
+
+            if (authError) {
+                toast({
+                    variant: "destructive",
+                    title: "Registration Failed",
+                    description: authError.message,
+                });
+                return;
+            }
+
+            if (authData.user) {
+                // 2. Create organization (Simplified for now, in a real app this might be a separate step or handled by a trigger)
+                const { error: orgError } = await supabase
+                    .from('organizations')
+                    .insert({
+                        name: companyName,
+                        registration_number: "PENDING", // Initial value
+                        sector: "Food & Beverage", // Default sector
+                    });
+
+                if (orgError) {
+                    console.error("Error creating organization:", orgError);
+                }
+
+                // 3. Profiles table is likely updated via trigger, but we ensure basic feedback
+                toast({
+                    title: "Account Created",
+                    description: "Please check your email to verify your account.",
+                });
+                navigate("/auth/signin");
+            }
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Unexpected Error",
+                description: "An unexpected error occurred during registration.",
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -52,6 +112,8 @@ export default function SignUp() {
                                         type="text"
                                         placeholder="Global Foods Ltd"
                                         required
+                                        value={companyName}
+                                        onChange={(e) => setCompanyName(e.target.value)}
                                         className="pl-10 h-11 border-border focus-visible:ring-primary"
                                         disabled={isLoading}
                                     />
@@ -67,6 +129,8 @@ export default function SignUp() {
                                         type="text"
                                         placeholder="John African"
                                         required
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
                                         className="pl-10 h-11 border-border focus-visible:ring-primary"
                                         disabled={isLoading}
                                     />
@@ -82,6 +146,8 @@ export default function SignUp() {
                                         type="email"
                                         placeholder="contact@company.com"
                                         required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
                                         className="pl-10 h-11 border-border focus-visible:ring-primary"
                                         disabled={isLoading}
                                     />
@@ -97,6 +163,8 @@ export default function SignUp() {
                                         type="password"
                                         placeholder="••••••••"
                                         required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
                                         className="pl-10 h-11 border-border focus-visible:ring-primary"
                                         disabled={isLoading}
                                     />

@@ -9,12 +9,17 @@ import {
     Calendar,
     ShieldCheck,
     CheckCircle2,
-    XCircle
+    XCircle,
+    History as HistoryIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 const alerts = [
     {
@@ -55,6 +60,69 @@ const applications = [
 ];
 
 export default function ClientDashboard() {
+    const [isLoading, setIsLoading] = useState(true);
+    const [stats, setStats] = useState({
+        active: 0,
+        pending: 0,
+        action: 0,
+        total: 0
+    });
+    const [apps, setApps] = useState<any[]>([]);
+    const [activeCert, setActiveCert] = useState<any>(null);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        fetchDashboardData();
+    }, []);
+
+    const fetchDashboardData = async () => {
+        setIsLoading(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // Fetch Apps
+            const { data: applications, error: appError } = await supabase
+                .from('certification_applications')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (appError) throw appError;
+            setApps(applications || []);
+
+            // Fetch Certificates
+            const { data: certs, error: certError } = await supabase
+                .from('certificates')
+                .select('*');
+
+            if (certError) throw certError;
+
+            const active = certs?.find(c => c.status === 'active');
+            setActiveCert(active);
+
+            // Fetch CARs for "Action Required"
+            const { count: carCount, error: carError } = await supabase
+                .from('corrective_actions')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'pending');
+
+            setStats({
+                active: certs?.filter(c => c.status === 'active').length || 0,
+                pending: applications?.filter(a => a.status === 'submitted').length || 0,
+                action: carCount || 0,
+                total: certs?.length || 0
+            });
+
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Error loading dashboard",
+                description: error.message,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
     return (
         <ClientLayout>
             <div className="space-y-8 animate-in fade-in duration-500">
@@ -85,8 +153,8 @@ export default function ClientDashboard() {
                             <div
                                 key={alert.id}
                                 className={`flex items-start gap-4 p-4 rounded-xl border-l-4 shadow-sm transition-all hover:shadow-md ${alert.type === 'critical'
-                                        ? 'bg-destructive/10 border-destructive'
-                                        : 'bg-amber-500/10 border-amber-500'
+                                    ? 'bg-destructive/10 border-destructive'
+                                    : 'bg-amber-500/10 border-amber-500'
                                     }`}
                             >
                                 <div className={`p-2 rounded-full ${alert.type === 'critical' ? 'bg-destructive/20 text-destructive' : 'bg-amber-500/20 text-amber-600'
@@ -113,20 +181,38 @@ export default function ClientDashboard() {
                         <div className="absolute top-0 right-0 p-4 opacity-10">
                             <ShieldCheck className="h-32 w-32" />
                         </div>
-                        <CardHeader className="relative z-10">
-                            <CardTitle className="text-white/80 text-xs uppercase tracking-widest font-sans font-bold">Active Certificate</CardTitle>
-                            <div className="flex items-baseline gap-2 mt-2">
-                                <span className="text-4xl font-bold">142</span>
-                                <span className="text-lg text-white/60">Days Left</span>
+                        {isLoading ? (
+                            <div className="p-8 flex items-center justify-center">
+                                <Loader2 className="h-8 w-8 animate-spin text-white/50" />
                             </div>
-                        </CardHeader>
-                        <CardContent className="relative z-10 pt-4">
-                            <p className="text-sm text-white/70">Certificate: <span className="text-white font-mono">AHI-2025-0082</span></p>
-                            <p className="text-xs text-secondary mt-1 font-semibold">Scope: Livestock Processing</p>
-                            <Button size="sm" className="w-full mt-6 bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-all font-bold">
-                                View Certificate
-                            </Button>
-                        </CardContent>
+                        ) : activeCert ? (
+                            <>
+                                <CardHeader className="relative z-10">
+                                    <CardTitle className="text-white/80 text-xs uppercase tracking-widest font-sans font-bold">Active Certificate</CardTitle>
+                                    <div className="flex items-baseline gap-2 mt-2">
+                                        <span className="text-4xl font-bold">
+                                            {Math.max(0, Math.ceil((new Date(activeCert.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))}
+                                        </span>
+                                        <span className="text-lg text-white/60">Days Left</span>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="relative z-10 pt-4">
+                                    <p className="text-sm text-white/70">No: <span className="text-white font-mono">{activeCert.certificate_number}</span></p>
+                                    <p className="text-xs text-secondary mt-1 font-semibold line-clamp-1">{activeCert.scope}</p>
+                                    <Button size="sm" className="w-full mt-6 bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-all font-bold" asChild>
+                                        <Link to="/client/certificates">View Certificate</Link>
+                                    </Button>
+                                </CardContent>
+                            </>
+                        ) : (
+                            <div className="p-8 flex flex-col items-center justify-center text-center">
+                                <ShieldCheck className="h-12 w-12 text-white/20 mb-4" />
+                                <p className="text-white/60 text-sm">No active certification found.</p>
+                                <Button size="sm" className="mt-4 bg-white/20 text-white hover:bg-white/30" asChild>
+                                    <Link to="/client/apply">Apply Now</Link>
+                                </Button>
+                            </div>
+                        )}
                     </Card>
 
                     {/* Quick Stats */}
@@ -138,22 +224,22 @@ export default function ClientDashboard() {
                         <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                             <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-muted/30 border border-border/50">
                                 <BadgeCheck className="h-6 w-6 text-primary mb-2" />
-                                <span className="text-2xl font-bold">03</span>
+                                <span className="text-2xl font-bold">{isLoading ? "..." : stats.active.toString().padStart(2, '0')}</span>
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Active</span>
                             </div>
                             <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-muted/30 border border-border/50">
                                 <Clock className="h-6 w-6 text-secondary mb-2" />
-                                <span className="text-2xl font-bold">02</span>
+                                <span className="text-2xl font-bold">{isLoading ? "..." : stats.pending.toString().padStart(2, '0')}</span>
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Pending</span>
                             </div>
                             <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-muted/30 border border-border/50">
                                 <AlertTriangle className="h-6 w-6 text-amber-500 mb-2" />
-                                <span className="text-2xl font-bold">01</span>
+                                <span className="text-2xl font-bold">{isLoading ? "..." : stats.action.toString().padStart(2, '0')}</span>
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Action Req.</span>
                             </div>
                             <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-muted/30 border border-border/50">
-                                <History className="h-6 w-6 text-muted-foreground mb-2" />
-                                <span className="text-2xl font-bold">12</span>
+                                <HistoryIcon className="h-6 w-6 text-muted-foreground mb-2" />
+                                <span className="text-2xl font-bold">{isLoading ? "..." : stats.total.toString().padStart(2, '0')}</span>
                                 <span className="text-[10px] text-muted-foreground uppercase font-bold">Total Issued</span>
                             </div>
                         </CardContent>
@@ -169,27 +255,36 @@ export default function ClientDashboard() {
                             <Button variant="link" size="sm" className="text-primary font-bold">View History</Button>
                         </div>
                         <div className="space-y-4">
-                            {applications.map((app) => (
+                            {isLoading ? (
+                                <div className="text-center py-8 text-muted-foreground">
+                                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                                    <p className="text-xs">Loading applications...</p>
+                                </div>
+                            ) : apps.length === 0 ? (
+                                <div className="text-center py-8 border-2 border-dashed rounded-xl">
+                                    <p className="text-muted-foreground text-sm">No active applications.</p>
+                                </div>
+                            ) : apps.slice(0, 3).map((app) => (
                                 <Card key={app.id} className="overflow-hidden border-none shadow-md hover:shadow-lg transition-all group">
                                     <div className="h-1 bg-muted">
-                                        <Progress value={app.progress} className="h-full rounded-none" />
+                                        <Progress value={app.status === 'submitted' ? 60 : 100} className="h-full rounded-none" />
                                     </div>
                                     <CardContent className="p-5">
                                         <div className="flex items-start justify-between">
                                             <div>
-                                                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded uppercase font-bold">{app.id}</span>
-                                                <h4 className="font-bold text-foreground mt-2 group-hover:text-primary transition-colors">{app.name}</h4>
+                                                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded uppercase font-bold">{app.application_number}</span>
+                                                <h4 className="font-bold text-foreground mt-2 group-hover:text-primary transition-colors">{app.application_type}</h4>
                                                 <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                                                     <Calendar className="h-3.5 w-3.5" />
-                                                    {app.date}
+                                                    {new Date(app.created_at).toLocaleDateString()}
                                                 </div>
                                             </div>
                                             <div className="text-right">
                                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
-                                                    {app.step}
+                                                    {app.status}
                                                 </span>
                                                 <div className="flex items-center justify-end mt-4 text-xs font-bold text-muted-foreground">
-                                                    {app.progress}% Complete
+                                                    Details
                                                     <ChevronRight className="ml-1 h-4 w-4" />
                                                 </div>
                                             </div>

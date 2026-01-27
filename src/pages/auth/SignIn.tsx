@@ -6,19 +6,49 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SignIn() {
     const [isLoading, setIsLoading] = useState(false);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
     const navigate = useNavigate();
+    const { toast } = useToast();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        // Simulate login
-        setTimeout(() => {
-            setIsLoading(false);
+
+        try {
+            const { error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) {
+                toast({
+                    variant: "destructive",
+                    title: "System Error",
+                    description: error.message,
+                });
+                return;
+            }
+
+            toast({
+                title: "Authentication Successful",
+                description: "Welcome to the AHI Client Portal.",
+            });
             navigate("/client/dashboard");
-        }, 1500);
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Unexpected Error",
+                description: "An unexpected error occurred during sign-in.",
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -57,6 +87,8 @@ export default function SignIn() {
                                         type="email"
                                         placeholder="name@company.com"
                                         required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
                                         className="pl-10 h-11 border-border focus-visible:ring-primary"
                                         disabled={isLoading}
                                     />
@@ -80,6 +112,8 @@ export default function SignIn() {
                                         type="password"
                                         placeholder="••••••••"
                                         required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
                                         className="pl-10 h-11 border-border focus-visible:ring-primary"
                                         disabled={isLoading}
                                     />

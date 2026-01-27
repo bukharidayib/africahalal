@@ -25,6 +25,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 const categories = [
     "All Documents",
@@ -76,6 +80,103 @@ const documents = [
 
 export default function DocumentVault() {
     const [activeTab, setActiveTab] = useState("All Documents");
+    const [isLoading, setIsLoading] = useState(true);
+    const [isUploading, setIsUploading] = useState(false);
+    const [docs, setDocs] = useState<any[]>([]);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        fetchDocuments();
+    }, []);
+
+    const fetchDocuments = async () => {
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('application_documents')
+                .select(`
+                    *,
+                    certification_applications (
+                        application_number
+                    )
+                `)
+                .order('uploaded_at', { ascending: false });
+
+            if (error) throw error;
+            setDocs(data || []);
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Error fetching documents",
+                description: error.message,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Not authenticated");
+
+            // 1. Upload to Storage
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random()}.${fileExt}`;
+            const filePath = `${user.id}/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('application-documents')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            // 2. Get latest application for this user (Simplified)
+            const { data: appData, error: appError } = await supabase
+                .from('certification_applications')
+                .select('id')
+                .eq('organization_id', user.id) // This assumes org_id = user_id for simplicity or requires join
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            // Note: In real app, we should probably let user select the application or 
+            // have a better way to link it. For now, we use a placeholder application or 
+            // the latest one if it exists.
+
+            // 3. Insert record
+            const { error: dbError } = await supabase
+                .from('application_documents')
+                .insert({
+                    application_id: appData?.id || '00000000-0000-0000-0000-000000000000', // Handle if no app found
+                    document_type: 'Evidence',
+                    file_name: file.name,
+                    file_path: filePath,
+                    file_size: file.size,
+                    uploaded_by: user.id
+                });
+
+            if (dbError) throw dbError;
+
+            toast({
+                title: "Document Uploaded",
+                description: "Your document has been securely stored in the vault.",
+            });
+            fetchDocuments();
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Upload Failed",
+                description: error.message,
+            });
+        } finally {
+            setIsUploading(false);
+        }
+    };
 
     return (
         <ClientLayout>
@@ -86,10 +187,25 @@ export default function DocumentVault() {
                         <h1 className="text-3xl font-bold font-serif tracking-tight">Document vault</h1>
                         <p className="text-muted-foreground mt-1 text-sm">Review, track, and upload your compliance evidence.</p>
                     </div>
-                    <Button className="bg-primary text-white hover:bg-primary/90 shadow-md">
-                        <Upload className="mr-2 h-4 w-4" />
-                        Upload Evidence
-                    </Button>
+                    <div className="flex gap-2">
+                        <Input
+                            type="file"
+                            className="hidden"
+                            id="file-upload"
+                            onChange={handleUpload}
+                            disabled={isUploading}
+                        />
+                        <Button
+                            asChild
+                            className="bg-primary text-white hover:bg-primary/90 shadow-md cursor-pointer"
+                            disabled={isUploading}
+                        >
+                            <label htmlFor="file-upload">
+                                {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                                {isUploading ? "Uploading..." : "Upload Evidence"}
+                            </label>
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Info Box */}
@@ -134,68 +250,75 @@ export default function DocumentVault() {
 
                 {/* Document List */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {documents.map((doc) => (
-                        <Card key={doc.id} className="group hover:shadow-xl transition-all duration-300 border-none bg-card shadow-md relative overflow-hidden">
-                            {/* Status Ribbon */}
-                            <div className={`absolute top-0 right-0 px-3 py-1 text-[9px] font-bold uppercase tracking-widest rounded-bl-lg ${doc.status === 'Verified' ? 'bg-green-500/10 text-green-600' :
-                                    doc.status === 'Under Review' ? 'bg-amber-500/10 text-amber-600' :
-                                        'bg-destructive/10 text-destructive'
-                                }`}>
-                                {doc.status}
-                            </div>
-
-                            <CardHeader className="pt-8 pb-4">
-                                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform">
-                                    <FileText className="h-6 w-6" />
-                                </div>
-                                <CardTitle className="text-base font-bold leading-tight line-clamp-2">
-                                    {doc.name}
-                                </CardTitle>
-                                <CardDescription className="text-xs uppercase font-mono tracking-tighter mt-1">
-                                    {doc.category}
-                                </CardDescription>
-                            </CardHeader>
-
-                            <CardContent className="space-y-4">
-                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                    <div>
-                                        <span className="text-muted-foreground block">Uploaded:</span>
-                                        <span className="font-semibold">{doc.date}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-muted-foreground block">Expiry:</span>
-                                        <span className={`font-semibold ${doc.status === 'Expired' ? 'text-destructive' : 'text-foreground'}`}>
-                                            {doc.expiry}
-                                        </span>
-                                    </div>
+                    {isLoading ? (
+                        <div className="col-span-full flex flex-col items-center justify-center py-12 text-muted-foreground">
+                            <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                            <p>Loading your documents...</p>
+                        </div>
+                    ) : docs.length === 0 ? (
+                        <div className="col-span-full flex flex-col items-center justify-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
+                            <Files className="h-12 w-12 mb-4 opacity-20" />
+                            <p>No documents found in your vault.</p>
+                        </div>
+                    ) : docs
+                        .filter(doc => activeTab === "All Documents" || doc.document_type === activeTab)
+                        .map((doc) => (
+                            <Card key={doc.id} className="group hover:shadow-xl transition-all duration-300 border-none bg-card shadow-md relative overflow-hidden">
+                                {/* Status Ribbon - Placeholder status */}
+                                <div className={`absolute top-0 right-0 px-3 py-1 text-[9px] font-bold uppercase tracking-widest rounded-bl-lg bg-amber-500/10 text-amber-600`}>
+                                    Pending
                                 </div>
 
-                                <div className="pt-4 flex items-center justify-between border-t border-border/50">
-                                    <span className="text-[10px] font-mono text-muted-foreground">{doc.size} | {doc.id}</span>
-                                    <div className="flex gap-1">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary transition-colors">
-                                            <Eye className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary transition-colors">
-                                            <Download className="h-4 w-4" />
-                                        </Button>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                    <MoreVertical className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem>New Version</DropdownMenuItem>
-                                                <DropdownMenuItem>Share with AHI</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-muted-foreground opacity-50 cursor-not-allowed">Delete (Disabled)</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                <CardHeader className="pt-8 pb-4">
+                                    <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform">
+                                        <FileText className="h-6 w-6" />
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                    <CardTitle className="text-base font-bold leading-tight line-clamp-2">
+                                        {doc.file_name}
+                                    </CardTitle>
+                                    <CardDescription className="text-xs uppercase font-mono tracking-tighter mt-1">
+                                        {doc.document_type}
+                                    </CardDescription>
+                                </CardHeader>
+
+                                <CardContent className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>
+                                            <span className="text-muted-foreground block">Uploaded:</span>
+                                            <span className="font-semibold">{new Date(doc.uploaded_at).toLocaleDateString()}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground block">Size:</span>
+                                            <span className="font-semibold">{(doc.file_size / 1024 / 1024).toFixed(2)} MB</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4 flex items-center justify-between border-t border-border/50">
+                                        <span className="text-[10px] font-mono text-muted-foreground">{doc.id.split('-')[0]}</span>
+                                        <div className="flex gap-1">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary transition-colors">
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary transition-colors">
+                                                <Download className="h-4 w-4" />
+                                            </Button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                        <MoreVertical className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem>New Version</DropdownMenuItem>
+                                                    <DropdownMenuItem>Share with AHI</DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-muted-foreground opacity-50 cursor-not-allowed">Delete (Disabled)</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
                 </div>
             </div>
         </ClientLayout>

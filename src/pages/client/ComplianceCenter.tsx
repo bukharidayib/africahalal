@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { ClientLayout } from "@/components/layout/ClientLayout";
 import {
     ClipboardCheck,
@@ -16,6 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 const carItems = [
     {
@@ -45,6 +50,51 @@ const carItems = [
 ];
 
 export default function ComplianceCenter() {
+    const [isLoading, setIsLoading] = useState(true);
+    const [carItems, setCarItems] = useState<any[]>([]);
+    const [latestReport, setLatestReport] = useState<any>(null);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        fetchComplianceData();
+    }, []);
+
+    const fetchComplianceData = async () => {
+        setIsLoading(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // Fetch CARs
+            const { data: cars, error: carError } = await supabase
+                .from('corrective_actions')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (carError) throw carError;
+            setCarItems(cars || []);
+
+            // Fetch Latest Inspection Report
+            const { data: reports, error: reportError } = await supabase
+                .from('inspection_reports')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (reportError) throw reportError;
+            if (reports && reports.length > 0) {
+                setLatestReport(reports[0]);
+            }
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Error fetching compliance data",
+                description: error.message,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
     return (
         <ClientLayout>
             <div className="space-y-8 animate-in fade-in duration-500">
@@ -56,58 +106,60 @@ export default function ComplianceCenter() {
 
                 {/* Inspection Report Overview */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card className="border-none shadow-md bg-card border-t-4 border-primary">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                                <Badge variant="outline" className="text-[10px] font-bold tracking-widest uppercase">Latest Inspection</Badge>
-                                <span className="text-xs text-muted-foreground font-mono">AHI-INS-9921</span>
-                            </div>
-                            <CardTitle className="text-xl font-serif mt-2">Industrial Kitchen Audit</CardTitle>
-                            <CardDescription>Performed on 20 Jan 2026 by AHI Inspection Team</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                    <span className="text-sm font-medium">Critical Compliance</span>
+                    {isLoading ? (
+                        <div className="col-span-full flex items-center justify-center p-12">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                    ) : latestReport ? (
+                        <Card className="border-none shadow-md bg-card border-t-4 border-primary">
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                    <Badge variant="outline" className="text-[10px] font-bold tracking-widest uppercase">Latest Inspection</Badge>
+                                    <span className="text-xs text-muted-foreground font-mono">{latestReport.id.split('-')[0]}</span>
                                 </div>
-                                <span className="text-sm font-bold text-green-600">PASSED</span>
-                            </div>
-                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                                <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                                    <span className="text-sm font-medium">Minor Issues</span>
+                                <CardTitle className="text-xl font-serif mt-2">Audit Report</CardTitle>
+                                <CardDescription>Performed on {new Date(latestReport.created_at).toLocaleDateString()}</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                                    <div className="flex items-center gap-2">
+                                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                        <span className="text-sm font-medium">Critical Compliance</span>
+                                    </div>
+                                    <span className="text-sm font-bold text-green-600">PASSED</span>
                                 </div>
-                                <span className="text-sm font-bold text-amber-600">03 FOUND</span>
-                            </div>
-                            <Button variant="outline" className="w-full mt-2 font-bold group">
-                                Read Full Report
-                                <FileSearch className="ml-2 h-4 w-4 group-hover:scale-110 transition-transform" />
-                            </Button>
-                        </CardContent>
-                    </Card>
+                                <Button variant="outline" className="w-full mt-2 font-bold group">
+                                    Read Full Report
+                                    <FileSearch className="ml-2 h-4 w-4 group-hover:scale-110 transition-transform" />
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <Card className="border-none shadow-md bg-muted/10 border-dashed border-2">
+                            <CardContent className="p-12 text-center text-muted-foreground">
+                                <ClipboardCheck className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                                <p>No inspection reports found yet.</p>
+                            </CardContent>
+                        </Card>
+                    )}
 
-                    <Card className="border-none shadow-md bg-gradient-to-br from-secondary/5 to-secondary/10 border border-secondary/20">
-                        <CardHeader>
-                            <CardTitle className="text-xl font-serif">Corrective Actions Progress</CardTitle>
-                            <CardDescription>Resolve all issues to proceed with certification.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-sm font-bold">
-                                    <span>Overall Resolution</span>
-                                    <span>66%</span>
+                    {!isLoading && (
+                        <Card className="border-none shadow-md bg-gradient-to-br from-secondary/5 to-secondary/10 border border-secondary/20">
+                            <CardHeader>
+                                <CardTitle className="text-xl font-serif">Corrective Actions Progress</CardTitle>
+                                <CardDescription>Resolve all issues to proceed with certification.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm font-bold">
+                                        <span>Overall Resolution</span>
+                                        <span>{carItems.length > 0 ? Math.round((carItems.filter(c => c.status === 'completed').length / carItems.length) * 100) : 0}%</span>
+                                    </div>
+                                    <Progress value={carItems.length > 0 ? (carItems.filter(c => c.status === 'completed').length / carItems.length) * 100 : 0} className="h-2" />
                                 </div>
-                                <Progress value={66} className="h-2" />
-                            </div>
-                            <div className="bg-white/50 p-4 rounded-xl border border-secondary/20 flex gap-3 items-center">
-                                <ShieldAlert className="h-6 w-6 text-secondary animate-pulse" />
-                                <p className="text-xs font-medium leading-relaxed">
-                                    Account status is <span className="text-secondary font-bold">PENDING CORRECTIONS</span>. Certification issuance is paused until major CARs are accepted.
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 {/* CAR List */}
@@ -118,42 +170,54 @@ export default function ComplianceCenter() {
                     </div>
 
                     <div className="grid gap-4">
-                        {carItems.map((car) => (
+                        {isLoading ? (
+                            <div className="text-center py-12 text-muted-foreground">
+                                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                                <p>Fetching corrective actions...</p>
+                            </div>
+                        ) : carItems.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">
+                                <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-10 text-green-500" />
+                                <p>Excellent! You have no open corrective actions.</p>
+                            </div>
+                        ) : carItems.map((car) => (
                             <Card key={car.id} className="border-none shadow-sm hover:shadow-md transition-all group overflow-hidden">
                                 <CardContent className="p-0">
                                     <div className="flex flex-col md:flex-row">
-                                        <div className={`w-full md:w-2 ${car.severity === 'Major' ? 'bg-destructive' : 'bg-amber-500'
+                                        <div className={`w-full md:w-2 ${car.severity === 'major' ? 'bg-destructive' : 'bg-amber-500'
                                             }`} />
                                         <div className="flex-1 p-6">
                                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                                                 <div className="space-y-1">
                                                     <div className="flex items-center gap-2">
-                                                        <Badge variant={car.severity === 'Major' ? 'destructive' : 'secondary'} className="text-[9px] uppercase tracking-widest">
+                                                        <Badge variant={car.severity === 'major' ? 'destructive' : 'secondary'} className="text-[9px] uppercase tracking-widest">
                                                             {car.severity}
                                                         </Badge>
-                                                        <span className="text-xs font-mono text-muted-foreground">{car.id}</span>
+                                                        <span className="text-xs font-mono text-muted-foreground">{car.id.split('-')[0]}</span>
                                                     </div>
-                                                    <h3 className="text-lg font-bold mt-1 group-hover:text-primary transition-colors">{car.issue}</h3>
+                                                    <h3 className="text-lg font-bold mt-1 group-hover:text-primary transition-colors">{car.description}</h3>
                                                     <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-2">
                                                         <ArrowRight className="h-3.5 w-3.5 text-secondary" />
-                                                        <span className="font-semibold text-foreground">Action required:</span> {car.action}
+                                                        <span className="font-semibold text-foreground">Action required:</span> {car.required_action}
                                                     </p>
                                                 </div>
                                                 <div className="text-right flex flex-col items-end gap-3 min-w-[140px]">
-                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${car.status === 'Accepted' ? 'bg-green-500/10 text-green-600' :
-                                                        car.status === 'Under Review' ? 'bg-blue-500/10 text-blue-600' :
+                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${car.status === 'completed' ? 'bg-green-500/10 text-green-600' :
+                                                        car.status === 'in_progress' ? 'bg-blue-500/10 text-blue-600' :
                                                             'bg-amber-500/10 text-amber-600'
                                                         }`}>
-                                                        {car.status === 'Accepted' ? <CheckCircle2 className="mr-1.5 h-3 h-3" /> : <Clock className="mr-1.5 h-3 h-3" />}
-                                                        {car.status}
+                                                        {car.status === 'completed' ? <CheckCircle2 className="mr-1.5 h-3 h-3" /> : <Clock className="mr-1.5 h-3 h-3" />}
+                                                        {car.status.replace('_', ' ')}
                                                     </span>
                                                     <div className="text-xs font-mono text-muted-foreground">
-                                                        DUE: <span className="font-bold text-foreground">{car.dueDate}</span>
+                                                        DUE: <span className="font-bold text-foreground">{new Date(car.due_date).toLocaleDateString()}</span>
                                                     </div>
-                                                    {car.status === 'Open' ? (
-                                                        <Button size="sm" className="bg-primary text-white hover:bg-primary/90 shadow h-8">
-                                                            <Upload className="mr-2 h-3.5 w-3.5" />
-                                                            Upload Evidence
+                                                    {car.status === 'open' ? (
+                                                        <Button size="sm" className="bg-primary text-white hover:bg-primary/90 shadow h-8" asChild>
+                                                            <Link to="/client/documents">
+                                                                <Upload className="mr-2 h-3.5 w-3.5" />
+                                                                Upload Evidence
+                                                            </Link>
                                                         </Button>
                                                     ) : (
                                                         <Button variant="outline" size="sm" className="h-8 group-hover:border-primary/50 transition-colors">

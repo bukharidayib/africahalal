@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 import {
     ShieldCheck,
     Search,
@@ -27,30 +30,45 @@ export default function VerifyPublic() {
     const [certId, setCertId] = useState(certIdFromQuery || "");
     const [isSearching, setIsSearching] = useState(false);
     const [result, setResult] = useState<any>(null);
+    const { toast } = useToast();
 
-    const handleVerify = (e: React.FormEvent) => {
+    const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!certId) return;
 
         setIsSearching(true);
-        // Simulate verification
-        setTimeout(() => {
-            setIsSearching(false);
-            if (certId === "AHI-2025-0082") {
+        try {
+            const { data, error } = await supabase
+                .from('certificates')
+                .select('*')
+                .eq('certificate_number', certId)
+                .maybeSingle();
+
+            if (error) throw error;
+
+            if (data) {
                 setResult({
                     valid: true,
-                    id: "AHI-2025-0082",
-                    entity: "African Halal Institute - Main Facility",
-                    scope: "Livestock Processing & Distribution",
-                    issueDate: "20 Jan 2025",
-                    expiryDate: "20 Jan 2026",
-                    status: "Active",
+                    id: data.certificate_number,
+                    entity: "African Halal Institute Certified Partner",
+                    scope: data.scope,
+                    issueDate: new Date(data.issue_date).toLocaleDateString(),
+                    expiryDate: new Date(data.expiry_date).toLocaleDateString(),
+                    status: data.status,
                     type: "Standard Halal Accreditation"
                 });
             } else {
                 setResult({ valid: false });
             }
-        }, 1500);
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Search Error",
+                description: error.message,
+            });
+        } finally {
+            setIsSearching(false);
+        }
     };
 
     return (
