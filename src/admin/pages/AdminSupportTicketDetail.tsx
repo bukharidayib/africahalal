@@ -123,10 +123,20 @@ export default function AdminSupportTicketDetail() {
   }
 
   async function handleSendMessage() {
-    if (!newMessage.trim() || !user) return;
+    if (!newMessage.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+
+    if (!user) {
+      toast.error('You must be logged in to send messages');
+      return;
+    }
 
     setIsSending(true);
     try {
+      console.log('Sending message with user ID:', user.id);
+      
       const { error } = await supabase
         .from('ticket_messages')
         .insert({
@@ -136,23 +146,30 @@ export default function AdminSupportTicketDetail() {
           message: newMessage.trim(),
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Insert error:', error);
+        throw error;
+      }
 
       // Update ticket status if it was open
       if (ticket?.status === 'open') {
-        await supabase
+        const { error: updateError } = await supabase
           .from('support_tickets')
           .update({ status: 'in_progress', updated_at: new Date().toISOString() })
           .eq('id', id);
         
-        setTicket(prev => prev ? { ...prev, status: 'in_progress' } : null);
+        if (updateError) {
+          console.error('Update ticket error:', updateError);
+        } else {
+          setTicket(prev => prev ? { ...prev, status: 'in_progress' } : null);
+        }
       }
 
       setNewMessage('');
       toast.success('Reply sent');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send reply');
+      toast.error(error?.message || 'Failed to send reply');
     } finally {
       setIsSending(false);
     }
