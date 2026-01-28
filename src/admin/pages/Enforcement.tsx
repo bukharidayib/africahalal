@@ -43,10 +43,14 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { AdminLayout } from '../components/layout/AdminLayout';
+import { useAdminAuthContext } from '../contexts/AdminAuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, addDays } from 'date-fns';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 type NCNSeverity = 'minor' | 'major' | 'critical';
 type CorrectiveActionStatus = 'pending' | 'under_review' | 'accepted' | 'rejected';
@@ -82,6 +86,14 @@ interface CorrectiveAction {
   };
 }
 
+interface Application {
+  id: string;
+  application_number: string;
+  organizations?: {
+    name: string;
+  };
+}
+
 const severityConfig: Record<NCNSeverity, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }> = {
   minor: { label: 'Minor', variant: 'outline', className: 'border-amber-300 text-amber-700 bg-amber-50' },
   major: { label: 'Major', variant: 'secondary', className: 'border-orange-300 text-orange-700 bg-orange-50' },
@@ -95,7 +107,18 @@ const caStatusConfig: Record<CorrectiveActionStatus, { label: string; variant: '
   rejected: { label: 'Rejected', variant: 'destructive', icon: XCircle },
 };
 
+const ncnCategories = [
+  'Documentation Deficiency',
+  'Process Non-Compliance',
+  'Ingredient Verification',
+  'Facility Standards',
+  'Record Keeping',
+  'Supplier Compliance',
+  'Other',
+];
+
 export default function Enforcement() {
+  const { user } = useAdminAuthContext();
   const [ncns, setNCNs] = useState<NCN[]>([]);
   const [correctiveActions, setCorrectiveActions] = useState<CorrectiveAction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -107,6 +130,17 @@ export default function Enforcement() {
   const [selectedCA, setSelectedCA] = useState<CorrectiveAction | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Issue NCN dialog state
+  const [isNCNDialogOpen, setIsNCNDialogOpen] = useState(false);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [ncnForm, setNCNForm] = useState({
+    application_id: '',
+    category: '',
+    severity: 'minor' as NCNSeverity,
+    description: '',
+    due_date: undefined as Date | undefined,
+  });
 
   useEffect(() => {
     fetchData();
@@ -155,6 +189,89 @@ export default function Enforcement() {
       console.error('Error fetching enforcement data:', error);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function fetchApplications() {
+    try {
+      const { data, error } = await supabase
+        .from('certification_applications')
+        .select(`
+          id,
+          application_number,
+          organizations (
+            name
+          )
+        `)
+        .in('status', ['submitted', 'under_review', 'awaiting_inspection', 'inspection_complete', 'pending_decision'])
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setApplications(data || []);
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+    }
+  }
+
+  function handleOpenNCNDialog() {
+    setNCNForm({
+      application_id: '',
+      category: '',
+      severity: 'minor',
+      description: '',
+      due_date: addDays(new Date(), 14), // Default 14 days
+    });
+    fetchApplications();
+    setIsNCNDialogOpen(true);
+  }
+
+  async function handleIssueNCN() {
+    if (!ncnForm.application_id || !ncnForm.category || !ncnForm.description || !ncnForm.due_date || !user) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Generate NCN number using RPC
+      const { data: ncnNumber, error: genError } = await supabase.rpc('generate_ncn_number');
+      if (genError) throw genError;
+
+      const { error } = await supabase
+        .from('non_conformance_notices')
+        .insert({
+          ncn_number: ncnNumber,
+          application_id: ncnForm.application_id,
+          category: ncnForm.category,
+          severity: ncnForm.severity,
+          description: ncnForm.description,
+          due_date: format(ncnForm.due_date, 'yyyy-MM-dd'),
+          issued_by: user.id,
+          status: 'open',
+        });
+
+      if (error) throw error;
+
+      // Log audit
+      await supabase.rpc('log_audit', {
+        _action: 'ncn_issued',
+        _resource_type: 'non_conformance_notices',
+        _resource_id: ncnForm.application_id,
+        _metadata: {
+          ncn_number: ncnNumber,
+          severity: ncnForm.severity,
+          category: ncnForm.category,
+        },
+      });
+
+      toast.success(`NCN ${ncnNumber} issued successfully`);
+      setIsNCNDialogOpen(false);
+      fetchData();
+    } catch (error) {
+      console.error('Error issuing NCN:', error);
+      toast.error('Failed to issue NCN');
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -241,7 +358,7 @@ export default function Enforcement() {
               Manage non-conformance notices and corrective actions
             </p>
           </div>
-          <Button>
+          <Button onClick={handleOpenNCNDialog}>
             <Plus className="mr-2 h-4 w-4" />
             Issue NCN
           </Button>
@@ -553,6 +670,132 @@ export default function Enforcement() {
             >
               <CheckCircle2 className="mr-2 h-4 w-4" />
               Accept
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Issue NCN Dialog */}
+      <Dialog open={isNCNDialogOpen} onOpenChange={setIsNCNDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Issue Non-Conformance Notice</DialogTitle>
+            <DialogDescription>
+              Create a new NCN for an application that requires corrective action.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Application</Label>
+              <Select 
+                value={ncnForm.application_id} 
+                onValueChange={(value) => setNCNForm({ ...ncnForm, application_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an application" />
+                </SelectTrigger>
+                <SelectContent>
+                  {applications.length === 0 ? (
+                    <SelectItem value="none" disabled>No applications available</SelectItem>
+                  ) : (
+                    applications.map((app) => (
+                      <SelectItem key={app.id} value={app.id}>
+                        {app.application_number} - {app.organizations?.name || 'Unknown'}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select 
+                value={ncnForm.category} 
+                onValueChange={(value) => setNCNForm({ ...ncnForm, category: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ncnCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Severity</Label>
+              <div className="flex gap-2">
+                {(['minor', 'major', 'critical'] as NCNSeverity[]).map((sev) => (
+                  <Button
+                    key={sev}
+                    type="button"
+                    variant={ncnForm.severity === sev ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(
+                      ncnForm.severity === sev && severityConfig[sev].className
+                    )}
+                    onClick={() => setNCNForm({ ...ncnForm, severity: sev })}
+                  >
+                    {severityConfig[sev].label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={ncnForm.description}
+                onChange={(e) => setNCNForm({ ...ncnForm, description: e.target.value })}
+                placeholder="Describe the non-conformance issue..."
+                rows={4}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Due Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !ncnForm.due_date && "text-muted-foreground"
+                    )}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {ncnForm.due_date 
+                      ? format(ncnForm.due_date, 'PPP')
+                      : 'Pick a due date'
+                    }
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={ncnForm.due_date}
+                    onSelect={(date) => setNCNForm({ ...ncnForm, due_date: date })}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsNCNDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleIssueNCN} disabled={isSubmitting}>
+              {isSubmitting ? 'Issuing...' : 'Issue NCN'}
             </Button>
           </DialogFooter>
         </DialogContent>

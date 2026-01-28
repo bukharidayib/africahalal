@@ -152,10 +152,20 @@ export default function AdminSupportChatSession() {
   }
 
   async function handleSendMessage() {
-    if (!newMessage.trim() || !user) return;
+    if (!newMessage.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+
+    if (!user) {
+      toast.error('You must be logged in to send messages');
+      return;
+    }
 
     setIsSending(true);
     try {
+      console.log('Sending chat message with user ID:', user.id);
+      
       const { error } = await supabase
         .from('chat_messages')
         .insert({
@@ -165,12 +175,16 @@ export default function AdminSupportChatSession() {
           message: newMessage.trim(),
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Insert error:', error);
+        throw error;
+      }
+      
       setNewMessage('');
       inputRef.current?.focus();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send message');
+      toast.error(error?.message || 'Failed to send message');
     } finally {
       setIsSending(false);
     }

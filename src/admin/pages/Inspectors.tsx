@@ -123,6 +123,82 @@ export default function Inspectors() {
     }
   }
 
+  async function handleAddInspector() {
+    if (!newInspector.email.trim()) {
+      toast.error('Please enter an email address');
+      return;
+    }
+
+    if (newInspector.specializations.length === 0) {
+      toast.error('Please select at least one specialization');
+      return;
+    }
+
+    if (newInspector.regions.length === 0) {
+      toast.error('Please select at least one region');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Find user by email
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', newInspector.email.trim().toLowerCase())
+        .single();
+
+      if (profileError || !profile) {
+        toast.error('User not found. They must sign up first.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Check if already an inspector
+      const { data: existing } = await supabase
+        .from('inspectors')
+        .select('id')
+        .eq('user_id', profile.id)
+        .single();
+
+      if (existing) {
+        toast.error('This user is already an inspector.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Generate inspector number
+      const year = new Date().getFullYear();
+      const { count } = await supabase
+        .from('inspectors')
+        .select('*', { count: 'exact', head: true });
+      const inspectorNumber = `INS-${year}-${String((count || 0) + 1).padStart(5, '0')}`;
+
+      // Create inspector
+      const { error } = await supabase
+        .from('inspectors')
+        .insert({
+          user_id: profile.id,
+          inspector_number: inspectorNumber,
+          specializations: newInspector.specializations,
+          regions: newInspector.regions,
+          is_active: true,
+        });
+
+      if (error) throw error;
+
+      toast.success('Inspector added successfully');
+      setIsAddDialogOpen(false);
+      setNewInspector({ email: '', specializations: [], regions: [] });
+      fetchInspectors();
+    } catch (error) {
+      console.error('Error adding inspector:', error);
+      toast.error('Failed to add inspector');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   async function toggleInspectorStatus(inspector: Inspector) {
     try {
       const { error } = await supabase
@@ -388,7 +464,7 @@ export default function Inspectors() {
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               Cancel
             </Button>
-            <Button disabled={isSubmitting}>
+            <Button onClick={handleAddInspector} disabled={isSubmitting}>
               {isSubmitting ? 'Adding...' : 'Add Inspector'}
             </Button>
           </DialogFooter>
