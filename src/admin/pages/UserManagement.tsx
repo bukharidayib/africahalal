@@ -56,11 +56,12 @@ interface UserRole {
   };
 }
 
-const roleColors: Record<AdminRole, string> = {
+const roleColors: Record<string, string> = {
   super_admin: 'bg-purple-100 text-purple-800',
   certification_officer: 'bg-blue-100 text-blue-800',
   finance_officer: 'bg-green-100 text-green-800',
   it_system_auditor: 'bg-amber-100 text-amber-800',
+  support_agent: 'bg-pink-100 text-pink-800',
 };
 
 export default function UserManagement() {
@@ -277,6 +278,7 @@ export default function UserManagement() {
                       <SelectItem value="certification_officer">Certification Officer</SelectItem>
                       <SelectItem value="finance_officer">Finance Officer</SelectItem>
                       <SelectItem value="it_system_auditor">IT System Auditor</SelectItem>
+                      <SelectItem value="support_agent">Support Agent</SelectItem>
                       <SelectItem value="super_admin">Super Administrator</SelectItem>
                     </SelectContent>
                   </Select>

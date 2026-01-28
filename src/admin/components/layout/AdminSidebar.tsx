@@ -10,6 +10,8 @@ import {
   ScrollText,
   Settings,
   Shield,
+  MessageSquare,
+  Key,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAdminAuthContext } from '../../contexts/AdminAuthContext';
@@ -64,6 +66,12 @@ const navItems: NavItem[] = [
     permission: 'canViewEnforcement',
   },
   {
+    title: 'Support Center',
+    href: '/admin/support',
+    icon: MessageSquare,
+    permission: 'canViewSupport',
+  },
+  {
     title: 'Audit Logs',
     href: '/admin/audit-logs',
     icon: ScrollText,
@@ -73,6 +81,12 @@ const navItems: NavItem[] = [
     title: 'User Management',
     href: '/admin/users',
     icon: Shield,
+    permission: 'canManageUsers',
+  },
+  {
+    title: 'Roles & Permissions',
+    href: '/admin/roles',
+    icon: Key,
     permission: 'canManageUsers',
   },
   {
