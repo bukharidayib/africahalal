@@ -12,7 +12,9 @@ import {
     ClipboardList,
     Plus,
     Trash2,
-    Loader2
+    Loader2,
+    Beaker,
+    FileCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,6 +29,7 @@ import {
     SelectValue
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -38,12 +41,15 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { ProductIngredientModal, Ingredient } from "@/components/client/ProductIngredientModal";
+import { MandatoryDocuments } from "@/components/client/MandatoryDocuments";
 
 const steps = [
     { id: 1, name: "Establishment Details", icon: Building2 },
     { id: 2, name: "Certification Scope", icon: FileBadge },
     { id: 3, name: "Product Information", icon: ClipboardList },
-    { id: 4, name: "Declaration", icon: BadgeCheck },
+    { id: 4, name: "Mandatory Documents", icon: FileCheck },
+    { id: 5, name: "Declaration", icon: BadgeCheck },
 ];
 
 interface ProductItem {
@@ -51,12 +57,22 @@ interface ProductItem {
     name: string;
     brand: string;
     category: string;
+    ingredients: Ingredient[];
+}
+
+interface UploadedFile {
+    documentId: string;
+    fileName: string;
+    filePath: string;
+    fileSize: number;
 }
 
 export default function CertificationApplication() {
     const [currentStep, setCurrentStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+    const [ingredientModalOpen, setIngredientModalOpen] = useState(false);
+    const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -69,6 +85,7 @@ export default function CertificationApplication() {
         country: "",
         categories: [] as string[],
         products: [] as ProductItem[],
+        uploadedFiles: [] as UploadedFile[],
         declaration_confirmed: false,
         declaration_compliance: false,
         signature: ""
@@ -82,7 +99,6 @@ export default function CertificationApplication() {
     });
 
     const handleNext = () => {
-        // Validate current step before proceeding
         if (!validateStep(currentStep)) return;
         if (currentStep < steps.length) setCurrentStep(currentStep + 1);
     };
@@ -118,7 +134,31 @@ export default function CertificationApplication() {
                     toast({
                         variant: "destructive",
                         title: "Products Required",
-                        description: "Please add at least one product or service to certify.",
+                        description: "Please add at least one product to certify.",
+                    });
+                    return false;
+                }
+                // Check if all products have at least one ingredient
+                const productsWithoutIngredients = formData.products.filter(p => p.ingredients.length === 0);
+                if (productsWithoutIngredients.length > 0) {
+                    toast({
+                        variant: "destructive",
+                        title: "Ingredients Required",
+                        description: `Please add ingredients for: ${productsWithoutIngredients.map(p => p.name).join(', ')}`,
+                    });
+                    return false;
+                }
+                return true;
+            case 4:
+                // Check required documents
+                const requiredDocIds = ["business_registration", "tax_clearance", "ingredient_spec", "halal_policy"];
+                const uploadedDocIds = formData.uploadedFiles.map(f => f.documentId);
+                const missingDocs = requiredDocIds.filter(id => !uploadedDocIds.includes(id));
+                if (missingDocs.length > 0) {
+                    toast({
+                        variant: "destructive",
+                        title: "Missing Documents",
+                        description: "Please upload all required documents before proceeding.",
                     });
                     return false;
                 }
@@ -146,7 +186,8 @@ export default function CertificationApplication() {
             id: crypto.randomUUID(),
             name: newProduct.name,
             brand: newProduct.brand,
-            category: newProduct.category || "General"
+            category: newProduct.category || "General",
+            ingredients: []
         };
 
         setFormData(prev => ({
@@ -159,7 +200,7 @@ export default function CertificationApplication() {
 
         toast({
             title: "Product Added",
-            description: `${product.name} has been added to your application.`,
+            description: `${product.name} has been added. Please add ingredients for this product.`,
         });
     };
 
@@ -173,6 +214,45 @@ export default function CertificationApplication() {
             description: "The product has been removed from your application.",
         });
     };
+
+    const openIngredientModal = (productId: string) => {
+        setSelectedProductId(productId);
+        setIngredientModalOpen(true);
+    };
+
+    const handleSaveIngredients = (ingredients: Ingredient[]) => {
+        if (!selectedProductId) return;
+        
+        setFormData(prev => ({
+            ...prev,
+            products: prev.products.map(p => 
+                p.id === selectedProductId 
+                    ? { ...p, ingredients } 
+                    : p
+            )
+        }));
+
+        toast({
+            title: "Ingredients Saved",
+            description: `${ingredients.length} ingredient(s) saved for this product.`,
+        });
+    };
+
+    const handleFileUpload = (file: UploadedFile) => {
+        setFormData(prev => ({
+            ...prev,
+            uploadedFiles: [...prev.uploadedFiles.filter(f => f.documentId !== file.documentId), file]
+        }));
+    };
+
+    const handleFileRemove = (documentId: string) => {
+        setFormData(prev => ({
+            ...prev,
+            uploadedFiles: prev.uploadedFiles.filter(f => f.documentId !== documentId)
+        }));
+    };
+
+    const selectedProduct = formData.products.find(p => p.id === selectedProductId);
 
     const handleSubmit = async () => {
         if (!formData.declaration_confirmed || !formData.declaration_compliance || !formData.signature) {
@@ -207,7 +287,6 @@ export default function CertificationApplication() {
                     .single();
 
                 if (orgError && orgError.code === 'PGRST116') {
-                    // Create org if doesn't exist - generate UUID client-side to avoid SELECT permission issues
                     const newOrgId = crypto.randomUUID();
                     const { error: createError } = await supabase
                         .from('organizations')
@@ -223,7 +302,6 @@ export default function CertificationApplication() {
                     if (createError) throw createError;
                     organization_id = newOrgId;
 
-                    // Link user to organization
                     await supabase
                         .from('profiles')
                         .update({ organization_id })
@@ -256,6 +334,54 @@ export default function CertificationApplication() {
 
             if (appError) throw appError;
 
+            // Insert Products and Ingredients
+            for (const product of formData.products) {
+                const { data: productData, error: productError } = await supabase
+                    .from('application_products')
+                    .insert({
+                        application_id: appData.id,
+                        name: product.name,
+                        brand: product.brand,
+                        category: product.category
+                    })
+                    .select('id')
+                    .single();
+
+                if (productError) throw productError;
+
+                // Insert ingredients for this product
+                if (product.ingredients.length > 0) {
+                    const ingredientsToInsert = product.ingredients.map(ing => ({
+                        product_id: productData.id,
+                        ingredient_name: ing.ingredient_name,
+                        percentage: ing.percentage,
+                        source: ing.source,
+                        is_halal_certified: ing.is_halal_certified,
+                        supplier_name: ing.supplier_name
+                    }));
+
+                    const { error: ingError } = await supabase
+                        .from('product_ingredients')
+                        .insert(ingredientsToInsert);
+
+                    if (ingError) throw ingError;
+                }
+            }
+
+            // Link uploaded documents to application
+            for (const file of formData.uploadedFiles) {
+                await supabase
+                    .from('application_documents')
+                    .insert({
+                        application_id: appData.id,
+                        document_type: file.documentId,
+                        file_name: file.fileName,
+                        file_path: file.filePath,
+                        file_size: file.fileSize,
+                        uploaded_by: user.id
+                    });
+            }
+
             // Log Audit
             await supabase.rpc('log_audit', {
                 _action: 'application_submitted',
@@ -264,6 +390,7 @@ export default function CertificationApplication() {
                 _metadata: { 
                     step: 'submission',
                     products_count: formData.products.length,
+                    documents_count: formData.uploadedFiles.length,
                     categories: formData.categories
                 }
             });
@@ -272,7 +399,7 @@ export default function CertificationApplication() {
                 title: "Application Submitted Successfully",
                 description: `Application ${applicationNumber} has been sent for review.`,
             });
-            navigate("/client/dashboard");
+            navigate("/client/applications");
         } catch (error: any) {
             console.error('Submission error:', error);
             toast({
@@ -483,8 +610,8 @@ export default function CertificationApplication() {
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <Label className="text-foreground text-base">Product/Service List *</Label>
-                                            <p className="text-sm text-muted-foreground mt-1">Add all products or services to be covered under this certification.</p>
+                                            <Label className="text-foreground text-base">Product List *</Label>
+                                            <p className="text-sm text-muted-foreground mt-1">Add all products to be covered under this certification with their ingredients.</p>
                                         </div>
                                         <Button 
                                             variant="outline" 
@@ -493,7 +620,7 @@ export default function CertificationApplication() {
                                             onClick={() => setIsAddItemOpen(true)}
                                         >
                                             <Plus className="h-4 w-4" />
-                                            Add Item
+                                            Add Product
                                         </Button>
                                     </div>
                                     <div className="border rounded-lg overflow-hidden">
@@ -503,16 +630,17 @@ export default function CertificationApplication() {
                                                     <th className="px-4 py-3 text-left font-semibold">Product Name</th>
                                                     <th className="px-4 py-3 text-left font-semibold">Brand</th>
                                                     <th className="px-4 py-3 text-left font-semibold">Category</th>
-                                                    <th className="px-4 py-3 text-right font-semibold">Action</th>
+                                                    <th className="px-4 py-3 text-center font-semibold">Ingredients</th>
+                                                    <th className="px-4 py-3 text-right font-semibold">Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {formData.products.length === 0 ? (
                                                     <tr className="border-t bg-muted/20">
-                                                        <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                                                        <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                                                             <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
                                                             <p className="italic">No products added yet.</p>
-                                                            <p className="text-xs mt-1">Click "Add Item" to add products to your certification scope.</p>
+                                                            <p className="text-xs mt-1">Click "Add Product" to add products to your certification scope.</p>
                                                         </td>
                                                     </tr>
                                                 ) : (
@@ -521,6 +649,23 @@ export default function CertificationApplication() {
                                                             <td className="px-4 py-3 font-medium text-foreground">{product.name}</td>
                                                             <td className="px-4 py-3 text-muted-foreground">{product.brand}</td>
                                                             <td className="px-4 py-3 text-muted-foreground">{product.category}</td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="sm"
+                                                                    className="gap-1"
+                                                                    onClick={() => openIngredientModal(product.id)}
+                                                                >
+                                                                    <Beaker className="h-4 w-4" />
+                                                                    {product.ingredients.length > 0 ? (
+                                                                        <Badge variant="secondary" className="ml-1">
+                                                                            {product.ingredients.length}
+                                                                        </Badge>
+                                                                    ) : (
+                                                                        <span className="text-destructive text-xs">Add</span>
+                                                                    )}
+                                                                </Button>
+                                                            </td>
                                                             <td className="px-4 py-3 text-right">
                                                                 <Button 
                                                                     variant="ghost" 
@@ -528,8 +673,7 @@ export default function CertificationApplication() {
                                                                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                                     onClick={() => handleRemoveProduct(product.id)}
                                                                 >
-                                                                    <Trash2 className="h-4 w-4 mr-1" />
-                                                                    Remove
+                                                                    <Trash2 className="h-4 w-4" />
                                                                 </Button>
                                                             </td>
                                                         </tr>
@@ -540,15 +684,33 @@ export default function CertificationApplication() {
                                     </div>
                                     {formData.products.length > 0 && (
                                         <p className="text-xs text-muted-foreground">
-                                            {formData.products.length} product(s) added to certification scope.
+                                            {formData.products.length} product(s) added. Each product must have at least one ingredient.
                                         </p>
                                     )}
                                 </div>
                             </div>
                         )}
 
-                        {/* Step 4: Declaration */}
+                        {/* Step 4: Mandatory Documents */}
                         {currentStep === 4 && (
+                            <div className="space-y-6 animate-in fade-in duration-300">
+                                <div className="bg-primary/5 p-4 rounded-lg flex gap-3 items-start border border-primary/10">
+                                    <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                                    <p className="text-sm text-primary/80">
+                                        Upload all required documents to support your certification application. Accepted formats include PDF, images, and Office documents.
+                                    </p>
+                                </div>
+                                <MandatoryDocuments
+                                    applicationId={null}
+                                    uploadedFiles={formData.uploadedFiles}
+                                    onUpload={handleFileUpload}
+                                    onRemove={handleFileRemove}
+                                />
+                            </div>
+                        )}
+
+                        {/* Step 5: Declaration */}
+                        {currentStep === 5 && (
                             <div className="space-y-6 animate-in fade-in duration-300">
                                 <div className="space-y-4 border rounded-xl p-6 bg-muted/20">
                                     <h3 className="font-bold text-lg font-serif text-foreground">Legal Declaration</h3>
@@ -609,12 +771,14 @@ export default function CertificationApplication() {
                                         <span className="text-foreground">{formData.entity_name || "Not provided"}</span>
                                         <span className="text-muted-foreground">Registration:</span>
                                         <span className="text-foreground">{formData.registration_number || "Not provided"}</span>
-                                        <span className="text-muted-foreground">Country:</span>
+                                        <span className="text-muted-foreground">Location:</span>
                                         <span className="text-foreground">{formData.country || "Not provided"}</span>
                                         <span className="text-muted-foreground">Categories:</span>
                                         <span className="text-foreground">{formData.categories.length} selected</span>
                                         <span className="text-muted-foreground">Products:</span>
                                         <span className="text-foreground">{formData.products.length} items</span>
+                                        <span className="text-muted-foreground">Documents:</span>
+                                        <span className="text-foreground">{formData.uploadedFiles.length} uploaded</span>
                                     </div>
                                 </div>
                             </div>
@@ -670,18 +834,18 @@ export default function CertificationApplication() {
                 </p>
             </div>
 
-            {/* Add Item Dialog */}
+            {/* Add Product Dialog */}
             <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Add Product/Service</DialogTitle>
+                        <DialogTitle>Add Product</DialogTitle>
                         <DialogDescription>
-                            Enter the details of the product or service to be certified.
+                            Enter the details of the product to be certified.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
-                            <Label htmlFor="product-name">Product/Service Name *</Label>
+                            <Label htmlFor="product-name">Product Name *</Label>
                             <Input
                                 id="product-name"
                                 placeholder="e.g. Frozen Beef Patties"
@@ -714,7 +878,6 @@ export default function CertificationApplication() {
                                     <SelectItem value="Processed Foods">Processed Foods</SelectItem>
                                     <SelectItem value="Cosmetics">Cosmetics</SelectItem>
                                     <SelectItem value="Pharmaceuticals">Pharmaceuticals</SelectItem>
-                                    <SelectItem value="Services">Services</SelectItem>
                                     <SelectItem value="Other">Other</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -731,6 +894,15 @@ export default function CertificationApplication() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Ingredient Modal */}
+            <ProductIngredientModal
+                open={ingredientModalOpen}
+                onOpenChange={setIngredientModalOpen}
+                productName={selectedProduct?.name || ""}
+                ingredients={selectedProduct?.ingredients || []}
+                onSave={handleSaveIngredients}
+            />
         </ClientLayout>
     );
 }

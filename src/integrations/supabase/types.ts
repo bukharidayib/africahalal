@@ -58,6 +58,41 @@ export type Database = {
           },
         ]
       }
+      application_products: {
+        Row: {
+          application_id: string
+          brand: string
+          category: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          application_id: string
+          brand: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          application_id?: string
+          brand?: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_products_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "certification_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       application_status_history: {
         Row: {
           application_id: string
@@ -368,6 +403,65 @@ export type Database = {
           },
         ]
       }
+      chat_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          sender_id: string
+          sender_type: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          sender_id: string
+          sender_type: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          sender_id?: string
+          sender_type?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_sessions: {
+        Row: {
+          ended_at: string | null
+          id: string
+          started_at: string
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       corrective_actions: {
         Row: {
           evidence_files: string[] | null
@@ -414,6 +508,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      faq_items: {
+        Row: {
+          answer: string
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          question: string
+          sort_order: number | null
+        }
+        Insert: {
+          answer: string
+          category: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          question: string
+          sort_order?: number | null
+        }
+        Update: {
+          answer?: string
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          question?: string
+          sort_order?: number | null
+        }
+        Relationships: []
       }
       inspection_reports: {
         Row: {
@@ -696,6 +820,50 @@ export type Database = {
         }
         Relationships: []
       }
+      product_ingredients: {
+        Row: {
+          created_at: string
+          id: string
+          ingredient_name: string
+          is_halal_certified: boolean | null
+          notes: string | null
+          percentage: number | null
+          product_id: string
+          source: string | null
+          supplier_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ingredient_name: string
+          is_halal_certified?: boolean | null
+          notes?: string | null
+          percentage?: number | null
+          product_id: string
+          source?: string | null
+          supplier_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ingredient_name?: string
+          is_halal_certified?: boolean | null
+          notes?: string | null
+          percentage?: number | null
+          product_id?: string
+          source?: string | null
+          supplier_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_ingredients_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "application_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -730,6 +898,80 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          priority: string | null
+          resolved_at: string | null
+          status: string | null
+          subject: string
+          ticket_number: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          priority?: string | null
+          resolved_at?: string | null
+          status?: string | null
+          subject: string
+          ticket_number: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          priority?: string | null
+          resolved_at?: string | null
+          status?: string | null
+          subject?: string
+          ticket_number?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ticket_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          sender_id: string
+          sender_type: string
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          sender_id: string
+          sender_type: string
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          sender_id?: string
+          sender_type?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
             referencedColumns: ["id"]
           },
         ]
@@ -773,6 +1015,7 @@ export type Database = {
       generate_application_number: { Args: never; Returns: string }
       generate_certificate_number: { Args: never; Returns: string }
       generate_ncn_number: { Args: never; Returns: string }
+      generate_ticket_number: { Args: never; Returns: string }
       get_user_role: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
