@@ -29,6 +29,14 @@ import DocumentVault from "./pages/client/DocumentVault";
 import ComplianceCenter from "./pages/client/ComplianceCenter";
 import CertificateVault from "./pages/client/CertificateVault";
 import VerifyPublic from "./pages/VerifyPublic";
+import MyApplications from "./pages/client/MyApplications";
+import ClientApplicationDetail from "./pages/client/ClientApplicationDetail";
+import SupportCenter from "./pages/client/SupportCenter";
+import SupportTickets from "./pages/client/SupportTickets";
+import SupportTicketNew from "./pages/client/SupportTicketNew";
+import SupportTicketDetail from "./pages/client/SupportTicketDetail";
+import SupportFAQ from "./pages/client/SupportFAQ";
+import SupportChat from "./pages/client/SupportChat";
 
 // Admin Portal
 import { AdminAuthProvider } from "./admin/contexts/AdminAuthContext";
@@ -76,9 +84,17 @@ const App = () => (
           {/* Client Portal Protected Routes */}
           <Route path="/client/dashboard" element={<ProtectedRoute><ClientDashboard /></ProtectedRoute>} />
           <Route path="/client/apply" element={<ProtectedRoute><CertificationApplication /></ProtectedRoute>} />
+          <Route path="/client/applications" element={<ProtectedRoute><MyApplications /></ProtectedRoute>} />
+          <Route path="/client/applications/:id" element={<ProtectedRoute><ClientApplicationDetail /></ProtectedRoute>} />
           <Route path="/client/documents" element={<ProtectedRoute><DocumentVault /></ProtectedRoute>} />
           <Route path="/client/inspections" element={<ProtectedRoute><ComplianceCenter /></ProtectedRoute>} />
           <Route path="/client/certificates" element={<ProtectedRoute><CertificateVault /></ProtectedRoute>} />
+          <Route path="/client/support" element={<ProtectedRoute><SupportCenter /></ProtectedRoute>} />
+          <Route path="/client/support/tickets" element={<ProtectedRoute><SupportTickets /></ProtectedRoute>} />
+          <Route path="/client/support/tickets/new" element={<ProtectedRoute><SupportTicketNew /></ProtectedRoute>} />
+          <Route path="/client/support/tickets/:id" element={<ProtectedRoute><SupportTicketDetail /></ProtectedRoute>} />
+          <Route path="/client/support/faq" element={<ProtectedRoute><SupportFAQ /></ProtectedRoute>} />
+          <Route path="/client/support/chat" element={<ProtectedRoute><SupportChat /></ProtectedRoute>} />
 
           {/* Admin Portal Routes */}
           <Route path="/admin/login" element={
