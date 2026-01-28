@@ -1,347 +1,331 @@
 
-## Implementation Plan: Enhanced Client Portal with Products/Ingredients, Documents, Applications Module, and Support Center
 
-This plan addresses the four major feature requests:
-1. **Enhanced Product Information Step**: Add ingredient lists to products, remove service references
-2. **Mandatory Assets Step**: New application step for required documents upload
-3. **My Applications Module**: New client portal module to view all applications with details
-4. **Support Center Module**: Complete support system with tickets, FAQ, chat, and contact info
+## Implementation Plan: Enhanced Admin Panel with Full Client Portal Tracking, Support Management, and Dynamic RBAC
+
+This plan addresses three major requirements:
+1. **Client Portal Tracking**: Admin dashboard and modules that track all client activities (applications, documents, inspections, etc.)
+2. **Support Management**: Admin interface for managing support tickets and responding to live chats
+3. **Dynamic RBAC System**: Professional role-based access control with customizable roles and permissions
 
 ---
 
-## Overview
+## Overview of Changes
 
 ```text
-+-----------------------------------------------------------------+
-|                     CLIENT PORTAL NAVIGATION                     |
-+-----------------------------------------------------------------+
-| Dashboard | Apply Now | My Applications | Documents | Support   |
-+-----------------------------------------------------------------+
-|                    My Inspections | Certificates                 |
-+-----------------------------------------------------------------+
++--------------------------------------------------------------------+
+|                      ADMIN PORTAL NAVIGATION                        |
++--------------------------------------------------------------------+
+| Dashboard | Applications | Certificates | Inspections | Inspectors |
++--------------------------------------------------------------------+
+| Enforcement | Support Center | Audit Logs | User Management        |
++--------------------------------------------------------------------+
+|                     Roles & Permissions | Settings                  |
++--------------------------------------------------------------------+
 ```
 
 ---
 
-## 1. Enhanced Product Information (with Ingredients)
+## 1. Enhanced Admin Dashboard with Client Activity Tracking
 
 ### Current State
-- Products only have: name, brand, category
-- UI mentions "Product/Service List"
+- Dashboard shows basic stats (total applications, pending review, certificates, etc.)
+- No real-time activity feed
+- No quick access to recent client activities
 
-### New Design
-- Remove all "service" references - focus only on products
-- Add ingredient list per product
-- Two-step flow: Create Product -> Add Ingredients
+### Solution
+Enhance the dashboard to show:
+- Real-time activity feed (new applications, document uploads, ticket creations)
+- Recent client activities across all modules
+- Quick action buttons to jump to relevant items
+- Support queue indicator with unread count
+
+### Dashboard Enhancements
 
 ```text
-+---------------------------------------------------------------+
-| PRODUCT INFORMATION                                            |
-+---------------------------------------------------------------+
-|                                                                |
-| Products for Certification                     [+ Add Product] |
-|                                                                |
-| +-----------------------------------------------------------+ |
-| | Halal Beef Sausages                          [Ingredients] | |
-| | Brand: AHI Foods | Category: Processed Meats              | |
-| | Ingredients: Beef (60%), Salt, Spices, Casing...    [Edit] | |
-| +-----------------------------------------------------------+ |
-|                                                                |
-| +-----------------------------------------------------------+ |
-| | Chicken Patties                              [Ingredients] | |
-| | Brand: AHI Foods | Category: Processed Meats              | |
-| | 3 ingredients added                           [Edit] [Del] | |
-| +-----------------------------------------------------------+ |
-|                                                                |
-+---------------------------------------------------------------+
++-----------------------------------------------------------------------+
+| ADMIN DASHBOARD                                                        |
++-----------------------------------------------------------------------+
+|                                                                        |
+| [Stats Cards - existing]                                               |
+|                                                                        |
++-----------------------------------------------------------------------+
+| RECENT ACTIVITY FEED                    | SUPPORT QUEUE               |
+|                                         |                              |
+| [icon] New application submitted        | Open Tickets: 12            |
+|        APP-2026... | 2 min ago          | Unread Messages: 5          |
+|                                         | Active Chats: 3             |
+| [icon] Document uploaded                |                              |
+|        Business Registration | 15 min   | [View Support ->]           |
+|                                         |                              |
+| [icon] Support ticket created           +------------------------------+
+|        TKT-001234 | 1 hour ago          |                              |
+|                                         | QUICK ACTIONS                |
+| [icon] Chat session started             | [New Application]            |
+|        Client: John Doe | 2 hours       | [Schedule Inspection]        |
+|                                         | [Issue Certificate]          |
++-----------------------------------------------------------------------+
 ```
 
-### Data Structure Changes
+---
 
-**New Database Tables Required:**
+## 2. Admin Support Center Module
+
+### New Routes
+- `/admin/support` - Support center dashboard
+- `/admin/support/tickets` - All tickets list
+- `/admin/support/tickets/:id` - Ticket detail with reply
+- `/admin/support/chats` - Live chat sessions
+- `/admin/support/chats/:id` - Individual chat window
+
+### Support Dashboard
+
+```text
++-----------------------------------------------------------------------+
+| SUPPORT CENTER                                                         |
++-----------------------------------------------------------------------+
+|                                                                        |
+| [Open: 12] [In Progress: 5] [Resolved: 45] [Closed: 128]              |
+|                                                                        |
++-----------------------------------------------------------------------+
+| ACTIVE CHATS                            | RECENT TICKETS              |
+|                                         |                              |
+| [Online] John Doe                       | TKT-001234 | Document Issue |
+|          Last: "Hello, I need help..."  | Open | Normal | 2 min ago   |
+|          [Join Chat]                    |                              |
+|                                         | TKT-001233 | Payment Query  |
+| [Online] Jane Smith                     | Open | High | 1 hour ago    |
+|          Last: "Thanks for waiting"     |                              |
+|          [Join Chat]                    | TKT-001232 | Login Problem  |
+|                                         | In Progress | 3 hours ago   |
+| [Waiting] Bob Wilson                    |                              |
+|          No messages yet                | [View All Tickets ->]        |
+|          [Join Chat]                    |                              |
++-----------------------------------------------------------------------+
+```
+
+### Ticket Management
+
+```text
++-----------------------------------------------------------------------+
+| SUPPORT TICKETS                                                        |
++-----------------------------------------------------------------------+
+|                                                                        |
+| [Search...] [Status ▼] [Priority ▼] [Category ▼] [Date Range ▼]       |
+|                                                                        |
++-----------------------------------------------------------------------+
+| Ticket #   | Subject          | Client    | Status | Priority | Date  |
++-----------------------------------------------------------------------+
+| TKT-001234 | Document Issue   | John Doe  | Open   | Normal   | Today |
+| TKT-001233 | Payment Query    | Jane S.   | Open   | High     | Today |
+| TKT-001232 | Login Problem    | Bob W.    | In Prog| Normal   | Yday  |
++-----------------------------------------------------------------------+
+```
+
+### Ticket Detail with Admin Reply
+
+```text
++-----------------------------------------------------------------------+
+| TKT-001234 - Document Upload Issue                    [Open ▼]        |
++-----------------------------------------------------------------------+
+| Client: John Doe | john@example.com | Org: Global Foods Co.           |
+| Created: 28 Jan 2026, 10:30 AM | Category: Technical                  |
++-----------------------------------------------------------------------+
+| CONVERSATION                                                           |
+|                                                                        |
+| [Client] 10:30 - I'm having trouble uploading my business...          |
+|                                                                        |
+| [Support] 10:45 - Hi John, I'll look into this for you...             |
+|                                                                        |
+| [Client] 11:00 - Thank you, I'm still getting an error...             |
+|                                                                        |
++-----------------------------------------------------------------------+
+| REPLY                                                                  |
+| [_________________________________________________]                   |
+| [Send Reply] [Mark as Resolved] [Close Ticket]                        |
++-----------------------------------------------------------------------+
+```
+
+### Live Chat Management
+
+```text
++-----------------------------------------------------------------------+
+| LIVE CHAT - John Doe                                    [End Session] |
++-----------------------------------------------------------------------+
+| Client Info:                                                           |
+| Email: john@example.com | Org: Global Foods Co.                       |
+| Applications: 2 | Tickets: 3 | Member since: Jan 2026                 |
++-----------------------------------------------------------------------+
+| CHAT                                                                   |
+|                                                                        |
+| [Client] Hello, I need help with my application                       |
+|                                                                        |
+| [You] Hi John! I'd be happy to help. What seems to be the issue?     |
+|                                                                        |
+| [Client] I'm trying to add products but the form isn't working        |
+|                                                                        |
++-----------------------------------------------------------------------+
+| [Type your message...                              ] [Send]           |
++-----------------------------------------------------------------------+
+| QUICK RESPONSES                                                        |
+| [Greeting] [Looking into it] [Please wait] [Resolved?]                |
++-----------------------------------------------------------------------+
+```
+
+---
+
+## 3. Dynamic RBAC System
+
+### Current State
+- 4 fixed roles: super_admin, certification_officer, finance_officer, it_system_auditor
+- Permissions are hardcoded in `src/admin/lib/permissions.ts`
+- No UI to create custom roles or modify permissions
+
+### Solution
+Create a professional RBAC system with:
+1. **Permissions Table**: Define all available permissions
+2. **Roles Table**: Define roles with metadata
+3. **Role-Permission Mapping**: Link roles to their permissions
+4. **User-Role Assignment**: Existing, but enhanced UI
+
+### Database Schema Changes
 
 ```sql
--- Products for applications
-CREATE TABLE application_products (
+-- 1. Permissions Definition Table
+CREATE TABLE public.permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    application_id UUID REFERENCES certification_applications(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    brand TEXT NOT NULL,
-    category TEXT,
+    code TEXT NOT NULL UNIQUE,  -- e.g., 'applications.view', 'certificates.issue'
+    name TEXT NOT NULL,          -- e.g., 'View Applications'
+    description TEXT,
+    category TEXT NOT NULL,      -- e.g., 'Applications', 'Certificates'
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Ingredients for each product
-CREATE TABLE product_ingredients (
+-- 2. Custom Roles Table
+CREATE TABLE public.admin_roles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id UUID REFERENCES application_products(id) ON DELETE CASCADE,
-    ingredient_name TEXT NOT NULL,
-    percentage DECIMAL(5,2),
-    source TEXT,
-    is_halal_certified BOOLEAN DEFAULT false,
-    supplier_name TEXT,
-    notes TEXT,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### Application Flow Changes
-
-**Step 3: Product Information (Updated)**
-1. User clicks "Add Product" -> Modal opens
-2. Enter: Product Name, Brand, Category
-3. After product is added, "Manage Ingredients" button appears
-4. Click to open Ingredients Modal:
-   - Add multiple ingredients with: Name, Percentage, Source, Halal Certified checkbox, Supplier
-5. Products display with ingredient count badge
-
----
-
-## 2. Mandatory Assets Step (New Step 4)
-
-### Purpose
-Upload required compliance documents before declaration step.
-
-### Required Documents List
-- Business Registration Certificate (PACRA)
-- TPIN/Tax Clearance Certificate  
-- Ingredient Technical Specification Sheet
-- Halal Policy Statement
-- Process Flow Diagrams (optional)
-- Supplier Halal Certificates (optional)
-
-```text
-+---------------------------------------------------------------+
-| MANDATORY DOCUMENTS                                            |
-+---------------------------------------------------------------+
-|                                                                |
-| Required Documents for Certification                           |
-|                                                                |
-| * Business Registration (PACRA)                                |
-|   [ ] Not Uploaded                             [Upload]        |
-|                                                                |
-| * TPIN/Tax Clearance                                           |
-|   [x] tax_clearance_2026.pdf (2.4 MB)         [Replace]       |
-|                                                                |
-| * Ingredient Technical Spec Sheet                              |
-|   [ ] Not Uploaded                             [Upload]        |
-|                                                                |
-| Optional Documents                                             |
-|                                                                |
-| o Process Flow Diagrams                                        |
-|   [ ] Not Uploaded                             [Upload]        |
-|                                                                |
-+---------------------------------------------------------------+
-```
-
-### Updated Application Steps
-
-```text
-Step 1: Establishment Details (existing)
-Step 2: Certification Scope (existing)
-Step 3: Product Information with Ingredients (updated)
-Step 4: Mandatory Assets (NEW)
-Step 5: Declaration & Submit (existing, was step 4)
-```
-
----
-
-## 3. My Applications Module
-
-### New Route
-`/client/applications` - List all applications
-`/client/applications/:id` - View single application details
-
-### Sidebar Menu Update
-Add between "Apply Now" and "My Documents":
-```text
-- Dashboard
-- Apply Now
-- My Applications  <-- NEW
-- My Documents
-- Inspections
-- Certificate Vault
-```
-
-### Application List View
-
-```text
-+---------------------------------------------------------------+
-| MY APPLICATIONS                                                |
-+---------------------------------------------------------------+
-|                                                                |
-| [All] [Draft] [Submitted] [In Progress] [Completed]           |
-|                                                                |
-| +-----------------------------------------------------------+ |
-| | APP-1234567890                                             | |
-| | Full Certification | Submitted: 27 Jan 2026                | |
-| | Status: [Under Review]                          [View ->]  | |
-| +-----------------------------------------------------------+ |
-|                                                                |
-| +-----------------------------------------------------------+ |
-| | APP-0987654321                                             | |
-| | Annual Renewal | Submitted: 15 Jan 2026                    | |
-| | Status: [Awaiting Inspection]                   [View ->]  | |
-| +-----------------------------------------------------------+ |
-|                                                                |
-+---------------------------------------------------------------+
-```
-
-### Application Detail View (Client Side)
-
-```text
-+---------------------------------------------------------------+
-| <- Back to Applications                                        |
-|                                                                |
-| APP-1234567890                             [Under Review]      |
-| Full Certification                                             |
-+---------------------------------------------------------------+
-|                                                                |
-| [Overview] [Products] [Documents] [Timeline]                   |
-|                                                                |
-+---------------------------------------------------------------+
-| OVERVIEW TAB                                                   |
-|                                                                |
-| Organization: Global Foods Co.                                 |
-| Registration: REG-12345                                        |
-| Location: Lusaka, Zambia                                       |
-|                                                                |
-| Scope: Food Processing, Meat & Poultry                        |
-| Submitted: 27 Jan 2026                                        |
-|                                                                |
-+---------------------------------------------------------------+
-| PRODUCTS TAB                                                   |
-|                                                                |
-| 1. Halal Beef Sausages                                        |
-|    Brand: AHI Foods | Category: Processed Meats               |
-|    Ingredients: Beef (60%), Salt (5%), Spices (10%)...        |
-|                                                                |
-+---------------------------------------------------------------+
-| DOCUMENTS TAB                                                  |
-|                                                                |
-| - Business Registration.pdf      [View] [Download]            |
-| - TPIN Certificate.pdf           [View] [Download]            |
-| - Ingredient Specs.xlsx          [View] [Download]            |
-|                                                                |
-+---------------------------------------------------------------+
-| TIMELINE TAB                                                   |
-|                                                                |
-| [x] 27 Jan - Application Submitted                            |
-| [x] 28 Jan - Status: Under Review                             |
-| [ ] Awaiting inspection scheduling...                         |
-|                                                                |
-+---------------------------------------------------------------+
-```
-
----
-
-## 4. Support Center Module
-
-### New Route
-`/client/support` - Support center dashboard
-`/client/support/tickets` - Ticket list
-`/client/support/tickets/new` - Create ticket
-`/client/support/tickets/:id` - Ticket detail
-`/client/support/faq` - FAQ section
-`/client/support/chat` - Live chat
-
-### Sidebar Update
-Add after "Certificate Vault":
-```text
-- Certificate Vault
-- Support Center  <-- NEW
-```
-
-### Support Center Landing
-
-```text
-+---------------------------------------------------------------+
-| SUPPORT CENTER                                                 |
-+---------------------------------------------------------------+
-|                                                                |
-| How can we help you today?                                     |
-|                                                                |
-| +-------------+ +-------------+ +-------------+ +-------------+|
-| |   Tickets   | |    FAQ      | | Live Chat   | |  Contact   ||
-| |   [icon]    | |   [icon]    | |   [icon]    | |   [icon]   ||
-| | Submit/View | | Quick Help  | |Chat Experts | | Email/Phone||
-| +-------------+ +-------------+ +-------------+ +-------------+|
-|                                                                |
-| RECENT TICKETS                                                 |
-|                                                                |
-| TKT-001 | Document Upload Issue | Open   | 2 hours ago        |
-| TKT-002 | Payment Query         | Closed | 3 days ago         |
-|                                                                |
-+---------------------------------------------------------------+
-| CONTACT INFORMATION                                            |
-|                                                                |
-| Email: support@africanhalaal.com                               |
-| Phone: +260 XXX XXX XXX                                        |
-+---------------------------------------------------------------+
-```
-
-### Database Tables for Support
-
-```sql
--- Support tickets
-CREATE TABLE support_tickets (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ticket_number TEXT NOT NULL UNIQUE,
-    user_id UUID REFERENCES profiles(id) NOT NULL,
-    subject TEXT NOT NULL,
-    category TEXT NOT NULL,
-    priority TEXT DEFAULT 'normal',
-    status TEXT DEFAULT 'open',
+    name TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    description TEXT,
+    is_system_role BOOLEAN DEFAULT false,  -- Built-in roles cannot be deleted
+    created_by UUID REFERENCES auth.users(id),
     created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-    resolved_at TIMESTAMPTZ
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Ticket messages (threaded conversation)
-CREATE TABLE ticket_messages (
+-- 3. Role-Permission Mapping
+CREATE TABLE public.role_permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ticket_id UUID REFERENCES support_tickets(id) ON DELETE CASCADE,
-    sender_id UUID NOT NULL,
-    sender_type TEXT NOT NULL, -- 'client' or 'support'
-    message TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now()
+    role_id UUID REFERENCES admin_roles(id) ON DELETE CASCADE,
+    permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(role_id, permission_id)
 );
 
--- FAQ items
-CREATE TABLE faq_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    category TEXT NOT NULL,
-    question TEXT NOT NULL,
-    answer TEXT NOT NULL,
-    sort_order INTEGER DEFAULT 0,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
+-- Seed default permissions
+INSERT INTO public.permissions (code, name, category) VALUES
+('applications.view', 'View Applications', 'Applications'),
+('applications.manage', 'Manage Applications', 'Applications'),
+('applications.assign', 'Assign Officers', 'Applications'),
+('certificates.view', 'View Certificates', 'Certificates'),
+('certificates.issue', 'Issue Certificates', 'Certificates'),
+('certificates.revoke', 'Revoke Certificates', 'Certificates'),
+('inspections.view', 'View Inspections', 'Inspections'),
+('inspections.schedule', 'Schedule Inspections', 'Inspections'),
+('inspections.manage', 'Manage Inspections', 'Inspections'),
+('inspectors.view', 'View Inspectors', 'Inspectors'),
+('inspectors.manage', 'Manage Inspectors', 'Inspectors'),
+('enforcement.view', 'View Enforcement', 'Enforcement'),
+('enforcement.manage', 'Manage NCNs', 'Enforcement'),
+('support.view', 'View Support Tickets', 'Support'),
+('support.respond', 'Respond to Tickets', 'Support'),
+('support.manage', 'Manage All Support', 'Support'),
+('audit_logs.view', 'View Audit Logs', 'System'),
+('users.view', 'View Users', 'System'),
+('users.manage', 'Manage Users', 'System'),
+('roles.manage', 'Manage Roles', 'System'),
+('settings.manage', 'Manage Settings', 'System');
 
--- Chat sessions for realtime chat
-CREATE TABLE chat_sessions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES profiles(id) NOT NULL,
-    status TEXT DEFAULT 'active',
-    started_at TIMESTAMPTZ DEFAULT now(),
-    ended_at TIMESTAMPTZ
-);
-
--- Chat messages
-CREATE TABLE chat_messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id UUID REFERENCES chat_sessions(id) ON DELETE CASCADE,
-    sender_id UUID NOT NULL,
-    sender_type TEXT NOT NULL,
-    message TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
+-- Seed default roles and map to permissions
+INSERT INTO public.admin_roles (name, display_name, description, is_system_role) VALUES
+('super_admin', 'Super Administrator', 'Full system access', true),
+('certification_officer', 'Certification Officer', 'Manages applications and certificates', true),
+('finance_officer', 'Finance Officer', 'View-only access to applications and certificates', true),
+('it_system_auditor', 'IT System Auditor', 'Audit and compliance access', true),
+('support_agent', 'Support Agent', 'Handle support tickets and chats', true);
 ```
 
-### Realtime Chat Implementation
-- Uses Supabase Realtime subscriptions for live messaging
-- Chat widget opens in full-page view in Support Center
-- Support agents respond via admin portal
+### Roles & Permissions UI
+
+```text
++-----------------------------------------------------------------------+
+| ROLES & PERMISSIONS                                    [+ Create Role]|
++-----------------------------------------------------------------------+
+|                                                                        |
+| ROLES                                                                  |
++-----------------------------------------------------------------------+
+| Role                    | Users | Permissions | System | Actions      |
++-----------------------------------------------------------------------+
+| Super Administrator     | 2     | 21/21       | Yes    | [Edit]       |
+| Certification Officer   | 5     | 12/21       | Yes    | [Edit]       |
+| Finance Officer         | 3     | 5/21        | Yes    | [Edit]       |
+| IT System Auditor       | 1     | 8/21        | Yes    | [Edit]       |
+| Support Agent           | 4     | 4/21        | Yes    | [Edit]       |
+| Custom Inspector Lead   | 2     | 6/21        | No     | [Edit] [Del] |
++-----------------------------------------------------------------------+
+```
+
+### Role Editor
+
+```text
++-----------------------------------------------------------------------+
+| EDIT ROLE: Certification Officer                                       |
++-----------------------------------------------------------------------+
+|                                                                        |
+| Name: [Certification Officer        ]                                  |
+| Description: [Manages applications and certificates              ]     |
+|                                                                        |
++-----------------------------------------------------------------------+
+| PERMISSIONS                                                            |
+|                                                                        |
+| APPLICATIONS                          | CERTIFICATES                   |
+| [x] View Applications                 | [x] View Certificates          |
+| [x] Manage Applications               | [x] Issue Certificates         |
+| [x] Assign Officers                   | [ ] Revoke Certificates        |
+|                                       |                                |
+| INSPECTIONS                           | SUPPORT                        |
+| [x] View Inspections                  | [ ] View Support Tickets       |
+| [x] Schedule Inspections              | [ ] Respond to Tickets         |
+| [x] Manage Inspections                | [ ] Manage All Support         |
+|                                       |                                |
+| ENFORCEMENT                           | SYSTEM                         |
+| [x] View Enforcement                  | [ ] View Audit Logs            |
+| [x] Manage NCNs                       | [ ] View Users                 |
+|                                       | [ ] Manage Users               |
+|                                       | [ ] Manage Roles               |
+|                                       | [ ] Manage Settings            |
+|                                                                        |
+| [Save Changes] [Cancel]                                                |
++-----------------------------------------------------------------------+
+```
+
+### Enhanced User Management
+
+```text
++-----------------------------------------------------------------------+
+| USER MANAGEMENT                                        [+ Add User]   |
++-----------------------------------------------------------------------+
+|                                                                        |
+| [Search...] [Role ▼] [Status ▼]                                       |
+|                                                                        |
++-----------------------------------------------------------------------+
+| User                    | Email              | Role(s)     | Assigned |
++-----------------------------------------------------------------------+
+| John Smith              | john@ahi.org       | Super Admin | 15 Jan   |
+| Sarah Johnson           | sarah@ahi.org      | Cert Officer| 20 Jan   |
+|                         |                    | Support     |          |
+| Mike Brown              | mike@ahi.org       | Finance     | 22 Jan   |
++-----------------------------------------------------------------------+
+```
 
 ---
 
@@ -351,242 +335,170 @@ CREATE TABLE chat_messages (
 
 | File | Purpose |
 |------|---------|
-| `src/pages/client/MyApplications.tsx` | Applications list page |
-| `src/pages/client/ApplicationDetail.tsx` | Single application detail view |
-| `src/pages/client/SupportCenter.tsx` | Support center main page |
-| `src/pages/client/SupportTickets.tsx` | Ticket list |
-| `src/pages/client/SupportTicketDetail.tsx` | Single ticket view |
-| `src/pages/client/SupportTicketNew.tsx` | Create new ticket |
-| `src/pages/client/SupportFAQ.tsx` | FAQ page |
-| `src/pages/client/SupportChat.tsx` | Live chat page |
-| `src/components/client/ProductIngredientModal.tsx` | Modal for managing ingredients |
-| `src/components/client/MandatoryDocuments.tsx` | Upload required docs component |
+| `src/admin/pages/AdminSupportCenter.tsx` | Support dashboard |
+| `src/admin/pages/AdminSupportTickets.tsx` | Ticket list with filters |
+| `src/admin/pages/AdminSupportTicketDetail.tsx` | Ticket detail & reply |
+| `src/admin/pages/AdminSupportChats.tsx` | Active chat sessions |
+| `src/admin/pages/AdminSupportChatSession.tsx` | Individual chat window |
+| `src/admin/pages/RolesPermissions.tsx` | Roles management |
+| `src/admin/pages/RoleEditor.tsx` | Create/edit role |
+| `src/admin/components/ActivityFeed.tsx` | Real-time activity feed |
+| `src/admin/components/SupportQueue.tsx` | Support queue widget |
+| `src/admin/lib/dynamicPermissions.ts` | Dynamic permission fetching |
 
 ### Files to Update
 
 | File | Changes |
 |------|---------|
-| `src/components/layout/ClientSidebar.tsx` | Add "My Applications" and "Support Center" menu items |
-| `src/App.tsx` | Add new routes for applications and support |
-| `src/pages/client/CertificationApplication.tsx` | Restructure product step, add ingredients, add mandatory docs step |
+| `src/admin/components/layout/AdminSidebar.tsx` | Add Support Center, Roles menu items |
+| `src/admin/pages/AdminDashboard.tsx` | Add activity feed, support queue |
+| `src/admin/pages/UserManagement.tsx` | Support multiple roles per user |
+| `src/admin/lib/permissions.ts` | Integrate dynamic permission system |
+| `src/admin/hooks/useAdminAuth.ts` | Fetch permissions from database |
+| `src/App.tsx` | Add new admin routes |
 
 ---
 
 ## Database Migration
 
 ```sql
--- 1. Application Products
-CREATE TABLE public.application_products (
+-- 1. Permissions table
+CREATE TABLE public.permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    application_id UUID REFERENCES certification_applications(id) ON DELETE CASCADE,
+    code TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
-    brand TEXT NOT NULL,
-    category TEXT,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.application_products ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Clients can manage own products" ON public.application_products
-FOR ALL TO authenticated
-USING (
-    application_id IN (
-        SELECT ca.id FROM certification_applications ca
-        JOIN profiles p ON p.organization_id = ca.organization_id
-        WHERE p.id = auth.uid()
-    )
-);
-
-CREATE POLICY "Admins can view products" ON public.application_products
-FOR SELECT TO authenticated
-USING (is_admin_user(auth.uid()));
-
--- 2. Product Ingredients
-CREATE TABLE public.product_ingredients (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id UUID REFERENCES application_products(id) ON DELETE CASCADE,
-    ingredient_name TEXT NOT NULL,
-    percentage DECIMAL(5,2),
-    source TEXT,
-    is_halal_certified BOOLEAN DEFAULT false,
-    supplier_name TEXT,
-    notes TEXT,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.product_ingredients ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Clients can manage own ingredients" ON public.product_ingredients
-FOR ALL TO authenticated
-USING (
-    product_id IN (
-        SELECT ap.id FROM application_products ap
-        JOIN certification_applications ca ON ca.id = ap.application_id
-        JOIN profiles p ON p.organization_id = ca.organization_id
-        WHERE p.id = auth.uid()
-    )
-);
-
-CREATE POLICY "Admins can view ingredients" ON public.product_ingredients
-FOR SELECT TO authenticated
-USING (is_admin_user(auth.uid()));
-
--- 3. Support Tickets
-CREATE TABLE public.support_tickets (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ticket_number TEXT NOT NULL UNIQUE,
-    user_id UUID NOT NULL,
-    subject TEXT NOT NULL,
+    description TEXT,
     category TEXT NOT NULL,
-    priority TEXT DEFAULT 'normal',
-    status TEXT DEFAULT 'open',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.permissions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can view permissions" ON public.permissions
+FOR SELECT TO authenticated
+USING (is_admin_user(auth.uid()));
+
+-- 2. Admin roles table (separate from user_roles assignment)
+CREATE TABLE public.admin_roles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    description TEXT,
+    is_system_role BOOLEAN DEFAULT false,
+    created_by UUID REFERENCES auth.users(id),
     created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-    resolved_at TIMESTAMPTZ
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_roles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own tickets" ON public.support_tickets
+CREATE POLICY "Admins can view roles" ON public.admin_roles
 FOR SELECT TO authenticated
-USING (user_id = auth.uid() OR is_admin_user(auth.uid()));
-
-CREATE POLICY "Users can create tickets" ON public.support_tickets
-FOR INSERT TO authenticated
-WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "Admins can update tickets" ON public.support_tickets
-FOR UPDATE TO authenticated
 USING (is_admin_user(auth.uid()));
 
--- 4. Ticket Messages
-CREATE TABLE public.ticket_messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ticket_id UUID REFERENCES support_tickets(id) ON DELETE CASCADE,
-    sender_id UUID NOT NULL,
-    sender_type TEXT NOT NULL,
-    message TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.ticket_messages ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view ticket messages" ON public.ticket_messages
-FOR SELECT TO authenticated
-USING (
-    ticket_id IN (
-        SELECT id FROM support_tickets
-        WHERE user_id = auth.uid() OR is_admin_user(auth.uid())
-    )
-);
-
-CREATE POLICY "Users can send messages" ON public.ticket_messages
-FOR INSERT TO authenticated
-WITH CHECK (sender_id = auth.uid());
-
--- 5. FAQ Items
-CREATE TABLE public.faq_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    category TEXT NOT NULL,
-    question TEXT NOT NULL,
-    answer TEXT NOT NULL,
-    sort_order INTEGER DEFAULT 0,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.faq_items ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Anyone can read active FAQs" ON public.faq_items
-FOR SELECT TO authenticated
-USING (is_active = true);
-
-CREATE POLICY "Admins can manage FAQs" ON public.faq_items
+CREATE POLICY "Super admins can manage roles" ON public.admin_roles
 FOR ALL TO authenticated
+USING (has_role(auth.uid(), 'super_admin'));
+
+-- 3. Role-Permission mapping
+CREATE TABLE public.role_permissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    role_id UUID REFERENCES admin_roles(id) ON DELETE CASCADE,
+    permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(role_id, permission_id)
+);
+
+ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can view role permissions" ON public.role_permissions
+FOR SELECT TO authenticated
 USING (is_admin_user(auth.uid()));
 
--- 6. Chat Sessions
-CREATE TABLE public.chat_sessions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL,
-    status TEXT DEFAULT 'active',
-    started_at TIMESTAMPTZ DEFAULT now(),
-    ended_at TIMESTAMPTZ
-);
+CREATE POLICY "Super admins can manage role permissions" ON public.role_permissions
+FOR ALL TO authenticated
+USING (has_role(auth.uid(), 'super_admin'));
 
-ALTER TABLE public.chat_sessions ENABLE ROW LEVEL SECURITY;
+-- Seed permissions
+INSERT INTO public.permissions (code, name, category) VALUES
+('applications.view', 'View Applications', 'Applications'),
+('applications.manage', 'Manage Applications', 'Applications'),
+('applications.assign', 'Assign Officers', 'Applications'),
+('certificates.view', 'View Certificates', 'Certificates'),
+('certificates.issue', 'Issue Certificates', 'Certificates'),
+('certificates.revoke', 'Revoke Certificates', 'Certificates'),
+('inspections.view', 'View Inspections', 'Inspections'),
+('inspections.schedule', 'Schedule Inspections', 'Inspections'),
+('inspections.manage', 'Manage Inspections', 'Inspections'),
+('inspectors.view', 'View Inspectors', 'Inspectors'),
+('inspectors.manage', 'Manage Inspectors', 'Inspectors'),
+('enforcement.view', 'View Enforcement', 'Enforcement'),
+('enforcement.manage', 'Manage NCNs', 'Enforcement'),
+('support.view', 'View Support', 'Support'),
+('support.respond', 'Respond to Support', 'Support'),
+('support.manage', 'Manage Support', 'Support'),
+('audit_logs.view', 'View Audit Logs', 'System'),
+('users.view', 'View Users', 'System'),
+('users.manage', 'Manage Users', 'System'),
+('roles.manage', 'Manage Roles', 'System'),
+('settings.manage', 'Manage Settings', 'System');
 
-CREATE POLICY "Users can view own sessions" ON public.chat_sessions
-FOR SELECT TO authenticated
-USING (user_id = auth.uid() OR is_admin_user(auth.uid()));
+-- Seed system roles
+INSERT INTO public.admin_roles (name, display_name, description, is_system_role) VALUES
+('super_admin', 'Super Administrator', 'Full system access with all permissions', true),
+('certification_officer', 'Certification Officer', 'Manages applications, inspections, and certificates', true),
+('finance_officer', 'Finance Officer', 'View-only access to applications and certificates', true),
+('it_system_auditor', 'IT System Auditor', 'Audit logs and read-only compliance access', true),
+('support_agent', 'Support Agent', 'Handles support tickets and live chats', true);
 
-CREATE POLICY "Users can create sessions" ON public.chat_sessions
-FOR INSERT TO authenticated
-WITH CHECK (user_id = auth.uid());
+-- Map roles to permissions (super_admin gets all)
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM admin_roles r, permissions p
+WHERE r.name = 'super_admin';
 
--- 7. Chat Messages
-CREATE TABLE public.chat_messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id UUID REFERENCES chat_sessions(id) ON DELETE CASCADE,
-    sender_id UUID NOT NULL,
-    sender_type TEXT NOT NULL,
-    message TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view chat messages" ON public.chat_messages
-FOR SELECT TO authenticated
-USING (
-    session_id IN (
-        SELECT id FROM chat_sessions
-        WHERE user_id = auth.uid() OR is_admin_user(auth.uid())
-    )
-);
-
-CREATE POLICY "Users can send chat messages" ON public.chat_messages
-FOR INSERT TO authenticated
-WITH CHECK (sender_id = auth.uid());
-
--- Enable realtime for chat
-ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
-
--- Function to generate ticket number
-CREATE OR REPLACE FUNCTION generate_ticket_number()
-RETURNS TEXT AS $$
-BEGIN
-    RETURN 'TKT-' || LPAD(FLOOR(RANDOM() * 1000000)::TEXT, 6, '0');
-END;
-$$ LANGUAGE plpgsql;
+-- Add Support-related permissions for new sidebar items
+UPDATE public.permissions SET category = 'Support' WHERE code LIKE 'support.%';
 ```
+
+---
+
+## Sidebar Updates
+
+Add new navigation items:
+- **Support Center** (after Enforcement, before Audit Logs)
+- **Roles & Permissions** (in Settings section or replace User Management header)
 
 ---
 
 ## Testing Checklist
 
-After implementation:
+After implementation, verify:
 
-1. **Product/Ingredients Flow**
-   - Create product -> add ingredients -> view summary
-   - Edit/delete ingredients
-   - Validate minimum 1 product with ingredients before proceeding
+1. **Dashboard Activity Feed**
+   - Shows recent applications, document uploads, tickets
+   - Real-time updates when new activities occur
+   - Links navigate to correct detail pages
 
-2. **Mandatory Documents Step**
-   - Upload required documents
-   - Replace existing uploads
-   - Cannot proceed without mandatory docs
+2. **Support Center**
+   - View all tickets with filtering
+   - Reply to tickets as support staff
+   - Change ticket status (open -> in_progress -> resolved -> closed)
+   - Join active chat sessions
+   - Send messages in real-time
+   - See client info during chat
 
-3. **My Applications Module**
-   - View all applications filtered by status
-   - Click to view full application details
-   - See products, ingredients, documents, timeline
+3. **RBAC System**
+   - View all roles and their permission counts
+   - Edit role permissions (checkbox grid)
+   - Create custom roles
+   - Delete non-system roles
+   - Assign multiple roles to users
+   - Users only see sidebar items they have permission for
+   - Permission checks work on API calls
 
-4. **Support Center**
-   - Create support ticket
-   - View ticket list and details
-   - Send/receive messages in ticket
-   - Browse FAQ
-   - Real-time chat functionality
-   - Contact information displayed correctly
+4. **Client Portal Integration**
+   - All client activities visible in admin
+   - Status changes from admin reflect in client portal
+   - Support responses visible to clients
 
