@@ -7,7 +7,8 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Plus
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,8 @@ import { AdminLayout } from '../components/layout/AdminLayout';
 import { useAdminAuthContext } from '../contexts/AdminAuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
+import { ActivityFeed } from '../components/ActivityFeed';
+import { SupportQueue } from '../components/SupportQueue';
 
 interface DashboardStats {
   totalApplications: number;
@@ -189,6 +192,19 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Activity Feed */}
+          <div className="lg:col-span-2">
+            <ActivityFeed />
+          </div>
+
+          {/* Support Queue */}
+          {(permissions.canViewSupport || permissions.canManageSupport) && (
+            <SupportQueue />
+          )}
+        </div>
+
+        {/* Recent Applications & Pending Approvals */}
         <div className="grid gap-4 md:grid-cols-2">
           {/* Recent Applications */}
           {permissions.canViewApplications && (
@@ -230,6 +246,41 @@ export default function AdminDashboard() {
             </Card>
           )}
         </div>
+
+        {/* Quick Actions Row */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              {permissions.canManageApplications && (
+                <Button asChild variant="outline">
+                  <Link to="/admin/applications">
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Application
+                  </Link>
+                </Button>
+              )}
+              {permissions.canManageInspections && (
+                <Button asChild variant="outline">
+                  <Link to="/admin/inspections">
+                    <ClipboardList className="mr-2 h-4 w-4" />
+                    Schedule Inspection
+                  </Link>
+                </Button>
+              )}
+              {permissions.canIssueCertificates && (
+                <Button asChild variant="outline">
+                  <Link to="/admin/certificates">
+                    <Award className="mr-2 h-4 w-4" />
+                    Issue Certificate
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </AdminLayout>
   );

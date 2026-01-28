@@ -13,6 +13,10 @@ export interface Permission {
   canManageSettings: boolean;
   canViewEnforcement: boolean;
   canManageEnforcement: boolean;
+  canViewSupport: boolean;
+  canRespondSupport: boolean;
+  canManageSupport: boolean;
+  canManageRoles: boolean;
 }
 
 export const rolePermissions: Record<AdminRole, Permission> = {
@@ -28,6 +32,10 @@ export const rolePermissions: Record<AdminRole, Permission> = {
     canManageSettings: true,
     canViewEnforcement: true,
     canManageEnforcement: true,
+    canViewSupport: true,
+    canRespondSupport: true,
+    canManageSupport: true,
+    canManageRoles: true,
   },
   certification_officer: {
     canViewApplications: true,
@@ -41,6 +49,10 @@ export const rolePermissions: Record<AdminRole, Permission> = {
     canManageSettings: false,
     canViewEnforcement: true,
     canManageEnforcement: true,
+    canViewSupport: false,
+    canRespondSupport: false,
+    canManageSupport: false,
+    canManageRoles: false,
   },
   finance_officer: {
     canViewApplications: true,
@@ -54,6 +66,10 @@ export const rolePermissions: Record<AdminRole, Permission> = {
     canManageSettings: false,
     canViewEnforcement: false,
     canManageEnforcement: false,
+    canViewSupport: false,
+    canRespondSupport: false,
+    canManageSupport: false,
+    canManageRoles: false,
   },
   it_system_auditor: {
     canViewApplications: true,
@@ -67,6 +83,10 @@ export const rolePermissions: Record<AdminRole, Permission> = {
     canManageSettings: false,
     canViewEnforcement: true,
     canManageEnforcement: false,
+    canViewSupport: false,
+    canRespondSupport: false,
+    canManageSupport: false,
+    canManageRoles: false,
   },
 };
 
@@ -84,17 +104,22 @@ export function getPermissions(role: AdminRole | null): Permission {
       canManageSettings: false,
       canViewEnforcement: false,
       canManageEnforcement: false,
+      canViewSupport: false,
+      canRespondSupport: false,
+      canManageSupport: false,
+      canManageRoles: false,
     };
   }
   return rolePermissions[role];
 }
 
-export function getRoleDisplayName(role: AdminRole): string {
-  const names: Record<AdminRole, string> = {
+export function getRoleDisplayName(role: AdminRole | string): string {
+  const names: Record<string, string> = {
     super_admin: 'Super Administrator',
     certification_officer: 'Certification Officer',
     finance_officer: 'Finance Officer',
     it_system_auditor: 'IT System Auditor',
+    support_agent: 'Support Agent',
   };
-  return names[role];
+  return names[role] || role;
 }

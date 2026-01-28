@@ -52,6 +52,13 @@ import Enforcement from "./admin/pages/Enforcement";
 import Inspectors from "./admin/pages/Inspectors";
 import AdminSettings from "./admin/pages/AdminSettings";
 import ApplicationDetail from "./admin/pages/ApplicationDetail";
+import AdminSupportCenter from "./admin/pages/AdminSupportCenter";
+import AdminSupportTickets from "./admin/pages/AdminSupportTickets";
+import AdminSupportTicketDetail from "./admin/pages/AdminSupportTicketDetail";
+import AdminSupportChats from "./admin/pages/AdminSupportChats";
+import AdminSupportChatSession from "./admin/pages/AdminSupportChatSession";
+import RolesPermissions from "./admin/pages/RolesPermissions";
+import RoleEditor from "./admin/pages/RoleEditor";
 
 const queryClient = new QueryClient();
 
@@ -155,6 +162,41 @@ const App = () => (
           <Route path="/admin/settings" element={
             <AdminAuthProvider>
               <AdminSettings />
+            </AdminAuthProvider>
+          } />
+          <Route path="/admin/support" element={
+            <AdminAuthProvider>
+              <AdminSupportCenter />
+            </AdminAuthProvider>
+          } />
+          <Route path="/admin/support/tickets" element={
+            <AdminAuthProvider>
+              <AdminSupportTickets />
+            </AdminAuthProvider>
+          } />
+          <Route path="/admin/support/tickets/:id" element={
+            <AdminAuthProvider>
+              <AdminSupportTicketDetail />
+            </AdminAuthProvider>
+          } />
+          <Route path="/admin/support/chats" element={
+            <AdminAuthProvider>
+              <AdminSupportChats />
+            </AdminAuthProvider>
+          } />
+          <Route path="/admin/support/chats/:id" element={
+            <AdminAuthProvider>
+              <AdminSupportChatSession />
+            </AdminAuthProvider>
+          } />
+          <Route path="/admin/roles" element={
+            <AdminAuthProvider>
+              <RolesPermissions />
+            </AdminAuthProvider>
+          } />
+          <Route path="/admin/roles/:id" element={
+            <AdminAuthProvider>
+              <RoleEditor />
             </AdminAuthProvider>
           } />
 
