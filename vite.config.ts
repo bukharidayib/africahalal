@@ -5,8 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "0.0.0.0",   // ✅ REQUIRED for Antigravity
-    port: 5173,        // ✅ Recommended preview port
+    host: "0.0.0.0",
+    port: 8080,
     strictPort: true,
     hmr: {
       overlay: false,
