@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Shield, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';

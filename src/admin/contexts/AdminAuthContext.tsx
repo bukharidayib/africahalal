@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { useAdminAuth } from '../hooks/useAdminAuth';
 import { AdminRole, Permission } from '../lib/permissions';
 import { User, Session } from '@supabase/supabase-js';
