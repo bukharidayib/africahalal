@@ -53,14 +53,14 @@ export function Header() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center gap-0.5">
+        <nav className="hidden lg:flex items-center ml-auto mr-6">
           {navItems.map((item) =>
             item.children ? (
               <DropdownMenu key={item.name}>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-1 px-3">
+                  <Button variant="ghost" className="gap-1 px-4 h-9 text-sm font-medium">
                     {item.name}
-                    <ChevronDown className="h-4 w-4" />
+                    <ChevronDown className="h-3 w-3 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center">
@@ -76,7 +76,7 @@ export function Header() {
                 key={item.path}
                 variant="ghost"
                 asChild
-                className={`px-3 ${isActive(item.path!) ? "bg-accent" : ""}`}
+                className={`px-4 h-9 text-sm font-medium ${isActive(item.path!) ? "bg-accent/50" : ""}`}
               >
                 <Link to={item.path!}>{item.name}</Link>
               </Button>
@@ -85,7 +85,7 @@ export function Header() {
         </nav>
 
         {/* Right Side Actions */}
-        <div className="flex items-center gap-3 ml-auto">
+        <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
