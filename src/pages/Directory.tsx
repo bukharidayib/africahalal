@@ -6,7 +6,8 @@ import {
   ExternalLink,
   CheckCircle2,
   Filter,
-  Building2
+  Building2,
+  BadgeCheck
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Layout } from "@/components/layout/Layout";
 import { HeroSection } from "@/components/sections/HeroSection";
 
@@ -104,6 +113,7 @@ export default function Directory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSector, setSelectedSector] = useState("All Sectors");
   const [selectedStatus, setSelectedStatus] = useState("All Status");
+  const [selectedInstitution, setSelectedInstitution] = useState<typeof certifiedInstitutions[0] | null>(null);
 
   const filteredInstitutions = certifiedInstitutions.filter((inst) => {
     const matchesSearch = inst.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -204,10 +214,12 @@ export default function Directory() {
                   <p className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">Scope:</span> {inst.scope}
                   </p>
-                  <Button variant="link" className="p-0 h-auto text-primary" asChild>
-                    <a href={`/verify?id=${inst.id}`}>
-                      View Certificate Details <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto text-primary"
+                    onClick={() => setSelectedInstitution(inst)}
+                  >
+                    View Certificate Details <ExternalLink className="ml-1 h-3 w-3" />
                   </Button>
                 </CardContent>
               </Card>
@@ -224,6 +236,72 @@ export default function Directory() {
             </div>
           )}
         </div>
+
+        {/* Certificate Details Dialog */}
+        <Dialog open={!!selectedInstitution} onOpenChange={(open) => !open && setSelectedInstitution(null)}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">
+                <BadgeCheck className="h-6 w-6 text-primary" />
+              </div>
+              <DialogTitle className="text-2xl">Certificate Details</DialogTitle>
+              <DialogDescription>
+                Official verification details for this institution's Halal certification.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedInstitution && (
+              <div className="space-y-6 pt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase">Certificate ID</p>
+                    <p className="font-mono text-sm">{selectedInstitution.id}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase">Status</p>
+                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                      {selectedInstitution.status}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase">Institution</p>
+                    <p className="text-sm font-semibold">{selectedInstitution.name}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase">Location</p>
+                    <p className="text-sm">{selectedInstitution.location}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1 border-t pt-4">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Industry Sector</p>
+                  <p className="text-sm">{selectedInstitution.sector}</p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Scope of Certification</p>
+                  <p className="text-sm bg-muted p-3 rounded-lg border italic">
+                    "{selectedInstitution.scope}"
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-muted-foreground border-t pt-4">
+                  <Calendar className="h-3 w-3" />
+                  <span>Certified since {selectedInstitution.certifiedSince}</span>
+                </div>
+              </div>
+            )}
+            <DialogFooter className="flex gap-2 sm:gap-0">
+              <Button variant="outline" className="flex-1" onClick={() => setSelectedInstitution(null)}>
+                Close
+              </Button>
+              <Button className="flex-1" asChild>
+                <a href={`/verify?id=${selectedInstitution?.id}`}>
+                  View Full Certificate
+                </a>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </section>
 
       {/* Info Banner */}

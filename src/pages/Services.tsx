@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
-import { 
-  BadgeCheck, 
-  ClipboardCheck, 
-  Users, 
+import {
+  BadgeCheck,
+  ClipboardCheck,
+  Users,
   Laptop,
   ArrowRight,
   CheckCircle2,
@@ -101,9 +101,8 @@ export default function Services() {
             {services.map((service, index) => (
               <div
                 key={service.title}
-                className={`grid lg:grid-cols-2 gap-8 items-center ${
-                  index % 2 === 1 ? "lg:flex-row-reverse" : ""
-                }`}
+                className={`grid lg:grid-cols-2 gap-8 items-center ${index % 2 === 1 ? "lg:flex-row-reverse" : ""
+                  }`}
               >
                 <div className={index % 2 === 1 ? "lg:order-2" : ""}>
                   <div className="flex items-center gap-3 mb-4">
@@ -158,108 +157,7 @@ export default function Services() {
         </div>
       </section>
 
-      {/* Service Packages */}
-      <section className="section-padding bg-background">
-        <div className="container max-w-4xl">
-          <SectionHeader
-            subtitle="Tailored Solutions"
-            title="Service Packages"
-            description="Flexible options to meet your certification needs."
-          />
-          <div className="grid md:grid-cols-3 gap-6">
-            <Card className="border-2 hover:border-primary transition-colors">
-              <CardHeader>
-                <CardTitle>Standard</CardTitle>
-                <CardDescription>For single-site operations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Initial certification audit
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Annual surveillance
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Digital certificate
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Directory listing
-                  </li>
-                </ul>
-                <Button className="w-full mt-6" variant="outline" asChild>
-                  <Link to="/contact">Get Quote</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card className="border-2 border-secondary shadow-lg relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-secondary text-secondary-foreground text-xs font-semibold px-3 py-1 rounded-full">
-                Most Popular
-              </div>
-              <CardHeader>
-                <CardTitle>Professional</CardTitle>
-                <CardDescription>For multi-site operations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Everything in Standard
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Multi-site coverage
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Priority scheduling
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Training session included
-                  </li>
-                </ul>
-                <Button className="w-full mt-6 bg-secondary text-secondary-foreground hover:bg-secondary/90" asChild>
-                  <Link to="/contact">Get Quote</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card className="border-2 hover:border-primary transition-colors">
-              <CardHeader>
-                <CardTitle>Enterprise</CardTitle>
-                <CardDescription>For large organizations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Everything in Professional
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Dedicated account manager
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Custom audit schedules
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-secondary" />
-                    Advisory consultations
-                  </li>
-                </ul>
-                <Button className="w-full mt-6" variant="outline" asChild>
-                  <Link to="/contact">Contact Sales</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
+
 
       {/* CTA */}
       <section className="py-16 bg-primary text-primary-foreground">
