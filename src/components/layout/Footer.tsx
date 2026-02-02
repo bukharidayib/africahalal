@@ -96,15 +96,15 @@ export function Footer() {
             <ul className="space-y-3">
               <li className="flex items-start gap-2 text-sm text-primary-foreground/80">
                 <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>123 Certification Drive, Johannesburg, South Africa</span>
+                <span>Matero, Lusaka, ZM</span>
               </li>
               <li className="flex items-center gap-2 text-sm text-primary-foreground/80">
                 <Phone className="h-4 w-4 flex-shrink-0" />
-                <span>+27 11 123 4567</span>
+                <span>+260972044414</span>
               </li>
               <li className="flex items-center gap-2 text-sm text-primary-foreground/80">
                 <Mail className="h-4 w-4 flex-shrink-0" />
-                <span>info@ahis.africa</span>
+                <span>info@africanhalaal.com</span>
               </li>
             </ul>
           </div>

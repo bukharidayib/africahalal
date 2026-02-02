@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { 
-  Mail, 
-  Phone, 
-  MapPin, 
+import {
+  Mail,
+  Phone,
+  MapPin,
   Clock,
   Send,
   Globe,
@@ -25,9 +25,9 @@ import { SectionHeader } from "@/components/sections/SectionHeader";
 import { toast } from "sonner";
 
 const contactInfo = [
-  { icon: Mail, label: "Email", value: "info@ahis.africa", link: "mailto:info@ahis.africa" },
-  { icon: Phone, label: "Phone", value: "+27 11 123 4567", link: "tel:+27111234567" },
-  { icon: MapPin, label: "Address", value: "123 Certification Drive, Johannesburg, South Africa" },
+  { icon: Mail, label: "Email", value: "info@africanhalaal.com", link: "mailto:info@africanhalaal.com" },
+  { icon: Phone, label: "Phone", value: "+260972044414", link: "tel:+260972044414" },
+  { icon: MapPin, label: "Address", value: "Matero, Lusaka, ZM" },
   { icon: Clock, label: "Hours", value: "Mon-Fri: 8:00 AM - 5:00 PM (SAST)" },
 ];
 
@@ -43,7 +43,7 @@ const subjects = [
 ];
 
 const regionalOffices = [
-  { region: "South Africa (HQ)", city: "Johannesburg", email: "southafrica@ahis.africa" },
+  { region: "Zambia (HQ)", city: "Lusaka", email: "info@africanhalaal.com" },
   { region: "East Africa", city: "Nairobi, Kenya", email: "eastafrica@ahis.africa" },
   { region: "West Africa", city: "Lagos, Nigeria", email: "westafrica@ahis.africa" },
   { region: "North Africa", city: "Cairo, Egypt", email: "northafrica@ahis.africa" },
@@ -67,10 +67,10 @@ export default function Contact() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     // Simulate form submission
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
+
     toast.success("Message sent successfully! We'll get back to you soon.");
     setFormData({
       name: "",
@@ -183,7 +183,7 @@ export default function Contact() {
                           type="tel"
                           value={formData.phone}
                           onChange={handleChange}
-                          placeholder="+27 11 123 4567"
+                          placeholder="+260972044414"
                         />
                       </div>
                       <div>
@@ -223,8 +223,8 @@ export default function Contact() {
                         required
                       />
                     </div>
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       className="w-full bg-primary"
                       disabled={isSubmitting}
                     >
@@ -259,7 +259,7 @@ export default function Contact() {
                   <Globe className="h-8 w-8 text-primary mx-auto mb-3" />
                   <h3 className="font-semibold mb-1">{office.region}</h3>
                   <p className="text-sm text-muted-foreground mb-2">{office.city}</p>
-                  <a 
+                  <a
                     href={`mailto:${office.email}`}
                     className="text-sm text-primary hover:underline"
                   >
