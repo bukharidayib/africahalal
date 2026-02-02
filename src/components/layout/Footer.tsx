@@ -113,9 +113,22 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-primary-foreground/20">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-primary-foreground/60">
-              © {new Date().getFullYear()} African Halal Institute. All rights reserved.
-            </p>
+            <div className="space-y-1">
+              <p className="text-sm text-primary-foreground/60">
+                © {new Date().getFullYear()} African Halal Institute. All rights reserved.
+              </p>
+              <p className="text-sm text-primary-foreground/60">
+                Powered By{" "}
+                <a
+                  href="https://www.afrosaas.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-secondary transition-colors font-medium"
+                >
+                  Afrosaas Inc.
+                </a>
+              </p>
+            </div>
             <div className="flex gap-6 text-sm text-primary-foreground/60">
               <Link to="/privacy" className="hover:text-secondary transition-colors">
                 Privacy Policy
