@@ -42,23 +42,23 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-      <div className="container flex h-16 items-center justify-between">
+      <div className="container flex h-16 items-center">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2">
-          <img src="/logo.png" alt="African Halal Institute" className="h-12 w-auto" />
+        <Link to="/" className="flex items-center gap-2 mr-6">
+          <img src="/logo.png" alt="African Halal Institute" className="h-10 w-auto" />
           <div className="hidden sm:block">
-            <p className="text-sm font-bold text-primary">African Halal Institute</p>
-            <p className="text-xs text-muted-foreground">Integrity • Compliance • Leadership</p>
+            <p className="text-sm font-bold text-primary leading-tight">African Halal Institute</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Integrity • Compliance</p>
           </div>
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-0.5">
           {navItems.map((item) =>
             item.children ? (
               <DropdownMenu key={item.name}>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-1">
+                  <Button variant="ghost" className="gap-1 px-3">
                     {item.name}
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -76,7 +76,7 @@ export function Header() {
                 key={item.path}
                 variant="ghost"
                 asChild
-                className={isActive(item.path!) ? "bg-accent" : ""}
+                className={`px-3 ${isActive(item.path!) ? "bg-accent" : ""}`}
               >
                 <Link to={item.path!}>{item.name}</Link>
               </Button>
@@ -85,7 +85,7 @@ export function Header() {
         </nav>
 
         {/* Right Side Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 ml-auto">
           <Button
             variant="ghost"
             size="icon"
