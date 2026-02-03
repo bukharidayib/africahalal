@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   QrCode,
@@ -9,7 +10,10 @@ import {
   Building2,
   MapPin,
   Calendar,
-  FileCheck
+  FileCheck,
+  Loader2,
+  Camera,
+  RefreshCw
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,61 +22,115 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Layout } from "@/components/layout/Layout";
 import { HeroSection } from "@/components/sections/HeroSection";
-
-// Mock certificate data
-const mockCertificates: Record<string, {
-  id: string;
-  company: string;
-  location: string;
-  sector: string;
-  scope: string;
-  issueDate: string;
-  expiryDate: string;
-  status: "valid" | "expired" | "suspended";
-}> = {
-  "AHI-2023-0001": {
-    id: "AHI-2023-0001",
-    company: "Fresh Foods Manufacturing Ltd",
-    location: "Johannesburg, South Africa",
-    sector: "Food & Beverage",
-    scope: "Processed foods, beverages, dairy products",
-    issueDate: "2023-03-15",
-    expiryDate: "2024-03-14",
-    status: "valid"
-  },
-  "AHI-2023-0002": {
-    id: "AHI-2023-0002",
-    company: "Sahara Halal Meats",
-    location: "Nairobi, Kenya",
-    sector: "Abattoirs & Meat",
-    scope: "Poultry slaughter and processing",
-    issueDate: "2023-06-01",
-    expiryDate: "2024-05-31",
-    status: "valid"
-  },
-};
+import { supabase } from "@/integrations/supabase/client";
+import { Html5QrcodeScanner } from "html5-qrcode";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Verify() {
+  const [searchParams] = useSearchParams();
+  const idFromQuery = searchParams.get("id");
+  const numberFromQuery = searchParams.get("number");
+
   const [certificateId, setCertificateId] = useState("");
   const [verificationResult, setVerificationResult] = useState<"idle" | "valid" | "invalid" | "searching">("idle");
-  const [certificate, setCertificate] = useState<typeof mockCertificates[string] | null>(null);
+  const [certificate, setCertificate] = useState<any>(null);
+  const [isScannerActive, setIsScannerActive] = useState(false);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const { toast } = useToast();
 
-  const handleVerify = () => {
-    if (!certificateId.trim()) return;
+  useEffect(() => {
+    if (idFromQuery) {
+      handleVerify(idFromQuery, 'id');
+    } else if (numberFromQuery) {
+      setCertificateId(numberFromQuery);
+      handleVerify(numberFromQuery, 'number');
+    }
+  }, [idFromQuery, numberFromQuery]);
+
+  useEffect(() => {
+    if (isScannerActive) {
+      const scanner = new Html5QrcodeScanner(
+        "qr-reader",
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        /* verbose= */ false
+      );
+
+      scanner.render((decodedText) => {
+        // Expected format: https://.../verify?id=UUID
+        try {
+          const url = new URL(decodedText);
+          const scannedId = url.searchParams.get("id");
+          if (scannedId) {
+            scanner.clear();
+            setIsScannerActive(false);
+            handleVerify(scannedId, 'id');
+          } else {
+            // Might be just the ID itself
+            scanner.clear();
+            setIsScannerActive(false);
+            handleVerify(decodedText, 'id');
+          }
+        } catch (e) {
+          // If not a URL, try as raw ID
+          scanner.clear();
+          setIsScannerActive(false);
+          handleVerify(decodedText, 'id');
+        }
+      }, (error) => {
+        // console.warn(error);
+      });
+
+      scannerRef.current = scanner;
+    }
+
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(console.error);
+      }
+    };
+  }, [isScannerActive]);
+
+  const handleVerify = async (val?: string, type: 'id' | 'number' = 'number') => {
+    const valueToUse = val || certificateId.trim();
+    if (!valueToUse) return;
 
     setVerificationResult("searching");
 
-    // Simulate API call
-    setTimeout(() => {
-      const found = mockCertificates[certificateId.toUpperCase()];
-      if (found) {
-        setCertificate(found);
+    try {
+      let query = supabase
+        .from('certificates')
+        .select('*, organizations(name, registration_number)');
+
+      if (type === 'id') {
+        query = query.eq('id', valueToUse);
+      } else {
+        query = query.eq('certificate_number', valueToUse);
+      }
+
+      const { data, error } = await query.maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setCertificate(data);
         setVerificationResult("valid");
+        toast({
+          title: "Certificate Verified",
+          description: "This is an authentic African Halal certificate.",
+        });
       } else {
         setCertificate(null);
         setVerificationResult("invalid");
       }
-    }, 1000);
+    } catch (error: any) {
+      console.error('Verification error:', error);
+      setVerificationResult("invalid");
+      toast({
+        variant: "destructive",
+        title: "Verification failed",
+        description: error.message,
+      });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -108,52 +166,72 @@ export default function Verify() {
             </TabsList>
 
             <TabsContent value="search">
-              <Card className="border-none shadow-lg">
-                <CardHeader>
+              <Card className="border-none shadow-lg overflow-hidden">
+                <CardHeader className="bg-primary/5 border-b">
                   <CardTitle>Enter Certificate ID</CardTitle>
                   <CardDescription>
-                    Enter the certificate number found on the Halal certificate (e.g., AHI-2023-0001)
+                    Enter the certificate number found on the Halal certificate (e.g., AHI-ZAM-2024-...)
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="p-6 space-y-4">
                   <div className="flex gap-2">
                     <Input
                       placeholder="AHI-XXXX-XXXX"
                       value={certificateId}
                       onChange={(e) => setCertificateId(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      className="text-lg"
+                      className="text-lg h-12"
                     />
                     <Button
-                      onClick={handleVerify}
-                      className="bg-primary"
+                      onClick={() => handleVerify()}
+                      className="bg-primary h-12 px-8"
                       disabled={verificationResult === "searching"}
                     >
-                      {verificationResult === "searching" ? "Verifying..." : "Verify"}
+                      {verificationResult === "searching" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Verify"
+                      )}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Try: AHI-2023-0001 or AHI-2023-0002 for demo
-                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="qr">
-              <Card className="border-none shadow-lg">
-                <CardHeader>
+              <Card className="border-none shadow-lg overflow-hidden">
+                <CardHeader className="bg-primary/5 border-b">
                   <CardTitle>Scan QR Code</CardTitle>
                   <CardDescription>
                     Point your camera at the QR code on the certificate
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="aspect-square max-w-xs mx-auto rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center p-8">
-                    <QrCode className="h-16 w-16 text-muted-foreground/50 mb-4" />
-                    <p className="text-sm text-muted-foreground text-center">
-                      QR scanning functionality would be available in a production environment
-                    </p>
-                  </div>
+                <CardContent className="p-8">
+                  {!isScannerActive ? (
+                    <div className="flex flex-col items-center justify-center space-y-6">
+                      <div className="aspect-square w-48 rounded-2xl bg-muted/50 flex flex-col items-center justify-center border-2 border-dashed border-primary/20">
+                        <Camera className="h-16 w-16 text-primary/30" />
+                      </div>
+                      <Button
+                        onClick={() => setIsScannerActive(true)}
+                        className="bg-primary font-bold px-8 h-12"
+                      >
+                        <Camera className="mr-2 h-5 w-5" />
+                        Start Camera Scanner
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div id="qr-reader" className="overflow-hidden rounded-xl border-4 border-primary/10" />
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsScannerActive(false)}
+                        className="w-full border-destructive text-destructive hover:bg-destructive/10"
+                      >
+                        Cancel Scanning
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -161,62 +239,88 @@ export default function Verify() {
 
           {/* Verification Result */}
           {verificationResult !== "idle" && verificationResult !== "searching" && (
-            <Card className={`mt-8 border-2 ${verificationResult === "valid" ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-red-500 bg-red-50 dark:bg-red-950/20"
+            <Card className={`mt-8 border-none shadow-2xl animate-in fade-in slide-in-from-top-4 duration-500 overflow-hidden ${verificationResult === "valid" ? "ring-2 ring-green-500" : "ring-2 ring-destructive"
               }`}>
-              <CardContent className="p-6">
+              <CardContent className="p-0">
                 {verificationResult === "valid" && certificate ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="h-8 w-8 text-green-600" />
-                      <div>
-                        <h3 className="text-xl font-bold text-green-800 dark:text-green-400">Certificate Valid</h3>
-                        <p className="text-sm text-green-700 dark:text-green-500">This certificate is authentic and currently active</p>
+                  <div className="space-y-0">
+                    <div className="bg-green-500 p-6 text-white flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="bg-white/20 p-2 rounded-full">
+                          <CheckCircle2 className="h-8 w-8 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold">Certificate Valid</h3>
+                          <p className="text-green-100 text-sm opacity-90">Authenticity confirmed by AHI Zambia</p>
+                        </div>
+                      </div>
+                      <Badge className="bg-white text-green-600 font-bold px-3 py-1">ACTIVE</Badge>
+                    </div>
+
+                    <div className="p-8 grid sm:grid-cols-2 gap-8 bg-white">
+                      <div className="space-y-6">
+                        <div className="flex items-start gap-4">
+                          <Building2 className="h-6 w-6 text-primary mt-1" />
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Certified Entity</p>
+                            <p className="text-lg font-bold text-slate-800 leading-tight">
+                              {certificate.organizations?.name || "Private Entity"}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">Reg: {certificate.organizations?.registration_number || "N/A"}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-4">
+                          <Shield className="h-6 w-6 text-primary mt-1" />
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Certification Scope</p>
+                            <p className="text-sm font-medium text-slate-700 italic leading-relaxed">
+                              "{certificate.scope}"
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6 border-l sm:pl-8 border-slate-100">
+                        <div className="flex items-start gap-4">
+                          <FileCheck className="h-6 w-6 text-primary mt-1" />
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Certificate No.</p>
+                            <p className="text-lg font-mono font-bold text-slate-800">{certificate.certificate_number}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-4">
+                          <Calendar className="h-6 w-6 text-primary mt-1" />
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Validity Period</p>
+                            <div className="flex flex-col">
+                              <span className="text-sm text-slate-600">Issued: <span className="font-bold">{new Date(certificate.issue_date).toLocaleDateString()}</span></span>
+                              <span className="text-sm text-secondary font-bold">Expires: {new Date(certificate.expiry_date).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-green-200 dark:border-green-800">
-                      <div className="flex items-start gap-3">
-                        <Building2 className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Company</p>
-                          <p className="font-medium">{certificate.company}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Location</p>
-                          <p className="font-medium">{certificate.location}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <FileCheck className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Sector</p>
-                          <p className="font-medium">{certificate.sector}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Valid Until</p>
-                          <p className="font-medium">{new Date(certificate.expiryDate).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pt-4 border-t border-green-200 dark:border-green-800">
-                      <p className="text-xs text-muted-foreground uppercase mb-1">Certification Scope</p>
-                      <p className="text-sm">{certificate.scope}</p>
+
+                    <div className="p-4 bg-slate-50 border-t flex items-center justify-center gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => setVerificationResult("idle")} className="text-muted-foreground">
+                        <RefreshCw className="mr-2 h-4 w-4" /> Verify Another
+                      </Button>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3">
-                    <XCircle className="h-8 w-8 text-red-600" />
+                  <div className="p-12 flex flex-col items-center text-center space-y-4 bg-destructive/5 text-destructive">
+                    <XCircle className="h-20 w-20 opacity-30" />
                     <div>
-                      <h3 className="text-xl font-bold text-red-800 dark:text-red-400">Certificate Not Found</h3>
-                      <p className="text-sm text-red-700 dark:text-red-500">
-                        The certificate ID entered does not match our records. Please check and try again.
+                      <h3 className="text-2xl font-bold">Verification Failed</h3>
+                      <p className="text-muted-foreground max-w-sm mx-auto mt-2">
+                        The certificate ID or QR code provided does not match our official records or has been revoked.
                       </p>
                     </div>
+                    <Button onClick={() => setVerificationResult("idle")} variant="outline" className="mt-4 border-destructive text-destructive hover:bg-destructive/10">
+                      Try Again
+                    </Button>
                   </div>
                 )}
               </CardContent>

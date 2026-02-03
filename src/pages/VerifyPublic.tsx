@@ -40,7 +40,7 @@ export default function VerifyPublic() {
         try {
             const { data, error } = await supabase
                 .from('certificates')
-                .select('*')
+                .select('*, organizations(name, registration_number)')
                 .eq('certificate_number', certId)
                 .maybeSingle();
 
@@ -50,7 +50,7 @@ export default function VerifyPublic() {
                 setResult({
                     valid: true,
                     id: data.certificate_number,
-                    entity: "African Halal Institute Certified Partner",
+                    entity: data.organizations?.name || "African Halal Institute Certified Partner",
                     scope: data.scope,
                     issueDate: new Date(data.issue_date).toLocaleDateString(),
                     expiryDate: new Date(data.expiry_date).toLocaleDateString(),

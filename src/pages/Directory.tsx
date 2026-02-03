@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search,
   MapPin,
@@ -7,7 +7,8 @@ import {
   CheckCircle2,
   Filter,
   Building2,
-  BadgeCheck
+  BadgeCheck,
+  Loader2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -30,97 +31,63 @@ import {
 } from "@/components/ui/dialog";
 import { Layout } from "@/components/layout/Layout";
 import { HeroSection } from "@/components/sections/HeroSection";
+import { supabase } from "@/integrations/supabase/client";
 
-const certifiedInstitutions = [
-  {
-    id: "AHI-2023-0001",
-    name: "Fresh Foods Manufacturing Ltd",
-    location: "Johannesburg, South Africa",
-    sector: "Food & Beverage",
-    certifiedSince: 2019,
-    status: "Active",
-    scope: "Processed foods, beverages",
-  },
-  {
-    id: "AHI-2023-0002",
-    name: "Sahara Halal Meats",
-    location: "Nairobi, Kenya",
-    sector: "Abattoirs & Meat",
-    certifiedSince: 2020,
-    status: "Active",
-    scope: "Poultry slaughter and processing",
-  },
-  {
-    id: "AHI-2023-0003",
-    name: "Golden Crescent Hotel",
-    location: "Cairo, Egypt",
-    sector: "Hospitality",
-    certifiedSince: 2021,
-    status: "Active",
-    scope: "Hotel F&B operations",
-  },
-  {
-    id: "AHI-2023-0004",
-    name: "Nile Valley Foods",
-    location: "Lagos, Nigeria",
-    sector: "Food & Beverage",
-    certifiedSince: 2018,
-    status: "Active",
-    scope: "Dairy products, confectionery",
-  },
-  {
-    id: "AHI-2023-0005",
-    name: "Cape Halal Abattoir",
-    location: "Cape Town, South Africa",
-    sector: "Abattoirs & Meat",
-    certifiedSince: 2017,
-    status: "Active",
-    scope: "Cattle and sheep slaughter",
-  },
-  {
-    id: "AHI-2023-0006",
-    name: "Medina Restaurant Group",
-    location: "Casablanca, Morocco",
-    sector: "Hospitality",
-    certifiedSince: 2022,
-    status: "Active",
-    scope: "Restaurant chain operations",
-  },
-  {
-    id: "AHI-2022-0007",
-    name: "Atlas Pharmaceuticals",
-    location: "Accra, Ghana",
-    sector: "Pharmaceuticals",
-    certifiedSince: 2021,
-    status: "Active",
-    scope: "Oral medications, supplements",
-  },
-  {
-    id: "AHI-2022-0008",
-    name: "Zambezi Logistics",
-    location: "Lusaka, Zambia",
-    sector: "Logistics",
-    certifiedSince: 2020,
-    status: "Active",
-    scope: "Cold chain and storage",
-  },
-];
-
-const sectors = ["All Sectors", "Food & Beverage", "Abattoirs & Meat", "Hospitality", "Pharmaceuticals", "Logistics"];
-const statuses = ["All Status", "Active", "Pending Renewal", "Suspended"];
+const sectors = ["All Sectors", "Food & Beverage", "Abattoirs & Meat", "Hospitality", "Pharmaceuticals", "Logistics", "Manufacturing"];
+const statuses = ["All Status", "Active", "Expired", "Suspended"];
 
 export default function Directory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSector, setSelectedSector] = useState("All Sectors");
   const [selectedStatus, setSelectedStatus] = useState("All Status");
-  const [selectedInstitution, setSelectedInstitution] = useState<typeof certifiedInstitutions[0] | null>(null);
+  const [selectedInstitution, setSelectedInstitution] = useState<any>(null);
+  const [institutions, setInstitutions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredInstitutions = certifiedInstitutions.filter((inst) => {
-    const matchesSearch = inst.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inst.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inst.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSector = selectedSector === "All Sectors" || inst.sector === selectedSector;
-    const matchesStatus = selectedStatus === "All Status" || inst.status === selectedStatus;
+  useEffect(() => {
+    fetchInstitutions();
+  }, []);
+
+  async function fetchInstitutions() {
+    setIsLoading(true);
+    try {
+      // Fetch certificates joined with organizations
+      const { data, error } = await supabase
+        .from('certificates')
+        .select(`
+          id,
+          certificate_number,
+          status,
+          scope,
+          issue_date,
+          organizations (
+            name,
+            address
+          )
+        `)
+        .order('issue_date', { ascending: false });
+
+      if (error) throw error;
+      setInstitutions(data || []);
+    } catch (error) {
+      console.error('Error fetching directory:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const filteredInstitutions = institutions.filter((inst) => {
+    const orgName = inst.organizations?.name || "";
+    const orgAddress = inst.organizations?.address || "";
+
+    const matchesSearch = orgName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      orgAddress.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inst.certificate_number.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // For now we don't have a rigid 'sector' field in orgs, so we match against scope or defaults
+    const matchesSector = selectedSector === "All Sectors" || inst.scope.toLowerCase().includes(selectedSector.toLowerCase());
+    const matchesStatus = selectedStatus === "All Status" || inst.status.toLowerCase() === selectedStatus.toLowerCase();
+
     return matchesSearch && matchesSector && matchesStatus;
   });
 
@@ -179,127 +146,131 @@ export default function Directory() {
       {/* Directory Grid */}
       <section className="section-padding bg-background">
         <div className="container">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredInstitutions.map((inst) => (
-              <Card key={inst.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Building2 className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg leading-tight">{inst.name}</CardTitle>
-                        <p className="text-xs text-muted-foreground">{inst.id}</p>
-                      </div>
-                    </div>
-                    <Badge variant={inst.status === "Active" ? "default" : "secondary"} className="bg-green-100 text-green-800">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      {inst.status}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4 flex-shrink-0" />
-                    {inst.location}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4 flex-shrink-0" />
-                    Certified since {inst.certifiedSince}
-                  </div>
-                  <div>
-                    <Badge variant="outline">{inst.sector}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">Scope:</span> {inst.scope}
-                  </p>
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-primary"
-                    onClick={() => setSelectedInstitution(inst)}
-                  >
-                    View Certificate Details <ExternalLink className="ml-1 h-3 w-3" />
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {filteredInstitutions.length === 0 && (
-            <div className="text-center py-16">
-              <Building2 className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No Results Found</h3>
-              <p className="text-muted-foreground">
-                Try adjusting your search or filters to find certified institutions.
-              </p>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="h-10 w-10 animate-spin text-primary/50" />
+              <p className="mt-4 text-muted-foreground animate-pulse">Loading directory data...</p>
             </div>
+          ) : (
+            <>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredInstitutions.map((inst) => (
+                  <Card key={inst.id} className="hover:shadow-lg transition-all hover:-translate-y-1 border-primary/5">
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                            <Building2 className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg leading-tight">
+                              {inst.organizations?.name || "Private Entity"}
+                            </CardTitle>
+                            <p className="text-xs text-muted-foreground">{inst.certificate_number}</p>
+                          </div>
+                        </div>
+                        <Badge
+                          variant={inst.status.toLowerCase() === "active" ? "default" : "secondary"}
+                          className={inst.status.toLowerCase() === "active" ? "bg-green-500 hover:bg-green-600" : ""}
+                        >
+                          {inst.status.toLowerCase() === "active" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                          {inst.status}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4 flex-shrink-0" />
+                        <span className="line-clamp-1">{inst.organizations?.address || "Location TBD"}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4 flex-shrink-0" />
+                        Issued {new Date(inst.issue_date).toLocaleDateString()}
+                      </div>
+                      <div className="pt-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">Scope</p>
+                        <p className="text-sm text-slate-600 line-clamp-2 italic">
+                          "{inst.scope}"
+                        </p>
+                      </div>
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto text-primary font-bold"
+                        onClick={() => setSelectedInstitution(inst)}
+                      >
+                        Verify Full Details <ExternalLink className="ml-1 h-3 w-3" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {filteredInstitutions.length === 0 && (
+                <div className="text-center py-24 bg-muted/30 rounded-3xl border-2 border-dashed border-muted">
+                  <Building2 className="h-20 w-20 text-muted-foreground/30 mx-auto mb-4" />
+                  <h3 className="text-2xl font-bold text-slate-800">No Certified Entities Found</h3>
+                  <p className="text-muted-foreground max-w-sm mx-auto mt-2">
+                    Try adjusting your search query or filters. Only registered certificates are shown here.
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Certificate Details Dialog */}
         <Dialog open={!!selectedInstitution} onOpenChange={(open) => !open && setSelectedInstitution(null)}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">
-                <BadgeCheck className="h-6 w-6 text-primary" />
-              </div>
-              <DialogTitle className="text-2xl">Certificate Details</DialogTitle>
-              <DialogDescription>
-                Official verification details for this institution's Halal certification.
-              </DialogDescription>
-            </DialogHeader>
+          <DialogContent className="sm:max-w-[500px] border-none shadow-2xl overflow-hidden p-0">
             {selectedInstitution && (
-              <div className="space-y-6 pt-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase">Certificate ID</p>
-                    <p className="font-mono text-sm">{selectedInstitution.id}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase">Status</p>
-                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                      {selectedInstitution.status}
-                    </Badge>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase">Institution</p>
-                    <p className="text-sm font-semibold">{selectedInstitution.name}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase">Location</p>
-                    <p className="text-sm">{selectedInstitution.location}</p>
-                  </div>
+              <>
+                <div className="bg-primary p-8 text-white relative">
+                  <BadgeCheck className="absolute top-4 right-4 h-16 w-16 text-white/10" />
+                  <h2 className="text-3xl font-bold tracking-tight">Verified Status</h2>
+                  <p className="text-primary-foreground/70">Official AHI Certification Record</p>
                 </div>
+                <div className="p-8 space-y-6">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Certificate Number</p>
+                      <p className="font-mono font-bold text-slate-800">{selectedInstitution.certificate_number}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Current Status</p>
+                      <Badge className={selectedInstitution.status.toLowerCase() === 'active' ? 'bg-green-500' : 'bg-slate-400'}>
+                        {selectedInstitution.status.toUpperCase()}
+                      </Badge>
+                    </div>
+                  </div>
 
-                <div className="space-y-1 border-t pt-4">
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Industry Sector</p>
-                  <p className="text-sm">{selectedInstitution.sector}</p>
-                </div>
+                  <div className="space-y-1 border-t pt-6">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Institution Name</p>
+                    <p className="text-lg font-bold text-slate-800">{selectedInstitution.organizations?.name}</p>
+                  </div>
 
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Scope of Certification</p>
-                  <p className="text-sm bg-muted p-3 rounded-lg border italic">
-                    "{selectedInstitution.scope}"
-                  </p>
-                </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Official Scope</p>
+                    <p className="text-sm bg-muted/50 p-4 rounded-xl border italic text-slate-600 leading-relaxed">
+                      "{selectedInstitution.scope}"
+                    </p>
+                  </div>
 
-                <div className="flex items-center gap-2 text-xs text-muted-foreground border-t pt-4">
-                  <Calendar className="h-3 w-3" />
-                  <span>Certified since {selectedInstitution.certifiedSince}</span>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Certification active since {new Date(selectedInstitution.issue_date).toLocaleDateString()}</span>
+                  </div>
                 </div>
-              </div>
+                <DialogFooter className="p-6 bg-slate-50 flex gap-3 sm:gap-0">
+                  <Button variant="ghost" className="flex-1 font-bold" onClick={() => setSelectedInstitution(null)}>
+                    Close
+                  </Button>
+                  <Button className="flex-1 font-bold bg-primary shadow-lg shadow-primary/20" asChild>
+                    <a href={`/verify?number=${selectedInstitution.certificate_number}`}>
+                      View Full Certificate
+                    </a>
+                  </Button>
+                </DialogFooter>
+              </>
             )}
-            <DialogFooter className="flex gap-2 sm:gap-0">
-              <Button variant="outline" className="flex-1" onClick={() => setSelectedInstitution(null)}>
-                Close
-              </Button>
-              <Button className="flex-1" asChild>
-                <a href={`/verify?id=${selectedInstitution?.id}`}>
-                  View Full Certificate
-                </a>
-              </Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
       </section>

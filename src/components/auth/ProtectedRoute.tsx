@@ -13,11 +13,18 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
 
   useEffect(() => {
+    // Safety timeout: don't hang for more than 5 seconds
+    const safetyTimeout = setTimeout(() => {
+      console.warn('Auth check timed out. Proceeding to auth state.');
+      setIsLoading(false);
+    }, 5000);
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setIsAuthenticated(!!session);
         setIsLoading(false);
+        clearTimeout(safetyTimeout);
       }
     );
 
@@ -25,9 +32,13 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAuthenticated(!!session);
       setIsLoading(false);
+      clearTimeout(safetyTimeout);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(safetyTimeout);
+    };
   }, []);
 
   if (isLoading) {
