@@ -138,7 +138,7 @@ export default function Directory() {
             </div>
           </div>
           <p className="mt-4 text-sm text-muted-foreground">
-            Showing {filteredInstitutions.length} of {certifiedInstitutions.length} certified institutions
+            Showing {filteredInstitutions.length} of {institutions.length} certified institutions
           </p>
         </div>
       </section>
