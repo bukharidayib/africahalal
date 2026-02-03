@@ -52,7 +52,26 @@ export function useAdminAuth() {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError) {
-        throw sessionError;
+        // Handle refresh token errors gracefully - treat as not authenticated
+        if (sessionError.message?.includes('Refresh Token') || sessionError.message?.includes('refresh_token')) {
+          console.warn('Session expired, clearing auth state');
+          try {
+            await supabase.auth.signOut();
+          } catch (e) {
+            // Ignore sign out errors
+          }
+        }
+        // Set not authenticated state instead of throwing
+        setState({
+          user: null,
+          session: null,
+          role: null,
+          permissions: getPermissions(null),
+          isLoading: false,
+          isAuthenticated: false,
+          error: null,
+        });
+        return;
       }
 
       if (!session) {
