@@ -103,100 +103,30 @@ const App = () => (
           <Route path="/client/support/faq" element={<ProtectedRoute><SupportFAQ /></ProtectedRoute>} />
           <Route path="/client/support/chat" element={<ProtectedRoute><SupportChat /></ProtectedRoute>} />
 
-          {/* Admin Portal Routes */}
-          <Route path="/admin/login" element={
+          {/* Admin Portal Routes - Single Provider wrapping all admin routes */}
+          <Route path="/admin/*" element={
             <AdminAuthProvider>
-              <AdminLogin />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/dashboard" element={
-            <AdminAuthProvider>
-              <AdminDashboard />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/applications" element={
-            <AdminAuthProvider>
-              <Applications />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/applications/:id" element={
-            <AdminAuthProvider>
-              <ApplicationDetail />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/certificates" element={
-            <AdminAuthProvider>
-              <Certificates />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/inspections" element={
-            <AdminAuthProvider>
-              <Inspections />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/approvals" element={
-            <AdminAuthProvider>
-              <PendingApprovals />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/audit-logs" element={
-            <AdminAuthProvider>
-              <AuditLogs />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/users" element={
-            <AdminAuthProvider>
-              <UserManagement />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/enforcement" element={
-            <AdminAuthProvider>
-              <Enforcement />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/inspectors" element={
-            <AdminAuthProvider>
-              <Inspectors />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/settings" element={
-            <AdminAuthProvider>
-              <AdminSettings />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/support" element={
-            <AdminAuthProvider>
-              <AdminSupportCenter />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/support/tickets" element={
-            <AdminAuthProvider>
-              <AdminSupportTickets />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/support/tickets/:id" element={
-            <AdminAuthProvider>
-              <AdminSupportTicketDetail />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/support/chats" element={
-            <AdminAuthProvider>
-              <AdminSupportChats />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/support/chats/:id" element={
-            <AdminAuthProvider>
-              <AdminSupportChatSession />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/roles" element={
-            <AdminAuthProvider>
-              <RolesPermissions />
-            </AdminAuthProvider>
-          } />
-          <Route path="/admin/roles/:id" element={
-            <AdminAuthProvider>
-              <RoleEditor />
+              <Routes>
+                <Route path="login" element={<AdminLogin />} />
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="applications" element={<Applications />} />
+                <Route path="applications/:id" element={<ApplicationDetail />} />
+                <Route path="certificates" element={<Certificates />} />
+                <Route path="inspections" element={<Inspections />} />
+                <Route path="approvals" element={<PendingApprovals />} />
+                <Route path="audit-logs" element={<AuditLogs />} />
+                <Route path="users" element={<UserManagement />} />
+                <Route path="enforcement" element={<Enforcement />} />
+                <Route path="inspectors" element={<Inspectors />} />
+                <Route path="settings" element={<AdminSettings />} />
+                <Route path="support" element={<AdminSupportCenter />} />
+                <Route path="support/tickets" element={<AdminSupportTickets />} />
+                <Route path="support/tickets/:id" element={<AdminSupportTicketDetail />} />
+                <Route path="support/chats" element={<AdminSupportChats />} />
+                <Route path="support/chats/:id" element={<AdminSupportChatSession />} />
+                <Route path="roles" element={<RolesPermissions />} />
+                <Route path="roles/:id" element={<RoleEditor />} />
+              </Routes>
             </AdminAuthProvider>
           } />
 
