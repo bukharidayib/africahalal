@@ -24,7 +24,7 @@ import { SectionHeader } from "@/components/sections/SectionHeader";
 
 const stats = [
   { value: "500+", label: "Certified Businesses" },
-  { value: "Zambia", label: "Primary Focus" },
+  { value: "Africa", label: "Continental Reach" },
   { value: "10+", label: "Years of Excellence" },
   { value: "50+", label: "Expert Auditors" },
 ];
@@ -43,7 +43,7 @@ const timeline = [
   { year: "2014", title: "Regional Growth", description: "Expanding our certification methodology" },
   { year: "2016", title: "International Recognition", description: "Achieved international accreditation" },
   { year: "2018", title: "Digital Transformation", description: "Launched online verification platform" },
-  { year: "2020", title: "Zambia Operations", description: "Concentrated operations in Zambia" },
+  { year: "2020", title: "Strategic Expansion", description: "Expanding operations across key regional hubs" },
   { year: "2023", title: "Innovation Leadership", description: "Blockchain-based certificate verification" },
 ];
 
@@ -77,12 +77,12 @@ export default function About() {
                 Beyond Boundaries
               </h2>
               <p className="text-muted-foreground mb-6 text-lg">
-                From humble beginnings, AHI has grown to become the leading
-                Halal certification authority in Zambia. Our commitment to
-                excellence and integrity has earned us trust from businesses and consumers alike.
+                From humble beginnings, AHI has grown to become a leading
+                Halal certification authority. Our commitment to
+                excellence and integrity has earned us trust from businesses and consumers across Africa.
               </p>
               <p className="text-muted-foreground mb-8">
-                We understand the unique challenges and opportunities in the Zambian market, combining
+                We understand the unique challenges and opportunities in diverse markets, combining
                 international best practices with local expertise to deliver certification services
                 that truly serve our communities.
               </p>
@@ -100,8 +100,8 @@ export default function About() {
                 <Globe className="h-32 w-32 text-primary/50" />
               </div>
               <div className="absolute -bottom-6 -left-6 bg-secondary rounded-lg p-4 shadow-lg">
-                <p className="text-2xl font-bold text-secondary-foreground">Zambia</p>
-                <p className="text-sm text-secondary-foreground/80">Regional Hub</p>
+                <p className="text-2xl font-bold text-secondary-foreground">Africa</p>
+                <p className="text-sm text-secondary-foreground/80">Our Vision</p>
               </div>
             </div>
           </div>
@@ -219,7 +219,7 @@ export default function About() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground text-lg">
-                  To be the foremost authority in Halal certification in Zambia,
+                  To be the foremost authority in Halal certification,
                   fostering consumer confidence and enabling businesses to thrive in
                   global Halal markets.
                 </p>
@@ -236,7 +236,7 @@ export default function About() {
                 <p className="text-muted-foreground text-lg">
                   To provide rigorous, transparent, and accessible Halal certification
                   services that uphold Shariah principles while supporting the growth
-                  of Zambian businesses in the global economy.
+                  of businesses in the global economy.
                 </p>
               </CardContent>
             </Card>

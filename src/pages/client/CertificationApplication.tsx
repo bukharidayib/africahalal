@@ -222,12 +222,12 @@ export default function CertificationApplication() {
 
     const handleSaveIngredients = (ingredients: Ingredient[]) => {
         if (!selectedProductId) return;
-        
+
         setFormData(prev => ({
             ...prev,
-            products: prev.products.map(p => 
-                p.id === selectedProductId 
-                    ? { ...p, ingredients } 
+            products: prev.products.map(p =>
+                p.id === selectedProductId
+                    ? { ...p, ingredients }
                     : p
             )
         }));
@@ -387,7 +387,7 @@ export default function CertificationApplication() {
                 _action: 'application_submitted',
                 _resource_type: 'certification_applications',
                 _resource_id: appData.id,
-                _metadata: { 
+                _metadata: {
                     step: 'submission',
                     products_count: formData.products.length,
                     documents_count: formData.uploadedFiles.length,
@@ -502,7 +502,7 @@ export default function CertificationApplication() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="country" className="text-foreground">Operating City (Zambia) *</Label>
+                                        <Label htmlFor="country" className="text-foreground">Operating City *</Label>
                                         <Select
                                             value={formData.country}
                                             onValueChange={(v) => updateFormData('country', v)}
@@ -580,9 +580,8 @@ export default function CertificationApplication() {
                                     ].map((cat) => (
                                         <div
                                             key={cat}
-                                            className={`flex items-center space-x-3 p-4 border rounded-lg hover:border-primary/50 transition-colors cursor-pointer group ${
-                                                formData.categories.includes(cat) ? 'border-primary bg-primary/5' : 'border-border'
-                                            }`}
+                                            className={`flex items-center space-x-3 p-4 border rounded-lg hover:border-primary/50 transition-colors cursor-pointer group ${formData.categories.includes(cat) ? 'border-primary bg-primary/5' : 'border-border'
+                                                }`}
                                             onClick={() => {
                                                 const current = formData.categories;
                                                 const next = current.includes(cat)
@@ -595,7 +594,7 @@ export default function CertificationApplication() {
                                                 id={cat}
                                                 className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                                                 checked={formData.categories.includes(cat)}
-                                                onCheckedChange={() => {}}
+                                                onCheckedChange={() => { }}
                                             />
                                             <label htmlFor={cat} className="text-sm font-medium leading-none cursor-pointer flex-1 text-foreground">{cat}</label>
                                         </div>
@@ -613,9 +612,9 @@ export default function CertificationApplication() {
                                             <Label className="text-foreground text-base">Product List *</Label>
                                             <p className="text-sm text-muted-foreground mt-1">Add all products to be covered under this certification with their ingredients.</p>
                                         </div>
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm" 
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
                                             className="gap-2"
                                             onClick={() => setIsAddItemOpen(true)}
                                         >
@@ -650,8 +649,8 @@ export default function CertificationApplication() {
                                                             <td className="px-4 py-3 text-muted-foreground">{product.brand}</td>
                                                             <td className="px-4 py-3 text-muted-foreground">{product.category}</td>
                                                             <td className="px-4 py-3 text-center">
-                                                                <Button 
-                                                                    variant="ghost" 
+                                                                <Button
+                                                                    variant="ghost"
                                                                     size="sm"
                                                                     className="gap-1"
                                                                     onClick={() => openIngredientModal(product.id)}
@@ -667,9 +666,9 @@ export default function CertificationApplication() {
                                                                 </Button>
                                                             </td>
                                                             <td className="px-4 py-3 text-right">
-                                                                <Button 
-                                                                    variant="ghost" 
-                                                                    size="sm" 
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
                                                                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                                     onClick={() => handleRemoveProduct(product.id)}
                                                                 >
@@ -715,10 +714,9 @@ export default function CertificationApplication() {
                                 <div className="space-y-4 border rounded-xl p-6 bg-muted/20">
                                     <h3 className="font-bold text-lg font-serif text-foreground">Legal Declaration</h3>
                                     <div className="space-y-4">
-                                        <div 
-                                            className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
-                                                formData.declaration_confirmed ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                                            }`}
+                                        <div
+                                            className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${formData.declaration_confirmed ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                                                }`}
                                             onClick={() => updateFormData('declaration_confirmed', !formData.declaration_confirmed)}
                                         >
                                             <Checkbox
@@ -731,15 +729,14 @@ export default function CertificationApplication() {
                                                 I hereby declare that all information provided in this application is true and correct to the best of my knowledge. I understand that providing false information may result in rejection or revocation of certification.
                                             </label>
                                         </div>
-                                        <div 
-                                            className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${
-                                                formData.declaration_compliance ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                                            }`}
+                                        <div
+                                            className={`flex items-start space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${formData.declaration_compliance ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                                                }`}
                                             onClick={() => updateFormData('declaration_compliance', !formData.declaration_compliance)}
                                         >
-                                            <Checkbox 
-                                                id="dec2" 
-                                                className="mt-1 data-[state=checked]:bg-primary data-[state=checked]:border-primary" 
+                                            <Checkbox
+                                                id="dec2"
+                                                className="mt-1 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                                                 checked={formData.declaration_compliance}
                                                 onCheckedChange={(checked) => updateFormData('declaration_compliance', checked === true)}
                                             />

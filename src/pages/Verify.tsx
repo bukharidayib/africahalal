@@ -170,13 +170,13 @@ export default function Verify() {
                 <CardHeader className="bg-primary/5 border-b">
                   <CardTitle>Enter Certificate ID</CardTitle>
                   <CardDescription>
-                    Enter the certificate number found on the Halal certificate (e.g., AHI-ZAM-2024-...)
+                    Enter the certificate number found on the Halal certificate (e.g., AHI-CRT-2025-0001)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-6 space-y-4">
                   <div className="flex gap-2">
                     <Input
-                      placeholder="AHI-XXXX-XXXX"
+                      placeholder="AHI-CRT-2025-0001"
                       value={certificateId}
                       onChange={(e) => setCertificateId(e.target.value)}
                       onKeyDown={handleKeyDown}
@@ -251,7 +251,7 @@ export default function Verify() {
                         </div>
                         <div>
                           <h3 className="text-xl font-bold">Certificate Valid</h3>
-                          <p className="text-green-100 text-sm opacity-90">Authenticity confirmed by AHI Zambia</p>
+                          <p className="text-green-100 text-sm opacity-90">Authenticity confirmed by African Halal Institute</p>
                         </div>
                       </div>
                       <Badge className="bg-white text-green-600 font-bold px-3 py-1">ACTIVE</Badge>

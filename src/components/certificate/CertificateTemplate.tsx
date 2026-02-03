@@ -44,7 +44,7 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
                     <div className="h-20 w-px bg-primary/20 mx-2" />
                     <div className="text-left">
                         <h1 className="text-3xl font-bold tracking-tighter text-primary">AFRICAN HALAL</h1>
-                        <p className="text-sm font-sans tracking-[0.2em] text-muted-foreground font-semibold">INSTITUTE ZAMBIA</p>
+                        <p className="text-sm font-sans tracking-[0.2em] text-muted-foreground font-semibold">INSTITUTIONAL REGISTRY</p>
                     </div>
                 </div>
 

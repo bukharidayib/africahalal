@@ -93,7 +93,7 @@ const faqs = [
   },
   {
     question: "Is AHI certification internationally recognized?",
-    answer: "Yes, AHI certification is recognized in Zambia and by major international Halal accreditation bodies. Our standards align with global Halal requirements, facilitating international trade.",
+    answer: "Yes, AHI certification is recognized by major international Halal accreditation bodies. Our standards align with global Halal requirements, facilitating international trade.",
   },
   {
     question: "What industries can apply for certification?",
@@ -107,7 +107,7 @@ const faqs = [
 
 const testimonials = [
   {
-    quote: "AHI certification opened doors to new markets in Zambia. Their professional team made the process seamless.",
+    quote: "AHI certification opened doors to new markets. Their professional team made the process seamless.",
     author: "Ahmed Hassan",
     company: "Fresh Foods Ltd",
     role: "CEO",
@@ -119,7 +119,7 @@ const testimonials = [
     role: "Operations Director",
   },
   {
-    quote: "Outstanding support throughout the certification journey. AHI truly understands the needs of Zambian businesses.",
+    quote: "Outstanding support throughout the certification journey. AHI truly understands the needs of modern businesses.",
     author: "Ibrahim Mensah",
     company: "Golden Harvest Hotels",
     role: "Managing Director",
@@ -147,7 +147,7 @@ export default function Index() {
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-[1.1] tracking-tight">
               Your Partner for{" "}
               <span className="text-primary">Halal Certification</span>{" "}
-              in <span className="text-primary">Zambia</span>
+              in <span className="text-primary">Africa</span>
             </h1>
 
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">

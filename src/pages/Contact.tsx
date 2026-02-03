@@ -26,9 +26,9 @@ import { toast } from "sonner";
 
 const contactInfo = [
   { icon: Mail, label: "Email", value: "info@africanhalaal.com", link: "mailto:info@africanhalaal.com" },
-  { icon: Phone, label: "Phone", value: "+260972044414", link: "tel:+260972044414" },
-  { icon: MapPin, label: "Address", value: "Matero, Lusaka, ZM" },
-  { icon: Clock, label: "Hours", value: "Mon-Fri: 8:00 AM - 5:00 PM (SAST)" },
+  { icon: Phone, label: "Phone", value: "+260 972 044 414", link: "tel:+260972044414" },
+  { icon: MapPin, label: "Address", value: "Lusaka, Zambia (Main Headquarters)" },
+  { icon: Clock, label: "Hours", value: "Mon-Fri: 8:00 AM - 5:00 PM (CAT)" },
 ];
 
 const subjects = [
@@ -43,7 +43,7 @@ const subjects = [
 ];
 
 const regionalOffices = [
-  { region: "Zambia (HQ)", city: "Lusaka", email: "info@africanhalaal.com" },
+  { region: "Main Headquarters", city: "Lusaka", email: "info@africanhalaal.com" },
   { region: "East Africa", city: "Nairobi, Kenya", email: "eastafrica@ahis.africa" },
   { region: "West Africa", city: "Lagos, Nigeria", email: "westafrica@ahis.africa" },
   { region: "North Africa", city: "Cairo, Egypt", email: "northafrica@ahis.africa" },
@@ -196,6 +196,7 @@ export default function Contact() {
                         />
                       </div>
                     </div>
+
                     <div>
                       <label className="text-sm font-medium mb-2 block">Subject *</label>
                       <Select
