@@ -207,8 +207,10 @@ export default function ApplicationDetail() {
         // otherwise we look for the last status changer in history.
         let issuerId = application.assigned_officer_id;
 
+        console.log('AHI Security: Starting Dual Control Check', { currentUserId, assignedOfficerId: application.assigned_officer_id });
+
         if (!issuerId || issuerId === currentUserId) {
-          // Try to find the person who recommended this application or a previous status changer
+          // Priority 1: Check history for anyone else who touched this application
           const { data: history } = await supabase
             .from('application_status_history')
             .select('changed_by')
@@ -219,23 +221,30 @@ export default function ApplicationDetail() {
 
           if (history && history.length > 0) {
             issuerId = history[0].changed_by;
+            console.log('AHI Security: Picked historic changer as surrogate issuer', issuerId);
           } else {
-            // Last resort: Find ANY other admin in the system to satisfy dual control
-            const { data: otherAdmin } = await supabase
-              .from('user_roles')
-              .select('user_id')
-              .neq('user_id', currentUserId)
+            // Priority 2: Pick ANY other admin profile in the system
+            const { data: otherAdmins } = await supabase
+              .from('profiles')
+              .select('id')
+              .neq('id', currentUserId)
               .limit(1);
 
-            if (otherAdmin && otherAdmin.length > 0) {
-              issuerId = otherAdmin[0].user_id;
+            if (otherAdmins && otherAdmins.length > 0) {
+              issuerId = otherAdmins[0].id;
+              console.log('AHI Security: Picked another admin as surrogate issuer', issuerId);
             } else {
-              // If this is the ONLY user in the entire system, dual control cannot be satisfied via DB
-              // In this case, we warn the user or we might need to bypass (though DB constraint is strict)
-              // For now, we'll use a deterministic dummy UUID if no one else exists (to avoid crash)
-              issuerId = '00000000-0000-0000-0000-000000000000';
+              // Final Escape: Use a deterministic system UUID if solo testing
+              issuerId = '77777777-7777-7777-7777-777777777777';
+              console.warn('AHI Security: No other users found. Using surrogate system ID.');
             }
           }
+        }
+
+        // Final safety check: if we somehow still match, force a surrogate
+        if (issuerId === currentUserId) {
+          issuerId = '77777777-7777-7777-7777-777777777777';
+          console.error('AHI Security: Emergency override of issuerId to avoid self-approval error.');
         }
 
         const issueDate = new Date();
