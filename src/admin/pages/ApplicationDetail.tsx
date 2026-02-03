@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { 
-  ArrowLeft, Building2, Calendar, FileText, Clock, CheckCircle2, 
+import {
+  ArrowLeft, Building2, Calendar, FileText, Clock, CheckCircle2,
   XCircle, AlertCircle, User, MapPin, Loader2, Save, History
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -178,7 +178,7 @@ export default function ApplicationDetail() {
     try {
       const { error } = await supabase
         .from('certification_applications')
-        .update({ 
+        .update({
           status: newStatus,
           updated_at: new Date().toISOString()
         })
@@ -192,11 +192,40 @@ export default function ApplicationDetail() {
         _resource_type: 'certification_applications',
         _resource_id: application.id,
         _reason_code: statusReason || null,
-        _metadata: { 
-          from_status: application.status, 
-          to_status: newStatus 
+        _metadata: {
+          from_status: application.status,
+          to_status: newStatus
         }
       });
+
+      if (newStatus === 'approved') {
+        const issueDate = new Date();
+        const expiryDate = new Date();
+        expiryDate.setFullYear(issueDate.getFullYear() + 1);
+
+        const certNumber = `AHI-ZAM-${issueDate.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const qrHash = crypto.randomUUID();
+
+        const { error: certError } = await supabase.from('certificates').insert({
+          application_id: application.id,
+          organization_id: application.organization_id,
+          certificate_number: certNumber,
+          scope: application.scope,
+          issue_date: issueDate.toISOString(),
+          expiry_date: expiryDate.toISOString(),
+          status: 'active',
+          approved_by: (await supabase.auth.getUser()).data.user?.id || '',
+          issued_by: (await supabase.auth.getUser()).data.user?.id || '',
+          qr_hash: qrHash
+        });
+
+        if (certError) throw certError;
+
+        toast({
+          title: 'Certificate Generated',
+          description: `A new certificate ${certNumber} has been issued.`,
+        });
+      }
 
       toast({
         title: 'Status Updated',
@@ -305,7 +334,7 @@ export default function ApplicationDetail() {
                       <Label className="text-muted-foreground text-xs">Submitted</Label>
                       <p className="font-medium flex items-center gap-2">
                         <Clock className="h-4 w-4 text-muted-foreground" />
-                        {application.submitted_at 
+                        {application.submitted_at
                           ? format(new Date(application.submitted_at), 'dd MMM yyyy')
                           : 'Not submitted'
                         }
@@ -383,8 +412,8 @@ export default function ApplicationDetail() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="new-status">New Status</Label>
-                    <Select 
-                      value={newStatus} 
+                    <Select
+                      value={newStatus}
                       onValueChange={(val) => setNewStatus(val as ApplicationStatus)}
                     >
                       <SelectTrigger>
@@ -412,7 +441,7 @@ export default function ApplicationDetail() {
                   />
                 </div>
 
-                <Button 
+                <Button
                   onClick={handleStatusUpdate}
                   disabled={isSaving || !newStatus || newStatus === application.status}
                   className="gap-2"
@@ -497,8 +526,8 @@ export default function ApplicationDetail() {
                 ) : (
                   <div className="space-y-3">
                     {documents.map((doc) => (
-                      <div 
-                        key={doc.id} 
+                      <div
+                        key={doc.id}
                         className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                       >
                         <div className="flex items-center gap-3">

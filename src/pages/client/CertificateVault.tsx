@@ -20,6 +20,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { CertificateDownloader } from "@/components/certificate/CertificateDownloader";
+import { format } from "date-fns";
 
 const certificates = [
     {
@@ -134,13 +136,21 @@ export default function CertificateVault() {
                             </div>
 
                             <div className="flex gap-4 pt-6">
-                                <Button className="bg-white text-primary hover:bg-white/90 font-bold px-8 shadow-xl active:scale-95 transition-all">
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Download High-Res PDF
-                                </Button>
-                                <Button variant="ghost" className="text-white hover:bg-white/10 font-medium">
-                                    <ExternalLink className="mr-2 h-4 w-4" />
-                                    Verify Online
+                                <CertificateDownloader
+                                    certificateId={activeCert.id}
+                                    certificateNumber={activeCert.certificate_number}
+                                    institutionName="African Halal Large-Scale Facility"
+                                    scope={activeCert.scope}
+                                    issueDate={format(new Date(activeCert.issue_date), 'dd MMM yyyy')}
+                                    expiryDate={format(new Date(activeCert.expiry_date), 'dd MMM yyyy')}
+                                    className="bg-white text-primary hover:bg-white/90 font-bold px-8 shadow-xl active:scale-95 transition-all text-sm h-10 px-6"
+                                    label="Download High-Res PDF"
+                                />
+                                <Button variant="ghost" className="text-white hover:bg-white/10 font-medium" asChild>
+                                    <a href={`/verify?id=${activeCert.id}`}>
+                                        <ExternalLink className="mr-2 h-4 w-4" />
+                                        Verify Online
+                                    </a>
                                 </Button>
                             </div>
                         </div>
@@ -219,12 +229,23 @@ export default function CertificateVault() {
                                         </td>
                                         <td className="px-6 py-5 text-right">
                                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary">
-                                                    <EyeIcon className="h-4 w-4" />
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary" asChild>
+                                                    <a href={`/verify?id=${cert.id}`}>
+                                                        <EyeIcon className="h-4 w-4" />
+                                                    </a>
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary">
-                                                    <Download className="h-4 w-4" />
-                                                </Button>
+                                                <CertificateDownloader
+                                                    certificateId={cert.id}
+                                                    certificateNumber={cert.certificate_number}
+                                                    institutionName="African Halal Institute"
+                                                    scope={cert.scope}
+                                                    issueDate={format(new Date(cert.issue_date), 'dd MMM yyyy')}
+                                                    expiryDate={format(new Date(cert.expiry_date), 'dd MMM yyyy')}
+                                                    variant="ghost"
+                                                    className="h-8 w-8 p-0 hover:bg-primary/5 hover:text-primary"
+                                                    label=""
+                                                    showIcon={true}
+                                                />
                                             </div>
                                         </td>
                                     </tr>

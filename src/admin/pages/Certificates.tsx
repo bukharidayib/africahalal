@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Award, 
-  Search, 
+import {
+  Award,
+  Search,
   ChevronRight,
   Building2,
   Calendar,
@@ -34,6 +34,7 @@ import {
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInDays } from 'date-fns';
+import { CertificateDownloader } from '@/components/certificate/CertificateDownloader';
 
 type CertificateStatus = 'active' | 'suspended' | 'revoked' | 'expired';
 
@@ -235,7 +236,7 @@ export default function Certificates() {
                     const status = statusConfig[cert.status];
                     const StatusIcon = status.icon;
                     const expiryInfo = getExpiryInfo(cert.expiry_date);
-                    
+
                     return (
                       <TableRow key={cert.id}>
                         <TableCell className="font-medium">
@@ -271,11 +272,25 @@ export default function Certificates() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button asChild variant="ghost" size="icon">
-                            <Link to={`/admin/certificates/${cert.id}`}>
-                              <ChevronRight className="h-4 w-4" />
-                            </Link>
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <CertificateDownloader
+                              certificateId={cert.id}
+                              certificateNumber={cert.certificate_number}
+                              institutionName={cert.organizations?.name || 'Unknown'}
+                              scope={cert.scope}
+                              issueDate={format(new Date(cert.issue_date), 'dd MMM yyyy')}
+                              expiryDate={format(new Date(cert.expiry_date), 'dd MMM yyyy')}
+                              variant="ghost"
+                              showIcon={true}
+                              label=""
+                              className="h-8 w-8 p-0"
+                            />
+                            <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                              <Link to={`/admin/certificates/${cert.id}`}>
+                                <ChevronRight className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
