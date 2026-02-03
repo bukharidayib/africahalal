@@ -58,7 +58,7 @@ export default function CertificateVault() {
         try {
             const { data, error } = await supabase
                 .from('certificates')
-                .select('*')
+                .select('*, organizations(name)')
                 .order('issue_date', { ascending: false });
 
             if (error) throw error;
@@ -139,7 +139,7 @@ export default function CertificateVault() {
                                 <CertificateDownloader
                                     certificateId={activeCert.id}
                                     certificateNumber={activeCert.certificate_number}
-                                    institutionName="African Halal Large-Scale Facility"
+                                    institutionName={(activeCert as any).organizations?.name || "African Halal Certified Entity"}
                                     scope={activeCert.scope}
                                     issueDate={format(new Date(activeCert.issue_date), 'dd MMM yyyy')}
                                     expiryDate={format(new Date(activeCert.expiry_date), 'dd MMM yyyy')}
@@ -237,7 +237,7 @@ export default function CertificateVault() {
                                                 <CertificateDownloader
                                                     certificateId={cert.id}
                                                     certificateNumber={cert.certificate_number}
-                                                    institutionName="African Halal Institute"
+                                                    institutionName={(cert as any).organizations?.name || "African Halal Institute"}
                                                     scope={cert.scope}
                                                     issueDate={format(new Date(cert.issue_date), 'dd MMM yyyy')}
                                                     expiryDate={format(new Date(cert.expiry_date), 'dd MMM yyyy')}

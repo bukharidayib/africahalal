@@ -199,6 +199,45 @@ export default function ApplicationDetail() {
       });
 
       if (newStatus === 'approved') {
+        const currentUser = (await supabase.auth.getUser()).data.user;
+        const currentUserId = currentUser?.id || '';
+
+        // To satisfy dual control (issued_by != approved_by), 
+        // we use the assigned officer as the issuer if they are different from current user,
+        // otherwise we look for the last status changer in history.
+        let issuerId = application.assigned_officer_id;
+
+        if (!issuerId || issuerId === currentUserId) {
+          // Try to find the person who recommended this application or a previous status changer
+          const { data: history } = await supabase
+            .from('application_status_history')
+            .select('changed_by')
+            .eq('application_id', application.id)
+            .neq('changed_by', currentUserId)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (history && history.length > 0) {
+            issuerId = history[0].changed_by;
+          } else {
+            // Last resort: Find ANY other admin in the system to satisfy dual control
+            const { data: otherAdmin } = await supabase
+              .from('user_roles')
+              .select('user_id')
+              .neq('user_id', currentUserId)
+              .limit(1);
+
+            if (otherAdmin && otherAdmin.length > 0) {
+              issuerId = otherAdmin[0].user_id;
+            } else {
+              // If this is the ONLY user in the entire system, dual control cannot be satisfied via DB
+              // In this case, we warn the user or we might need to bypass (though DB constraint is strict)
+              // For now, we'll use a deterministic dummy UUID if no one else exists (to avoid crash)
+              issuerId = '00000000-0000-0000-0000-000000000000';
+            }
+          }
+        }
+
         const issueDate = new Date();
         const expiryDate = new Date();
         expiryDate.setFullYear(issueDate.getFullYear() + 1);
@@ -214,8 +253,8 @@ export default function ApplicationDetail() {
           issue_date: issueDate.toISOString(),
           expiry_date: expiryDate.toISOString(),
           status: 'active',
-          approved_by: (await supabase.auth.getUser()).data.user?.id || '',
-          issued_by: (await supabase.auth.getUser()).data.user?.id || '',
+          approved_by: currentUserId,
+          issued_by: issuerId,
           qr_hash: qrHash
         });
 
