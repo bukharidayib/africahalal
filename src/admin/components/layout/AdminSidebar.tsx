@@ -90,6 +90,18 @@ const navItems: NavItem[] = [
     permission: 'canManageUsers',
   },
   {
+    title: 'Supervisors',
+    href: '/admin/supervisors',
+    icon: Users,
+    permission: 'canManageUsers',
+  },
+  {
+    title: 'Blog CMS',
+    href: '/admin/blogs',
+    icon: FileText,
+    permission: 'canManageSettings',
+  },
+  {
     title: 'Settings',
     href: '/admin/settings',
     icon: Settings,

@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Shield,
   Award,
@@ -22,6 +24,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Layout } from "@/components/layout/Layout";
 import { SectionHeader } from "@/components/sections/SectionHeader";
+
+interface BlogPost {
+  id: string;
+  title: string;
+  excerpt: string;
+  slug: string;
+  image_url: string;
+  published_at: string;
+}
 
 const coreValues = [
   {
@@ -127,6 +138,23 @@ const testimonials = [
 ];
 
 export default function Index() {
+  const [blogs, setBlogs] = useState<BlogPost[]>([]);
+
+  useEffect(() => {
+    fetchBlogs();
+  }, []);
+
+  const fetchBlogs = async () => {
+    const { data } = await supabase
+      .from('blogs')
+      .select('*')
+      .eq('published', true)
+      .order('published_at', { ascending: false })
+      .limit(3);
+
+    if (data) setBlogs(data);
+  };
+
   return (
     <Layout>
       {/* Hero Section */}
@@ -344,6 +372,52 @@ export default function Index() {
           </div>
         </div>
       </section>
+
+      {/* Blogs Section */}
+      {blogs.length > 0 && (
+        <section className="section-padding bg-background">
+          <div className="container">
+            <SectionHeader
+              subtitle="Latest Updates"
+              title="News & Insights"
+              description="Stay informed with the latest news and articles from the African Halal Institute."
+            />
+            <div className="grid md:grid-cols-3 gap-8">
+              {blogs.map((blog) => (
+                <Card key={blog.id} className="group overflow-hidden border hover:shadow-lg transition-all h-full flex flex-col">
+                  {blog.image_url && (
+                    <div className="h-48 overflow-hidden">
+                      <img
+                        src={blog.image_url}
+                        alt={blog.title}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    </div>
+                  )}
+                  <CardHeader>
+                    <div className="text-sm text-muted-foreground mb-2">
+                      {new Date(blog.published_at).toLocaleDateString()}
+                    </div>
+                    <CardTitle className="text-xl group-hover:text-primary transition-colors line-clamp-2">
+                      {blog.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <p className="text-muted-foreground line-clamp-3">{blog.excerpt}</p>
+                  </CardContent>
+                  <div className="p-6 pt-0 mt-auto">
+                    <Button variant="link" className="p-0 h-auto font-semibold" asChild>
+                      <Link to={`/blog/${blog.slug}`}>
+                        Read Article <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* FAQ Section */}
       <section id="faq" className="section-padding bg-background">

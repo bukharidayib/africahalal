@@ -84,6 +84,8 @@ export default function CertificationApplication() {
         employees: "",
         country: "",
         categories: [] as string[],
+        validity_period: "1_year", // Default to 1 Year
+        application_fee: 3000,
         products: [] as ProductItem[],
         uploadedFiles: [] as UploadedFile[],
         declaration_confirmed: false,
@@ -572,11 +574,11 @@ export default function CertificationApplication() {
                                 <div className="space-y-4">
                                     <Label className="text-foreground">Select Certification Category (select all that apply) *</Label>
                                     {[
-                                        "Food Processing / Manufacturing",
-                                        "Meat & Poultry Abattoir",
-                                        "Hospitality (Hotels & Restaurants)",
-                                        "Logistics & Warehousing",
-                                        "Pharmaceuticals & Cosmetics"
+                                        "Restuarents & Coffee",
+                                        "Abbatoirs",
+                                        "Meat Processing",
+                                        "Hospitality",
+                                        "Manufacturies"
                                     ].map((cat) => (
                                         <div
                                             key={cat}
@@ -599,6 +601,33 @@ export default function CertificationApplication() {
                                             <label htmlFor={cat} className="text-sm font-medium leading-none cursor-pointer flex-1 text-foreground">{cat}</label>
                                         </div>
                                     ))}
+                                </div>
+
+                                <div className="space-y-4 pt-4 border-t">
+                                    <Label className="text-foreground">Certification Validity Period *</Label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div
+                                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.validity_period === '6_months' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                                            onClick={() => updateFormData('validity_period', '6_months') || updateFormData('application_fee', 1500)}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="font-bold text-foreground">6 Months</span>
+                                                <Badge variant="outline" className="bg-background">ZMW 1,500</Badge>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">Short-term certification valid for six months from issuance.</p>
+                                        </div>
+
+                                        <div
+                                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.validity_period === '1_year' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                                            onClick={() => updateFormData('validity_period', '1_year') || updateFormData('application_fee', 3000)}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="font-bold text-foreground">1 Year</span>
+                                                <Badge variant="outline" className="bg-background">ZMW 3,000</Badge>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">Standard certification valid for one year from issuance.</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}

@@ -38,20 +38,10 @@ const sectors = [
   { icon: Building2, title: "Logistics & Storage", description: "Cold chain and warehousing facilities" },
 ];
 
-const timeline = [
-  { year: "2012", title: "Foundation", description: "AHI established with a focus on Halal excellence" },
-  { year: "2014", title: "Regional Growth", description: "Expanding our certification methodology" },
-  { year: "2016", title: "International Recognition", description: "Achieved international accreditation" },
-  { year: "2018", title: "Digital Transformation", description: "Launched online verification platform" },
-  { year: "2020", title: "Strategic Expansion", description: "Expanding operations across key regional hubs" },
-  { year: "2023", title: "Innovation Leadership", description: "Blockchain-based certificate verification" },
-];
-
 const coreValues = [
   { icon: Shield, title: "Integrity", description: "Upholding the highest ethical standards in every certification decision" },
   { icon: Award, title: "Excellence", description: "Striving for perfection in our processes and service delivery" },
   { icon: Eye, title: "Transparency", description: "Open and honest communication with all stakeholders" },
-  { icon: Globe, title: "Pan-Africanism", description: "Committed to African unity and continental development" },
 ];
 
 export default function About() {
@@ -168,43 +158,7 @@ export default function About() {
         </div>
       </section>
 
-      {/* Timeline */}
-      <section className="section-padding bg-background">
-        <div className="container">
-          <SectionHeader
-            subtitle="Our History"
-            title="Our Journey Through Time"
-            description="A decade of growth, innovation, and commitment to Halal excellence."
-          />
-          <div className="relative max-w-3xl mx-auto">
-            <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-0.5 bg-border md:-translate-x-1/2" />
-            {timeline.map((item, index) => (
-              <div
-                key={item.year}
-                className={`relative flex items-start gap-8 mb-8 ${index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"
-                  }`}
-              >
-                <div className={`flex-1 ${index % 2 === 0 ? "md:text-right" : ""} hidden md:block`}>
-                  <div className={`p-4 ${index % 2 === 0 ? "md:pr-8" : "md:pl-8"}`}>
-                    <p className="text-sm text-secondary font-medium">{item.year}</p>
-                    <h3 className="font-semibold text-lg mb-1">{item.title}</h3>
-                    <p className="text-muted-foreground text-sm">{item.description}</p>
-                  </div>
-                </div>
-                <div className="relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground font-bold text-sm">
-                  {index + 1}
-                </div>
-                <div className="flex-1 md:hidden">
-                  <p className="text-sm text-secondary font-medium">{item.year}</p>
-                  <h3 className="font-semibold text-lg mb-1">{item.title}</h3>
-                  <p className="text-muted-foreground text-sm">{item.description}</p>
-                </div>
-                <div className="flex-1 hidden md:block" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Timeline section removed */}
 
       {/* Vision & Mission */}
       <section className="section-padding bg-muted">

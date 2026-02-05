@@ -33,7 +33,7 @@ import { Layout } from "@/components/layout/Layout";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { supabase } from "@/integrations/supabase/client";
 
-const sectors = ["All Sectors", "Food & Beverage", "Abattoirs & Meat", "Hospitality", "Pharmaceuticals", "Logistics", "Manufacturing"];
+const sectors = ["All Sectors", "Restuarents & Coffee", "Abbatoirs", "Meat Processing", "Hospitality", "Manufacturies"];
 const statuses = ["All Status", "Active", "Expired", "Suspended"];
 
 export default function Directory() {

@@ -25,66 +25,54 @@ import { SectionHeader } from "@/components/sections/SectionHeader";
 
 const sectors = [
   {
-    id: "food",
-    name: "Food & Beverage",
-    icon: Utensils,
-    description: "Comprehensive certification for food manufacturers, processors, and beverage producers.",
+    id: "restaurants_coffee",
+    name: "Restuarents & Coffee",
+    icon: Coffee,
+    description: "Certification for dining establishments and coffee shops ensuring Halal compliance.",
     subcategories: [
       {
-        icon: Croissant,
-        name: "Bakery & Confectionery",
-        items: ["Breads and pastries", "Chocolates and sweets", "Biscuits and cookies", "Cakes and desserts"]
+        icon: ChefHat,
+        name: "Fine & Casual Dining",
+        items: ["Full-service restaurants", "Bistros and cafes", "Fast food outlets", "Coffee shops"]
       },
       {
         icon: Coffee,
-        name: "Beverages",
-        items: ["Soft drinks", "Fruit juices", "Energy drinks", "Flavored waters"]
-      },
-      {
-        icon: IceCream,
-        name: "Dairy Products",
-        items: ["Milk and cream", "Cheese and butter", "Yogurt and ice cream", "Dairy alternatives"]
-      },
-      {
-        icon: Soup,
-        name: "Processed Foods",
-        items: ["Canned goods", "Frozen foods", "Ready meals", "Sauces and condiments"]
-      },
+        name: "Specialty Coffee",
+        items: ["Roasteries", "Cafes", "Bean sourcing", "Beverage preparation"]
+      }
     ]
   },
   {
-    id: "meat",
-    name: "Abattoirs & Meat",
-    icon: Factory,
-    description: "Specialized certification for slaughterhouses and meat processing facilities.",
+    id: "abattoirs",
+    name: "Abbatoirs",
+    icon: Beef,
+    description: "Specialized certification for slaughterhouses and primary meat processing.",
     subcategories: [
       {
         icon: Beef,
         name: "Slaughter Facilities",
         items: ["Cattle abattoirs", "Poultry processing", "Sheep and goat facilities", "Mobile slaughter units"]
-      },
+      }
+    ]
+  },
+  {
+    id: "meat_processing",
+    name: "Meat Processing",
+    icon: Factory,
+    description: "Value-added meat products and processing facilities.",
+    subcategories: [
       {
         icon: Factory,
-        name: "Meat Processing",
+        name: "Processing",
         items: ["Deboning and portioning", "Sausage manufacturing", "Cured meats", "Meat packaging"]
-      },
-      {
-        icon: Fish,
-        name: "Seafood Processing",
-        items: ["Fish processing plants", "Shellfish facilities", "Seafood packaging", "Cold storage"]
-      },
-      {
-        icon: Warehouse,
-        name: "Cold Chain",
-        items: ["Refrigerated storage", "Frozen goods handling", "Transport verification", "Temperature monitoring"]
-      },
+      }
     ]
   },
   {
     id: "hospitality",
     name: "Hospitality",
     icon: Hotel,
-    description: "Certification for hotels, restaurants, and catering services serving Halal cuisine.",
+    description: "Certification for hotels, resorts, and tourism services.",
     subcategories: [
       {
         icon: Hotel,
@@ -92,22 +80,25 @@ const sectors = [
         items: ["Full-service hotels", "Resort properties", "Guest houses", "Serviced apartments"]
       },
       {
-        icon: ChefHat,
-        name: "Restaurants",
-        items: ["Fine dining", "Casual dining", "Fast food outlets", "Cafés and bistros"]
-      },
-      {
         icon: Soup,
-        name: "Catering Services",
-        items: ["Event catering", "Corporate catering", "Airline catering", "Hospital food services"]
-      },
-      {
-        icon: Building2,
-        name: "Institutional",
-        items: ["School cafeterias", "University dining", "Hospital kitchens", "Prison food services"]
-      },
+        name: "Catering",
+        items: ["Event catering", "Corporate catering", "Airline catering"]
+      }
     ]
   },
+  {
+    id: "manufacturies",
+    name: "Manufacturies",
+    icon: Building2,
+    description: "Industrial manufacturing of food and consumer goods.",
+    subcategories: [
+      {
+        icon: CheckCircle2,
+        name: "General Manufacturing",
+        items: ["Processed foods", "Beverages", "Pharmaceuticals", "Cosmetics"]
+      }
+    ]
+  }
 ];
 
 const certificationBenefits = [
@@ -120,7 +111,7 @@ const certificationBenefits = [
 ];
 
 export default function Industries() {
-  const [activeTab, setActiveTab] = useState("food");
+  const [activeTab, setActiveTab] = useState("restaurants_coffee");
 
   return (
     <Layout>

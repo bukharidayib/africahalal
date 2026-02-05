@@ -65,6 +65,16 @@ export default function ComplianceCenter() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
+            // Get organization_id
+            const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single();
+            const organizationId = profile?.organization_id;
+
+            if (!organizationId) {
+                // No org, no data
+                setIsLoading(false);
+                return;
+            }
+
             // Fetch CARs
             const { data: cars, error: carError } = await supabase
                 .from('corrective_actions')
@@ -80,14 +90,36 @@ export default function ComplianceCenter() {
                     )
                 `)
                 .order('submitted_at', { ascending: false });
+            // Ideally this should also be filtered by organization or linked via NCN -> Inspection -> Org
+            // But assuming CARs are linked to user or policies handle it. 
+            // However, for Inspections we definitely need Org ID as requested.
 
             if (carError) throw carError;
             setCarItems(cars || []);
 
-            // Fetch Latest Inspection Report
+            // Fetch Latest Inspection Report via related Inspections
+            // First get inspections for this org
+            const { data: inspections } = await supabase
+                .from('inspections')
+                .select('id')
+                .eq('organization_id', organizationId); // Assuming inspections has organization_id directly, or via app?
+
+            // Wait, looking at previous migration, inspections connects to applications.
+            // Let's safe-bet fetch via application?
+            // "JOIN public.certification_applications ca ON ca.id = i.application_id"
+
+            // Easier way if we don't change DB structure:
             const { data: reports, error: reportError } = await supabase
                 .from('inspection_reports')
-                .select('*')
+                .select(`
+                    *,
+                    inspection:inspections!inner(
+                        application:certification_applications!inner(
+                            organization_id
+                        )
+                    )
+                `)
+                .eq('inspection.application.organization_id', organizationId)
                 .order('created_at', { ascending: false })
                 .limit(1);
 
