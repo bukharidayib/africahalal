@@ -1,3 +1,4 @@
+import React from "react";
 import { Link } from "react-router-dom";
 import {
   Shield,
@@ -30,12 +31,11 @@ const stats = [
 ];
 
 const sectors = [
-  { icon: Utensils, title: "Food Manufacturers", description: "Processed foods, beverages, and ingredients" },
-  { icon: Factory, title: "Abattoirs & Processors", description: "Meat slaughter and processing facilities" },
-  { icon: Hotel, title: "Hospitality Sector", description: "Hotels, restaurants, and catering services" },
-  { icon: Pill, title: "Pharmaceuticals", description: "Medicines and healthcare products" },
-  { icon: Shirt, title: "Cosmetics & Personal Care", description: "Beauty and personal care products" },
-  { icon: Building2, title: "Logistics & Storage", description: "Cold chain and warehousing facilities" },
+  { icon: Utensils, title: "Restaurants & Coffee", description: "Dining establishments and cafes" },
+  { icon: Factory, title: "Abattoirs", description: "Meat slaughter facilities" },
+  { icon: Factory, title: "Meat Processing", description: "Meat processing and packaging" },
+  { icon: Hotel, title: "Hospitality", description: "Hotels and accommodation services" },
+  { icon: Factory, title: "Manufacturies", description: "Manufacturing plants and factories" },
 ];
 
 const coreValues = [
@@ -206,7 +206,7 @@ export default function About() {
             title="Our Core Values"
             description="The principles that guide every decision we make."
           />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {coreValues.map((value) => (
               <div
                 key={value.title}

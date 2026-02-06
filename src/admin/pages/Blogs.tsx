@@ -33,6 +33,7 @@ interface Blog {
     slug: string;
     excerpt: string;
     content: string;
+    image_url?: string;
     published: boolean;
     created_at: string;
 }
@@ -45,6 +46,7 @@ export default function Blogs() {
         title: "",
         slug: "",
         excerpt: "",
+        image_url: "",
         content: "",
         published: false
     });
@@ -100,7 +102,7 @@ export default function Blogs() {
 
             setIsCreateOpen(false);
             setEditingId(null);
-            setFormData({ title: "", slug: "", excerpt: "", content: "", published: false });
+            setFormData({ title: "", slug: "", excerpt: "", image_url: "", content: "", published: false });
             fetchBlogs();
         } catch (error: any) {
             toast({
@@ -127,6 +129,7 @@ export default function Blogs() {
             title: blog.title,
             slug: blog.slug,
             excerpt: blog.excerpt || "",
+            image_url: blog.image_url || "",
             content: blog.content,
             published: blog.published
         });
@@ -142,7 +145,7 @@ export default function Blogs() {
                         <h2 className="text-3xl font-bold tracking-tight">Blog CMS</h2>
                         <p className="text-muted-foreground">Manage articles and content for the landing page.</p>
                     </div>
-                    <Button onClick={() => { setEditingId(null); setFormData({ title: "", slug: "", excerpt: "", content: "", published: false }); setIsCreateOpen(true); }}>
+                    <Button onClick={() => { setEditingId(null); setFormData({ title: "", slug: "", excerpt: "", image_url: "", content: "", published: false }); setIsCreateOpen(true); }}>
                         <Plus className="mr-2 h-4 w-4" />
                         Create New Post
                     </Button>
@@ -207,6 +210,10 @@ export default function Blogs() {
                             <div className="space-y-2">
                                 <Label>Excerpt (Short description)</Label>
                                 <Textarea value={formData.excerpt} onChange={e => setFormData({ ...formData, excerpt: e.target.value })} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Image URL (Optional)</Label>
+                                <Input value={formData.image_url} onChange={e => setFormData({ ...formData, image_url: e.target.value })} placeholder="https://..." />
                             </div>
                             <div className="space-y-2">
                                 <Label>Content (Markdown supported) *</Label>

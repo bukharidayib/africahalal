@@ -1,6 +1,6 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Mail, Lock, Loader2, Chrome, ArrowLeft, Building2, User } from "lucide-react";
+import { Mail, Lock, Loader2, Chrome, ArrowLeft, Building2, User, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,12 +15,20 @@ export default function SignUp() {
     const [password, setPassword] = useState("");
     const [fullName, setFullName] = useState("");
     const [companyName, setCompanyName] = useState("");
+    const [nrc, setNrc] = useState("");
+    const [nrcError, setNrcError] = useState("");
     const navigate = useNavigate();
     const { toast } = useToast();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
+
+        if (!validateNrc(nrc)) {
+            setNrcError("Invalid NRC format. Use XXXXXX/XX/1, 2 or 3");
+            setIsLoading(false);
+            return;
+        }
 
         try {
             // 1. Sign up user
@@ -31,6 +39,7 @@ export default function SignUp() {
                     data: {
                         full_name: fullName,
                         company_name: companyName,
+                        nrc: nrc,
                     }
                 }
             });
@@ -73,6 +82,22 @@ export default function SignUp() {
             });
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const validateNrc = (value: string) => {
+        // Format: XXXXXX/XX/X where last digit is 1, 2, or 3
+        const regex = /^\d{6}\/\d{2}\/[1-3]$/;
+        return regex.test(value);
+    };
+
+    const handleNrcChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setNrc(value);
+        if (value && !validateNrc(value)) {
+            setNrcError("Format: 123456/11/1 (Last digit 1-3)");
+        } else {
+            setNrcError("");
         }
     };
 
@@ -135,6 +160,24 @@ export default function SignUp() {
                                         disabled={isLoading}
                                     />
                                 </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="nrc">NRC Number</Label>
+                                <div className="relative">
+                                    <FileText className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        id="nrc"
+                                        type="text"
+                                        placeholder="123456/11/1"
+                                        required
+                                        value={nrc}
+                                        onChange={handleNrcChange}
+                                        className={`pl-10 h-11 border-border focus-visible:ring-primary ${nrcError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                                        disabled={isLoading}
+                                    />
+                                </div>
+                                {nrcError && <p className="text-xs text-red-500 pt-1">{nrcError}</p>}
                             </div>
 
                             <div className="space-y-2">

@@ -1,3 +1,4 @@
+import React from "react";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,15 +10,17 @@ import {
   Utensils,
   Factory,
   Hotel,
-  Pill,
-  Shirt,
-  Check,
+  Coffee,
+  Store,
+  ChefHat,
+  Info,
   ArrowRight,
   FileSearch,
   ClipboardCheck,
   BadgeCheck,
   Eye,
-  ChevronDown
+  ChevronDown,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,12 +79,11 @@ const services = [
 ];
 
 const industries = [
-  { icon: Utensils, name: "Food & Beverage" },
+  { icon: Utensils, name: "Restaurants & Coffee" },
+  { icon: Factory, name: "Abattoirs" },
   { icon: Factory, name: "Meat Processing" },
   { icon: Hotel, name: "Hospitality" },
-  { icon: Pill, name: "Pharmaceuticals" },
-  { icon: Shirt, name: "Cosmetics" },
-  { icon: Building2, name: "Logistics" },
+  { icon: Factory, name: "Manufacturies" },
 ];
 
 const journeySteps = [
@@ -375,40 +377,51 @@ export default function Index() {
 
       {/* Blogs Section */}
       {blogs.length > 0 && (
-        <section className="section-padding bg-background">
+        <section className="section-padding bg-background/50">
           <div className="container">
             <SectionHeader
               subtitle="Latest Updates"
-              title="News & Insights"
+              title="Blogs"
               description="Stay informed with the latest news and articles from the African Halal Institute."
             />
             <div className="grid md:grid-cols-3 gap-8">
               {blogs.map((blog) => (
-                <Card key={blog.id} className="group overflow-hidden border hover:shadow-lg transition-all h-full flex flex-col">
-                  {blog.image_url && (
-                    <div className="h-48 overflow-hidden">
+                <Card key={blog.id} className="group overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 h-full flex flex-col bg-card/50 backdrop-blur-sm">
+                  {blog.image_url ? (
+                    <div className="h-52 overflow-hidden relative">
+                      <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors z-10" />
                       <img
                         src={blog.image_url}
                         alt={blog.title}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                     </div>
-                  )}
-                  <CardHeader>
-                    <div className="text-sm text-muted-foreground mb-2">
-                      {new Date(blog.published_at).toLocaleDateString()}
+                  ) : (
+                    <div className="h-52 bg-secondary/10 flex items-center justify-center">
+                      <Info className="h-12 w-12 text-secondary/40" />
                     </div>
-                    <CardTitle className="text-xl group-hover:text-primary transition-colors line-clamp-2">
+                  )}
+                  <CardHeader className="pb-3">
+                    <div className="text-xs font-medium text-primary mb-2 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      {new Date(blog.published_at).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </div>
+                    <CardTitle className="text-xl font-bold leading-tight group-hover:text-primary transition-colors line-clamp-2">
                       {blog.title}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="flex-grow">
-                    <p className="text-muted-foreground line-clamp-3">{blog.excerpt}</p>
+                  <CardContent className="flex-grow pb-4">
+                    <p className="text-muted-foreground line-clamp-3 text-sm leading-relaxed">{blog.excerpt}</p>
                   </CardContent>
-                  <div className="p-6 pt-0 mt-auto">
-                    <Button variant="link" className="p-0 h-auto font-semibold" asChild>
+                  <div className="p-6 pt-0 mt-auto border-t border-border/50">
+                    <Button variant="ghost" className="w-full justify-between hover:bg-transparent hover:text-primary px-0 group/btn" asChild>
                       <Link to={`/blog/${blog.slug}`}>
-                        Read Article <ArrowRight className="ml-2 h-4 w-4" />
+                        <span className="font-semibold">Read Article</span>
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                       </Link>
                     </Button>
                   </div>
