@@ -23,7 +23,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Edit, Trash2 } from "lucide-react";
+import { Loader2, Plus, Edit, Trash2, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 
@@ -212,8 +212,57 @@ export default function Blogs() {
                                 <Textarea value={formData.excerpt} onChange={e => setFormData({ ...formData, excerpt: e.target.value })} />
                             </div>
                             <div className="space-y-2">
-                                <Label>Image URL (Optional)</Label>
-                                <Input value={formData.image_url} onChange={e => setFormData({ ...formData, image_url: e.target.value })} placeholder="https://..." />
+                                <Label>Image</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+
+                                            try {
+                                                const fileExt = file.name.split('.').pop();
+                                                const fileName = `${Math.random()}.${fileExt}`;
+                                                const filePath = `${fileName}`;
+
+                                                const { error: uploadError } = await supabase.storage
+                                                    .from('blog-images')
+                                                    .upload(filePath, file);
+
+                                                if (uploadError) throw uploadError;
+
+                                                const { data } = supabase.storage
+                                                    .from('blog-images')
+                                                    .getPublicUrl(filePath);
+
+                                                setFormData({ ...formData, image_url: data.publicUrl });
+                                                toast({ title: "Image uploaded successfully" });
+                                            } catch (error: any) {
+                                                toast({
+                                                    variant: "destructive",
+                                                    title: "Upload failed",
+                                                    description: error.message
+                                                });
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1 h-px bg-border text-center relative">
+                                        <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-xs text-muted-foreground">OR</span>
+                                    </div>
+                                </div>
+                                <Input
+                                    value={formData.image_url}
+                                    onChange={e => setFormData({ ...formData, image_url: e.target.value })}
+                                    placeholder="Enter Image URL manually..."
+                                />
+                                {formData.image_url && (
+                                    <div className="relative aspect-video w-full overflow-hidden rounded-md border mt-2">
+                                        <img src={formData.image_url} alt="Preview" className="object-cover w-full h-full" />
+                                    </div>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label>Content (Markdown supported) *</Label>

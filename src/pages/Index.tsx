@@ -281,7 +281,7 @@ export default function Index() {
             title="Industries We Certify"
             description="Serving diverse sectors with specialized Halal certification expertise."
           />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
             {industries.map((industry) => (
               <div
                 key={industry.name}

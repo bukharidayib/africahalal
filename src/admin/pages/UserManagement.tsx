@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Shield, 
-  Search, 
+import {
+  Shield,
+  Search,
   Plus,
   User,
   Mail,
   Calendar,
   Trash2,
-  Edit
+  Edit,
+  AlertTriangle
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -40,71 +42,98 @@ import {
 import { Label } from '@/components/ui/label';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { useAdminAuthContext } from '../contexts/AdminAuthContext';
-import { AdminRole, getRoleDisplayName } from '../lib/permissions';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { fetchAllRoles, AdminRoleWithPermissions } from '../lib/dynamicPermissions';
 
-interface UserRole {
+interface UserRoleDetail {
   id: string;
   user_id: string;
-  role: AdminRole;
+  role_id: string;
   assigned_at: string;
+  admin_roles?: {
+    id: string;
+    display_name: string;
+    name: string;
+  };
   profiles?: {
     email: string;
     full_name: string;
   };
 }
 
-const roleColors: Record<string, string> = {
-  super_admin: 'bg-purple-100 text-purple-800',
-  certification_officer: 'bg-blue-100 text-blue-800',
-  finance_officer: 'bg-green-100 text-green-800',
-  it_system_auditor: 'bg-amber-100 text-amber-800',
-  support_agent: 'bg-pink-100 text-pink-800',
-};
-
 export default function UserManagement() {
   const { permissions, user: currentUser } = useAdminAuthContext();
-  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [userRoles, setUserRoles] = useState<UserRoleDetail[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<AdminRoleWithPermissions[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Create Dialog State
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserRole, setNewUserRole] = useState<AdminRole>('certification_officer');
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+
+  // Edit/Change Role Dialog State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingUserRole, setEditingUserRole] = useState<UserRoleDetail | null>(null);
+  const [newRoleId, setNewRoleId] = useState('');
+  const [changeReason, setChangeReason] = useState('');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchUserRoles();
+    loadData();
   }, []);
+
+  async function loadData() {
+    setIsLoading(true);
+    await Promise.all([fetchUserRoles(), loadRoles()]);
+    setIsLoading(false);
+  }
+
+  async function loadRoles() {
+    const roles = await fetchAllRoles();
+    setAvailableRoles(roles);
+  }
 
   async function fetchUserRoles() {
     try {
+      // Fetch user roles with role details
       const { data, error } = await supabase
         .from('user_roles')
-        .select('*')
+        .select(`
+          *,
+          admin_roles (id, display_name, name)
+        `)
         .order('assigned_at', { ascending: false });
 
       if (error) throw error;
-      
-      // Fetch profiles separately
-      const userIds = (data || []).map(r => r.user_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, email, full_name')
-        .in('id', userIds);
-      
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
-      const rolesWithProfiles = (data || []).map(r => ({
-        ...r,
-        profiles: profileMap.get(r.user_id),
-      })) as UserRole[];
 
-      setUserRoles(rolesWithProfiles);
+      // Fetch profiles separately (Supabase join limitation or preference)
+      const userIds = (data || []).map(r => r.user_id);
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .in('id', userIds);
+
+        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+        const rolesWithProfiles = (data || []).map(r => ({
+          ...r,
+          profiles: profileMap.get(r.user_id),
+        })) as UserRoleDetail[];
+
+        setUserRoles(rolesWithProfiles);
+      } else {
+        setUserRoles([]);
+      }
+
     } catch (error) {
       console.error('Error fetching user roles:', error);
-    } finally {
-      setIsLoading(false);
+      toast.error('Failed to load users');
     }
   }
 
@@ -113,10 +142,14 @@ export default function UserManagement() {
       toast.error('Email is required');
       return;
     }
+    if (!selectedRoleId) {
+      toast.error('Role is required');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      // First, find the user by email in profiles
+      // 1. Find user by email
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, email')
@@ -125,60 +158,116 @@ export default function UserManagement() {
 
       if (profileError || !profile) {
         toast.error('User not found', {
-          description: 'Make sure the user has signed up first.',
+          description: 'User must be signed up first.',
         });
         return;
       }
 
-      // Check if role already exists
-      const existingRole = userRoles.find(
-        r => r.user_id === profile.id && r.role === newUserRole
-      );
+      // 2. Check strict "One Role Per User" policy
+      const existingRole = userRoles.find(r => r.user_id === profile.id);
       if (existingRole) {
-        toast.error('Role already assigned', {
-          description: 'This user already has this role.',
+        toast.error('User already has a role', {
+          description: `User is already assigned as ${existingRole.admin_roles?.display_name}. Edit their role instead.`,
         });
         return;
       }
 
-      // Add the role
+      // 3. Assign Role
       const { error } = await supabase
         .from('user_roles')
         .insert({
           user_id: profile.id,
-          role: newUserRole,
+          role_id: selectedRoleId,
           assigned_by: currentUser?.id,
         });
 
       if (error) throw error;
 
-      // Log the action
+      // 4. Audit Log
       await supabase.rpc('log_audit', {
         _action: 'role_assigned',
         _resource_type: 'user_roles',
         _resource_id: profile.id,
-        _reason_code: 'admin_action',
-        _metadata: { email: newUserEmail, role: newUserRole },
+        _reason_code: 'initial_assignment',
+        _metadata: {
+          email: newUserEmail,
+          role_id: selectedRoleId,
+          role_name: availableRoles.find(r => r.id === selectedRoleId)?.display_name
+        },
       });
 
       toast.success('Role assigned successfully');
       setIsAddDialogOpen(false);
       setNewUserEmail('');
-      setNewUserRole('certification_officer');
+      setSelectedRoleId('');
       fetchUserRoles();
     } catch (error) {
-      console.error('Error adding role:', error);
+      console.error('Error assigning role:', error);
       toast.error('Failed to assign role');
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  async function handleRemoveRole(userRole: UserRole) {
+  async function handleChangeRole() {
+    if (!editingUserRole || !newRoleId) return;
+    if (!changeReason.trim()) {
+      toast.error('Reason is required', {
+        description: 'Please explain why this user\'s role is being changed.',
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Update user role
+      const { error } = await supabase
+        .from('user_roles')
+        .update({
+          role_id: newRoleId,
+          assigned_by: currentUser?.id, // track who changed it
+          assigned_at: new Date().toISOString() // update timestamp
+        })
+        .eq('id', editingUserRole.id);
+
+      if (error) throw error;
+
+      // Log Audit
+      await supabase.rpc('log_audit', {
+        _action: 'role_changed',
+        _resource_type: 'user_roles',
+        _resource_id: editingUserRole.user_id,
+        _reason_code: 'role_change',
+        _metadata: {
+          previous_role_id: editingUserRole.role_id,
+          new_role_id: newRoleId,
+          reason: changeReason
+        }
+      });
+
+      toast.success('User role updated');
+      setIsEditOpen(false);
+      setEditingUserRole(null);
+      setChangeReason('');
+      setNewRoleId('');
+      fetchUserRoles();
+
+    } catch (error) {
+      console.error('Error changing role:', error);
+      toast.error('Failed to update role');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleRemoveRole(userRole: UserRoleDetail) {
     if (userRole.user_id === currentUser?.id) {
       toast.error('Cannot remove your own role');
       return;
     }
+
+    // Use a confirm dialog or simpler confirm for now
+    if (!confirm(`Are you sure you want to remove access for ${userRole.profiles?.full_name}?`)) return;
 
     try {
       const { error } = await supabase
@@ -188,16 +277,15 @@ export default function UserManagement() {
 
       if (error) throw error;
 
-      // Log the action
       await supabase.rpc('log_audit', {
         _action: 'role_removed',
         _resource_type: 'user_roles',
         _resource_id: userRole.user_id,
         _reason_code: 'admin_action',
-        _metadata: { role: userRole.role },
+        _metadata: { role_id: userRole.role_id },
       });
 
-      toast.success('Role removed successfully');
+      toast.success('Access removed successfully');
       fetchUserRoles();
     } catch (error) {
       console.error('Error removing role:', error);
@@ -211,7 +299,7 @@ export default function UserManagement() {
     return (
       ur.profiles?.email.toLowerCase().includes(search) ||
       ur.profiles?.full_name.toLowerCase().includes(search) ||
-      ur.role.toLowerCase().includes(search)
+      ur.admin_roles?.display_name.toLowerCase().includes(search)
     );
   });
 
@@ -237,7 +325,7 @@ export default function UserManagement() {
           <div>
             <h1 className="text-2xl font-bold font-serif">User Management</h1>
             <p className="text-muted-foreground">
-              Manage admin roles and permissions
+              Manage admin users and assign roles.
             </p>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -265,21 +353,21 @@ export default function UserManagement() {
                     onChange={(e) => setNewUserEmail(e.target.value)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    The user must have an existing account.
+                    User must have an existing account.
                   </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Role</Label>
-                  <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v as AdminRole)}>
+                  <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="certification_officer">Certification Officer</SelectItem>
-                      <SelectItem value="finance_officer">Finance Officer</SelectItem>
-                      <SelectItem value="it_system_auditor">IT System Auditor</SelectItem>
-                      <SelectItem value="support_agent">Support Agent</SelectItem>
-                      <SelectItem value="super_admin">Super Administrator</SelectItem>
+                      {availableRoles.map(role => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.display_name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -338,7 +426,7 @@ export default function UserManagement() {
                     <TableHead>User</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Assigned</TableHead>
-                    <TableHead className="w-20">Actions</TableHead>
+                    <TableHead className="w-24 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -359,8 +447,8 @@ export default function UserManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={roleColors[userRole.role]}>
-                          {getRoleDisplayName(userRole.role)}
+                        <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800">
+                          {userRole.admin_roles?.display_name || 'Unknown Role'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
@@ -370,16 +458,29 @@ export default function UserManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {userRole.user_id !== currentUser?.id && (
+                        <div className="flex items-center justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleRemoveRole(userRole)}
+                            onClick={() => {
+                              setEditingUserRole(userRole);
+                              setNewRoleId(userRole.role_id);
+                              setIsEditOpen(true);
+                            }}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                           </Button>
-                        )}
+                          {userRole.user_id !== currentUser?.id && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleRemoveRole(userRole)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -388,6 +489,59 @@ export default function UserManagement() {
             )}
           </CardContent>
         </Card>
+
+        {/* Edit Role Dialog */}
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Change Role</DialogTitle>
+              <DialogDescription>
+                Changing the role for <span className="font-semibold">{editingUserRole?.profiles?.full_name}</span>.
+                This action will be audited.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>New Role</Label>
+                <Select value={newRoleId} onValueChange={setNewRoleId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRoles.map(role => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.display_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  Reason for Change <span className="text-destructive">*</span>
+                </Label>
+                <Textarea
+                  placeholder="e.g., Promotion to Senior Inspector"
+                  value={changeReason}
+                  onChange={(e) => setChangeReason(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  This reason will be permanently recorded in the audit log.
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+              <Button onClick={handleChangeRole} disabled={isSubmitting || !changeReason.trim()}>
+                {isSubmitting ? 'Updating...' : 'Update Role'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );

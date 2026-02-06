@@ -206,7 +206,7 @@ export default function About() {
             title="Our Core Values"
             description="The principles that guide every decision we make."
           />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {coreValues.map((value) => (
               <div
                 key={value.title}

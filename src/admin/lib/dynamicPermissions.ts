@@ -58,10 +58,12 @@ export async function fetchRolesWithPermissions(): Promise<AdminRoleWithPermissi
   // Fetch user counts per role
   const { data: userRoles, error: userRolesError } = await supabase
     .from('user_roles')
-    .select('role');
+    .select('role_id');
 
   const roleCounts = (userRoles || []).reduce((acc, ur) => {
-    acc[ur.role] = (acc[ur.role] || 0) + 1;
+    // @ts-ignore - role_id is dynamic now
+    const id = ur.role_id;
+    if (id) acc[id] = (acc[id] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
@@ -75,9 +77,24 @@ export async function fetchRolesWithPermissions(): Promise<AdminRoleWithPermissi
     return {
       ...role,
       permissions: rolePermissions,
-      user_count: roleCounts[role.name] || 0,
+      user_count: roleCounts[role.id] || 0,
     };
   });
+}
+
+// Fetch simple list of roles for dropdowns
+export async function fetchAllRoles(): Promise<AdminRoleWithPermissions[]> {
+  const { data, error } = await supabase
+    .from('admin_roles')
+    .select('*')
+    .order('display_name', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching roles:', error);
+    return [];
+  }
+
+  return (data || []).map(r => ({ ...r, permissions: [] }));
 }
 
 // Fetch user's permissions from database
@@ -132,7 +149,7 @@ export function convertToLegacyPermissions(permissionCodes: string[]): Record<st
 
 // Save role permissions
 export async function saveRolePermissions(
-  roleId: string, 
+  roleId: string,
   permissionCodes: string[]
 ): Promise<boolean> {
   try {
