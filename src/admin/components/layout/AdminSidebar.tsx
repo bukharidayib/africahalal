@@ -15,12 +15,13 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAdminAuthContext } from '../../contexts/AdminAuthContext';
+import { Permission } from '../../lib/permissions';
 
 interface NavItem {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  permission?: keyof typeof import('../../lib/permissions').rolePermissions.super_admin;
+  permission?: keyof Permission;
 }
 
 const navItems: NavItem[] = [

@@ -938,6 +938,7 @@ export type Database = {
       }
       permissions: {
         Row: {
+          action_type: string
           category: string
           code: string
           created_at: string | null
@@ -946,6 +947,7 @@ export type Database = {
           name: string
         }
         Insert: {
+          action_type?: string
           category: string
           code: string
           created_at?: string | null
@@ -954,6 +956,7 @@ export type Database = {
           name: string
         }
         Update: {
+          action_type?: string
           category?: string
           code?: string
           created_at?: string | null

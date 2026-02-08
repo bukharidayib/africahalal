@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Shield, AlertTriangle, Info } from 'lucide-react';
+import { ArrowLeft, Save, Shield, AlertTriangle, Info, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,14 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { useAdminAuthContext } from '../contexts/AdminAuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,7 +29,7 @@ import {
   saveWorkflowStagePermissions,
   DynamicPermission,
 } from '../lib/dynamicPermissions';
-import { HIGH_RISK_PERMISSIONS } from '../lib/permissions';
+import { HIGH_RISK_PERMISSIONS, PERMISSION_MODULES } from '../lib/permissions';
 import { WorkflowEngine, WorkflowStage } from '../lib/workflowEngine';
 import { toast } from 'sonner';
 
@@ -36,6 +42,16 @@ interface RoleDetail {
   status?: string;
 }
 
+interface ModulePermissions {
+  category: string;
+  create?: DynamicPermission;
+  read?: DynamicPermission;
+  update?: DynamicPermission;
+  delete?: DynamicPermission;
+  specials: DynamicPermission[];
+  all: DynamicPermission[];
+}
+
 export default function RoleEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -44,19 +60,17 @@ export default function RoleEditor() {
   const [allPermissions, setAllPermissions] = useState<DynamicPermission[]>([]);
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set());
   const [workflowStages, setWorkflowStages] = useState<WorkflowStage[]>([]);
-  const [stagePermissions, setStagePermissions] = useState<Set<string>>(new Set()); // "stageId:permissionId"
+  const [stagePermissions, setStagePermissions] = useState<Set<string>>(new Set());
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      loadData();
-    }
+    if (id) loadData();
   }, [id]);
 
   async function loadData() {
     try {
-      // Fetch role, permissions, stages, and stage permissions in parallel
       const [roleResult, perms, stages, existingStagePerms] = await Promise.all([
         supabase.from('admin_roles').select('*').eq('id', id).single(),
         fetchAllPermissions(),
@@ -69,7 +83,6 @@ export default function RoleEditor() {
       setAllPermissions(perms);
       setWorkflowStages(stages);
 
-      // Fetch role's current permissions
       const { data: rolePerms, error: rolePermsError } = await supabase
         .from('role_permissions')
         .select('permission_id, permissions(code)')
@@ -82,11 +95,14 @@ export default function RoleEditor() {
       );
       setSelectedPermissions(permCodes);
 
-      // Build stage permission keys
       const spKeys = new Set(
         existingStagePerms.map((sp: any) => `${sp.stage_id}:${sp.permission_id}`)
       );
       setStagePermissions(spKeys);
+
+      // Expand all modules by default
+      const categories = new Set(perms.map(p => p.category));
+      setExpandedModules(categories);
     } catch (error) {
       console.error('Error loading role data:', error);
       toast.error('Failed to load role data');
@@ -95,12 +111,53 @@ export default function RoleEditor() {
     }
   }
 
+  // Group permissions into module CRUD structure
+  const modules: ModulePermissions[] = useMemo(() => {
+    const grouped: Record<string, DynamicPermission[]> = {};
+    allPermissions.forEach(p => {
+      if (!grouped[p.category]) grouped[p.category] = [];
+      grouped[p.category].push(p);
+    });
+
+    // Sort modules by PERMISSION_MODULES order
+    const moduleOrder = Object.keys(PERMISSION_MODULES);
+    const sortedCategories = Object.keys(grouped).sort((a, b) => {
+      const ia = moduleOrder.indexOf(a);
+      const ib = moduleOrder.indexOf(b);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+
+    return sortedCategories.map(category => {
+      const perms = grouped[category];
+      const actionType = (p: DynamicPermission) => p.action_type || inferActionType(p.code);
+
+      return {
+        category,
+        create: perms.find(p => actionType(p) === 'create'),
+        read: perms.find(p => actionType(p) === 'read'),
+        update: perms.find(p => actionType(p) === 'update'),
+        delete: perms.find(p => actionType(p) === 'delete'),
+        specials: perms.filter(p => actionType(p) === 'special'),
+        all: perms,
+      };
+    });
+  }, [allPermissions]);
+
+  function inferActionType(code: string): string {
+    const action = code.split('.')[1];
+    if (!action) return 'special';
+    if (action === 'view') return 'read';
+    if (action === 'create') return 'create';
+    if (action === 'update') return 'update';
+    if (action === 'delete') return 'delete';
+    return 'special';
+  }
+
   async function handleSave() {
     if (!role) return;
 
     setIsSaving(true);
     try {
-      // Update role metadata
       const { error: updateError } = await supabase
         .from('admin_roles')
         .update({
@@ -112,10 +169,8 @@ export default function RoleEditor() {
 
       if (updateError) throw updateError;
 
-      // Save permissions
       const permSuccess = await saveRolePermissions(role.id, Array.from(selectedPermissions));
 
-      // Save workflow stage permissions
       const stagePermsArray = Array.from(stagePermissions).map(key => {
         const [stage_id, permission_id] = key.split(':');
         return { stage_id, permission_id };
@@ -150,28 +205,31 @@ export default function RoleEditor() {
   function togglePermission(code: string) {
     setSelectedPermissions(prev => {
       const next = new Set(prev);
-      if (next.has(code)) {
-        next.delete(code);
-      } else {
-        next.add(code);
-      }
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
       return next;
     });
   }
 
-  function toggleCategory(category: string) {
-    const categoryPerms = allPermissions.filter(p => p.category === category);
-    const allSelected = categoryPerms.every(p => selectedPermissions.has(p.code));
+  function toggleModuleAll(module: ModulePermissions) {
+    const allCodes = module.all.map(p => p.code);
+    const allSelected = allCodes.every(c => selectedPermissions.has(c));
 
     setSelectedPermissions(prev => {
       const next = new Set(prev);
-      categoryPerms.forEach(p => {
-        if (allSelected) {
-          next.delete(p.code);
-        } else {
-          next.add(p.code);
-        }
+      allCodes.forEach(c => {
+        if (allSelected) next.delete(c);
+        else next.add(c);
       });
+      return next;
+    });
+  }
+
+  function toggleExpandModule(category: string) {
+    setExpandedModules(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
       return next;
     });
   }
@@ -180,27 +238,24 @@ export default function RoleEditor() {
     const key = `${stageId}:${permissionId}`;
     setStagePermissions(prev => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
 
-  // Group permissions by category
-  const permissionsByCategory = allPermissions.reduce((acc, perm) => {
-    if (!acc[perm.category]) {
-      acc[perm.category] = [];
-    }
-    acc[perm.category].push(perm);
-    return acc;
-  }, {} as Record<string, DynamicPermission[]>);
-
   const isHighRisk = (code: string) => HIGH_RISK_PERMISSIONS.includes(code);
 
-  if (!permissions.canManageUsers) {
+  function getSpecialLabel(code: string): string {
+    const action = code.split('.')[1];
+    if (!action) return code;
+    return action
+      .split('_')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  }
+
+  if (!permissions.canManageUsers && !permissions.canManageRoles) {
     return (
       <AdminLayout>
         <div className="text-center py-12">
@@ -246,9 +301,6 @@ export default function RoleEditor() {
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold font-serif">Edit Role</h1>
-              {role.is_system_role && (
-                <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">System Role</Badge>
-              )}
               {role.status === 'suspended' && (
                 <Badge variant="destructive">Suspended</Badge>
               )}
@@ -304,70 +356,214 @@ export default function RoleEditor() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Permissions Tab */}
+          {/* CRUD Permission Matrix Tab */}
           <TabsContent value="permissions">
             <Card>
               <CardHeader>
                 <CardTitle>Permission Matrix</CardTitle>
                 <CardDescription>
-                  Select permissions by module. <AlertTriangle className="inline h-3 w-3 text-amber-500" /> marks high-risk permissions.
+                  Configure CRUD and special permissions per module. <AlertTriangle className="inline h-3 w-3 text-amber-500" /> marks high-risk permissions.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <TooltipProvider>
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {Object.entries(permissionsByCategory).map(([category, perms]) => {
-                      const allSelected = perms.every(p => selectedPermissions.has(p.code));
-                      const someSelected = perms.some(p => selectedPermissions.has(p.code));
+                  <div className="border rounded-lg overflow-hidden">
+                    {/* Table Header */}
+                    <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr_80px] gap-0 bg-muted/50 border-b px-4 py-3 text-sm font-medium text-muted-foreground">
+                      <div>Module</div>
+                      <div className="text-center">Create</div>
+                      <div className="text-center">Read</div>
+                      <div className="text-center">Update</div>
+                      <div className="text-center">Delete</div>
+                      <div>Extra Actions</div>
+                      <div className="text-center">All</div>
+                    </div>
+
+                    {/* Module Rows */}
+                    {modules.map((mod) => {
+                      const selectedCount = mod.all.filter(p => selectedPermissions.has(p.code)).length;
+                      const totalCount = mod.all.length;
+                      const allSelected = totalCount > 0 && selectedCount === totalCount;
+                      const isExpanded = expandedModules.has(mod.category);
+                      const moduleConfig = PERMISSION_MODULES[mod.category];
 
                       return (
-                        <div key={category} className="space-y-3 p-4 border rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id={`cat-${category}`}
-                              checked={allSelected}
-                              onCheckedChange={() => toggleCategory(category)}
-                              className={someSelected && !allSelected ? 'opacity-50' : ''}
-                            />
-                            <Label htmlFor={`cat-${category}`} className="text-sm font-semibold cursor-pointer">
-                              {category}
-                            </Label>
-                            <Badge variant="secondary" className="ml-auto">
-                              {perms.filter(p => selectedPermissions.has(p.code)).length}/{perms.length}
-                            </Badge>
-                          </div>
-                          <Separator />
-                          <div className="space-y-2 pl-2">
-                            {perms.map((perm) => (
-                              <div key={perm.code} className="flex items-center gap-2">
+                        <Collapsible
+                          key={mod.category}
+                          open={isExpanded}
+                          onOpenChange={() => toggleExpandModule(mod.category)}
+                        >
+                          {/* Module Row */}
+                          <div className={`grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr_80px] gap-0 items-center px-4 py-3 border-b transition-colors hover:bg-muted/30 ${selectedCount > 0 ? 'bg-primary/5' : ''}`}>
+                            {/* Module Name */}
+                            <CollapsibleTrigger asChild>
+                              <button className="flex items-center gap-2 text-left font-medium text-sm group">
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                )}
+                                <span>{moduleConfig?.label || mod.category}</span>
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  {selectedCount}/{totalCount}
+                                </Badge>
+                              </button>
+                            </CollapsibleTrigger>
+
+                            {/* CRUD Checkboxes */}
+                            <div className="flex justify-center">
+                              {mod.create ? (
                                 <Checkbox
-                                  id={perm.code}
-                                  checked={selectedPermissions.has(perm.code)}
-                                  onCheckedChange={() => togglePermission(perm.code)}
+                                  checked={selectedPermissions.has(mod.create.code)}
+                                  onCheckedChange={() => togglePermission(mod.create!.code)}
                                 />
-                                <Label htmlFor={perm.code} className="text-sm font-normal cursor-pointer flex items-center gap-1.5">
-                                  {perm.name}
-                                  {isHighRisk(perm.code) && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <AlertTriangle className="h-3 w-3 text-amber-500" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs max-w-[200px]">
-                                          High-risk permission. Grants access to sensitive operations.
-                                          Assign with caution.
-                                        </p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                </Label>
-                                <code className="text-[10px] bg-muted px-1 rounded ml-auto hidden lg:block">
-                                  {perm.code}
-                                </code>
-                              </div>
-                            ))}
+                              ) : (
+                                <span className="text-muted-foreground/30">—</span>
+                              )}
+                            </div>
+                            <div className="flex justify-center">
+                              {mod.read ? (
+                                <Checkbox
+                                  checked={selectedPermissions.has(mod.read.code)}
+                                  onCheckedChange={() => togglePermission(mod.read!.code)}
+                                />
+                              ) : (
+                                <span className="text-muted-foreground/30">—</span>
+                              )}
+                            </div>
+                            <div className="flex justify-center">
+                              {mod.update ? (
+                                <Checkbox
+                                  checked={selectedPermissions.has(mod.update.code)}
+                                  onCheckedChange={() => togglePermission(mod.update!.code)}
+                                />
+                              ) : (
+                                <span className="text-muted-foreground/30">—</span>
+                              )}
+                            </div>
+                            <div className="flex justify-center">
+                              {mod.delete ? (
+                                <Checkbox
+                                  checked={selectedPermissions.has(mod.delete.code)}
+                                  onCheckedChange={() => togglePermission(mod.delete!.code)}
+                                />
+                              ) : (
+                                <span className="text-muted-foreground/30">—</span>
+                              )}
+                            </div>
+
+                            {/* Extra Actions Preview */}
+                            <div className="flex flex-wrap gap-1">
+                              {mod.specials.slice(0, 3).map(sp => (
+                                <div key={sp.code} className="flex items-center gap-1">
+                                  <Checkbox
+                                    id={`inline-${sp.code}`}
+                                    checked={selectedPermissions.has(sp.code)}
+                                    onCheckedChange={() => togglePermission(sp.code)}
+                                    className="h-3.5 w-3.5"
+                                  />
+                                  <label
+                                    htmlFor={`inline-${sp.code}`}
+                                    className="text-xs cursor-pointer flex items-center gap-0.5"
+                                  >
+                                    {getSpecialLabel(sp.code)}
+                                    {isHighRisk(sp.code) && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <AlertTriangle className="h-3 w-3 text-amber-500" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="text-xs max-w-[200px]">
+                                            High-risk permission. Grants access to sensitive operations.
+                                          </p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                  </label>
+                                </div>
+                              ))}
+                              {mod.specials.length > 3 && (
+                                <span className="text-xs text-muted-foreground">+{mod.specials.length - 3} more</span>
+                              )}
+                            </div>
+
+                            {/* Select All */}
+                            <div className="flex justify-center">
+                              <Checkbox
+                                checked={allSelected}
+                                onCheckedChange={() => toggleModuleAll(mod)}
+                                className={selectedCount > 0 && !allSelected ? 'opacity-50' : ''}
+                              />
+                            </div>
                           </div>
-                        </div>
+
+                          {/* Expanded Details */}
+                          <CollapsibleContent>
+                            <div className="bg-muted/20 border-b px-8 py-4 space-y-3">
+                              {/* CRUD permissions detail */}
+                              {[mod.create, mod.read, mod.update, mod.delete].filter(Boolean).map(perm => (
+                                <div key={perm!.code} className="flex items-center gap-3 text-sm">
+                                  <Checkbox
+                                    id={`detail-${perm!.code}`}
+                                    checked={selectedPermissions.has(perm!.code)}
+                                    onCheckedChange={() => togglePermission(perm!.code)}
+                                  />
+                                  <label htmlFor={`detail-${perm!.code}`} className="cursor-pointer flex items-center gap-2 flex-1">
+                                    <span className="font-medium">{perm!.name}</span>
+                                    {isHighRisk(perm!.code) && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <AlertTriangle className="h-3 w-3 text-amber-500" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="text-xs">High-risk permission</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                  </label>
+                                  <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded">{perm!.code}</code>
+                                  {perm!.description && (
+                                    <span className="text-xs text-muted-foreground hidden lg:inline">{perm!.description}</span>
+                                  )}
+                                </div>
+                              ))}
+
+                              {/* Special permissions detail */}
+                              {mod.specials.length > 0 && (
+                                <>
+                                  <Separator className="my-2" />
+                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Extra Actions</p>
+                                  {mod.specials.map(perm => (
+                                    <div key={perm.code} className="flex items-center gap-3 text-sm">
+                                      <Checkbox
+                                        id={`detail-${perm.code}`}
+                                        checked={selectedPermissions.has(perm.code)}
+                                        onCheckedChange={() => togglePermission(perm.code)}
+                                      />
+                                      <label htmlFor={`detail-${perm.code}`} className="cursor-pointer flex items-center gap-2 flex-1">
+                                        <span className="font-medium">{perm.name}</span>
+                                        {isHighRisk(perm.code) && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <AlertTriangle className="h-3 w-3 text-amber-500" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p className="text-xs">High-risk permission. Assign with caution.</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                      </label>
+                                      <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded">{perm.code}</code>
+                                      {perm.description && (
+                                        <span className="text-xs text-muted-foreground hidden lg:inline">{perm.description}</span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </>
+                              )}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       );
                     })}
                   </div>
@@ -395,7 +591,6 @@ export default function RoleEditor() {
                 ) : (
                   <div className="space-y-6">
                     {workflowStages.map((stage) => {
-                      // Get permissions relevant to this stage
                       const relevantPerms = allPermissions.filter(p =>
                         selectedPermissions.has(p.code)
                       );

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
-import { AdminRole, getPermissions, Permission } from '../lib/permissions';
+import { AdminRole, Permission, getPermissions, convertCodesToPermissions } from '../lib/permissions';
 
 interface AdminAuthState {
   user: User | null;
@@ -39,13 +39,13 @@ export function useAdminAuth() {
   const [state, setState] = useState<AdminAuthState>(initialState);
   const stateRef = useRef(state);
   
-  // Keep ref in sync for signOut access
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
-  const fetchUserRole = useCallback(async (userId: string): Promise<AdminRole | null> => {
+  const fetchUserRoleAndPermissions = useCallback(async (userId: string): Promise<{ role: AdminRole | null; permissions: Permission }> => {
     try {
+      // Fetch role
       const { data, error } = await supabase
         .from('user_roles')
         .select('role_id, admin_roles!inner(name, status)')
@@ -55,31 +55,43 @@ export function useAdminAuth() {
 
       if (error) {
         console.error('Error fetching user role:', error);
-        return null;
+        return { role: null, permissions: getPermissions(null) };
       }
 
-      // Extract role name and status from the joined admin_roles table
       const roleData = (data as any)?.admin_roles;
       const roleName = roleData?.name;
       const roleStatus = roleData?.status;
 
-      // If role is suspended, deny access
       if (roleStatus === 'suspended') {
         console.warn('User role is suspended:', roleName);
-        return null;
+        return { role: null, permissions: getPermissions(null) };
       }
 
-      return roleName as AdminRole || null;
+      if (!roleName) {
+        return { role: null, permissions: getPermissions(null) };
+      }
+
+      // Fetch dynamic permissions from DB
+      const { data: permCodes, error: permError } = await supabase.rpc('get_user_permissions', {
+        _user_id: userId,
+      });
+
+      if (permError) {
+        console.error('Error fetching user permissions:', permError);
+        return { role: roleName as AdminRole, permissions: getPermissions(null) };
+      }
+
+      const permissions = convertCodesToPermissions(permCodes || []);
+      return { role: roleName as AdminRole, permissions };
     } catch (err) {
       console.error('Failed to fetch user role:', err);
-      return null;
+      return { role: null, permissions: getPermissions(null) };
     }
   }, []);
 
   useEffect(() => {
     let isMounted = true;
 
-    // Safety timeout - never hang more than 5 seconds
     const safetyTimeout = setTimeout(() => {
       if (isMounted) {
         console.warn('Admin auth check timed out - forcing unauthenticated state');
@@ -87,7 +99,6 @@ export function useAdminAuth() {
       }
     }, 5000);
 
-    // LISTENER for ongoing auth changes (does NOT control initial isLoading)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!isMounted) return;
@@ -97,15 +108,14 @@ export function useAdminAuth() {
           return;
         }
 
-        // Handle sign-in with fire-and-forget role check
         if (event === 'SIGNED_IN' && session?.user) {
-          fetchUserRole(session.user.id).then(role => {
+          fetchUserRoleAndPermissions(session.user.id).then(({ role, permissions }) => {
             if (isMounted) {
               setState({
                 user: session.user,
                 session,
                 role,
-                permissions: getPermissions(role),
+                permissions,
                 isLoading: false,
                 isAuthenticated: !!role,
                 error: role ? null : 'You do not have admin access to this portal.',
@@ -114,7 +124,6 @@ export function useAdminAuth() {
           });
         }
 
-        // Handle token refresh
         if (event === 'TOKEN_REFRESHED' && session?.user) {
           setState(prev => ({
             ...prev,
@@ -125,45 +134,32 @@ export function useAdminAuth() {
       }
     );
 
-    // INITIAL load (controls isLoading state)
     const initializeAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
 
-        // Handle session errors (expired tokens, etc.)
         if (error) {
           console.warn('Session error:', error.message);
-          // Try to clean up if it's a token error
           if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token')) {
-            try {
-              await supabase.auth.signOut();
-            } catch (e) {
-              // Ignore cleanup errors
-            }
+            try { await supabase.auth.signOut(); } catch (e) {}
           }
-          if (isMounted) {
-            setState(unauthenticatedState);
-          }
+          if (isMounted) setState(unauthenticatedState);
           return;
         }
 
-        // No session - user not logged in
         if (!session) {
-          if (isMounted) {
-            setState(unauthenticatedState);
-          }
+          if (isMounted) setState(unauthenticatedState);
           return;
         }
 
-        // Session exists - fetch role BEFORE setting loading false
-        const role = await fetchUserRole(session.user.id);
+        const { role, permissions } = await fetchUserRoleAndPermissions(session.user.id);
 
         if (isMounted) {
           setState({
             user: session.user,
             session,
             role,
-            permissions: getPermissions(role),
+            permissions,
             isLoading: false,
             isAuthenticated: !!role,
             error: role ? null : 'You do not have admin access to this portal.',
@@ -172,10 +168,7 @@ export function useAdminAuth() {
       } catch (err) {
         console.error('Auth initialization failed:', err);
         if (isMounted) {
-          setState({
-            ...unauthenticatedState,
-            error: 'Authentication check failed.',
-          });
+          setState({ ...unauthenticatedState, error: 'Authentication check failed.' });
         }
       } finally {
         clearTimeout(safetyTimeout);
@@ -189,30 +182,24 @@ export function useAdminAuth() {
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, [fetchUserRole]);
+  }, [fetchUserRoleAndPermissions]);
 
   const signIn = async (email: string, password: string) => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (data.session) {
-        const role = await fetchUserRole(data.session.user.id);
+        const { role, permissions } = await fetchUserRoleAndPermissions(data.session.user.id);
 
         if (!role) {
           await supabase.auth.signOut();
           throw new Error('You do not have admin access to this portal.');
         }
 
-        // Log the login action
         try {
           await supabase.rpc('log_audit', {
             _action: 'admin_login',
@@ -229,7 +216,7 @@ export function useAdminAuth() {
           user: data.session.user,
           session: data.session,
           role,
-          permissions: getPermissions(role),
+          permissions,
           isLoading: false,
           isAuthenticated: true,
           error: null,
@@ -247,14 +234,10 @@ export function useAdminAuth() {
   };
 
   const signOut = async () => {
-    // Capture current user for audit log before clearing state
     const currentUser = stateRef.current.user;
-
-    // IMMEDIATELY reset state and redirect - don't wait for async operations
     setState(unauthenticatedState);
     navigate('/admin/login', { replace: true });
 
-    // Background cleanup - fire and forget
     (async () => {
       try {
         if (currentUser) {
@@ -282,13 +265,13 @@ export function useAdminAuth() {
         return;
       }
 
-      const role = await fetchUserRole(session.user.id);
+      const { role, permissions } = await fetchUserRoleAndPermissions(session.user.id);
 
       setState({
         user: session.user,
         session,
         role,
-        permissions: getPermissions(role),
+        permissions,
         isLoading: false,
         isAuthenticated: !!role,
         error: role ? null : 'You do not have admin access to this portal.',
@@ -297,7 +280,7 @@ export function useAdminAuth() {
       console.error('Auth refresh failed:', err);
       setState(unauthenticatedState);
     }
-  }, [fetchUserRole]);
+  }, [fetchUserRoleAndPermissions]);
 
   return {
     ...state,

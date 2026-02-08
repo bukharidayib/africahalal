@@ -97,6 +97,13 @@ export default function RolesPermissions() {
   async function handleDeleteRole() {
     if (!selectedRole) return;
 
+    // Safety check: cannot delete role with users assigned
+    if ((selectedRole.user_count || 0) > 0) {
+      toast.error(`Cannot delete role with ${selectedRole.user_count} assigned user(s). Reassign users first.`);
+      setIsDeleteDialogOpen(false);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const success = await deleteRole(selectedRole.id);
@@ -166,7 +173,7 @@ export default function RolesPermissions() {
   const activeRoles = roles.filter(r => r.status === 'active').length;
   const suspendedRoles = roles.filter(r => r.status === 'suspended').length;
 
-  if (!permissions.canManageUsers) {
+  if (!permissions.canManageUsers && !permissions.canManageRoles) {
     return (
       <AdminLayout>
         <div className="text-center py-12">
@@ -273,7 +280,6 @@ export default function RolesPermissions() {
                     <TableHead className="text-center">Status</TableHead>
                     <TableHead className="text-center">Users</TableHead>
                     <TableHead className="text-center">Permissions</TableHead>
-                    <TableHead className="text-center">Type</TableHead>
                     <TableHead className="w-32">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -307,13 +313,6 @@ export default function RolesPermissions() {
                           {role.permissions.length}/{allPermissions.length}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center">
-                        {role.is_system_role ? (
-                          <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">System</Badge>
-                        ) : (
-                          <Badge variant="secondary">Custom</Badge>
-                        )}
-                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button asChild variant="ghost" size="icon" title="Edit permissions">
@@ -333,19 +332,19 @@ export default function RolesPermissions() {
                           >
                             <Power className={`h-4 w-4 ${role.status === 'active' ? 'text-amber-600' : 'text-green-600'}`} />
                           </Button>
-                          {!role.is_system_role && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => {
-                                setSelectedRole(role);
-                                setIsDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            title={(role.user_count || 0) > 0 ? 'Cannot delete: users assigned' : 'Delete role'}
+                            disabled={(role.user_count || 0) > 0}
+                            onClick={() => {
+                              setSelectedRole(role);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -361,7 +360,7 @@ export default function RolesPermissions() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Role</DialogTitle>
-              <DialogDescription>Create a custom role with specific permissions.</DialogDescription>
+              <DialogDescription>Create a role with specific permissions.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -463,9 +462,22 @@ export default function RolesPermissions() {
                 This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
+            {(selectedRole?.user_count || 0) > 0 && (
+              <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+                <p className="text-sm text-destructive">
+                  This role has <strong>{selectedRole?.user_count}</strong> assigned user(s).
+                  You must reassign them before deleting.
+                </p>
+              </div>
+            )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleDeleteRole} disabled={isSubmitting}>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteRole}
+                disabled={isSubmitting || (selectedRole?.user_count || 0) > 0}
+              >
                 {isSubmitting ? 'Deleting...' : 'Delete Role'}
               </Button>
             </DialogFooter>
