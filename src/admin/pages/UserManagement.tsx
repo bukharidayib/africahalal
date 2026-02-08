@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Shield, Search, Plus, User, Mail, Calendar, Trash2, Edit,
-  AlertTriangle, Eye, Power, Filter,
+  AlertTriangle, Eye, Power, Filter, Users, Send,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,14 +17,15 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { useAdminAuthContext } from '../contexts/AdminAuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { fetchAllRoles, fetchUserPermissions, AdminRoleWithPermissions } from '../lib/dynamicPermissions';
+import InvitationsTab from '../components/InvitationsTab';
 
 interface UserRoleDetail {
   id: string;
@@ -51,6 +52,7 @@ export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState('users');
 
   // Create Dialog State
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -282,7 +284,6 @@ export default function UserManagement() {
   }
 
   const filteredUsers = userRoles.filter(ur => {
-    // Text search
     if (searchQuery) {
       const search = searchQuery.toLowerCase();
       const matches =
@@ -291,9 +292,7 @@ export default function UserManagement() {
         ur.admin_roles?.display_name.toLowerCase().includes(search);
       if (!matches) return false;
     }
-    // Role filter
     if (filterRole !== 'all' && ur.role_id !== filterRole) return false;
-    // Status filter
     if (filterStatus !== 'all') {
       const roleStatus = ur.admin_roles?.status || 'active';
       if (roleStatus !== filterStatus) return false;
@@ -317,207 +316,229 @@ export default function UserManagement() {
     <AdminLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold font-serif">User Management</h1>
-            <p className="text-muted-foreground">Manage admin users and assign roles.</p>
-          </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Assign Role
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Assign Admin Role</DialogTitle>
-                <DialogDescription>Grant admin access to a registered user.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">User Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="user@example.com"
-                    value={newUserEmail}
-                    onChange={(e) => setNewUserEmail(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">User must have an existing account.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableRoles.filter(r => r.status === 'active').map(role => (
-                        <SelectItem key={role.id} value={role.id}>{role.display_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleAddRole} disabled={isSubmitting}>
-                  {isSubmitting ? 'Assigning...' : 'Assign Role'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+        <div>
+          <h1 className="text-2xl font-bold font-serif">User Management</h1>
+          <p className="text-muted-foreground">Manage admin users, assign roles, and send invitations.</p>
         </div>
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name, email, or role..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Select value={filterRole} onValueChange={setFilterRole}>
-                <SelectTrigger className="w-[180px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Filter by role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  {availableRoles.map(role => (
-                    <SelectItem key={role.id} value={role.id}>{role.display_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Active Users
+              <Badge variant="secondary" className="ml-1 text-xs">{userRoles.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="invitations" className="flex items-center gap-2">
+              <Send className="h-4 w-4" />
+              Invitations
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Users Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {filteredUsers.length} Admin User{filteredUsers.length !== 1 ? 's' : ''}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading users...</div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <h3 className="font-medium mb-1">No users found</h3>
-                <p className="text-sm">
-                  {searchQuery ? 'Try adjusting your search' : 'Add your first admin user'}
-                </p>
+          {/* Active Users Tab */}
+          <TabsContent value="users" className="space-y-6">
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 flex-1">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, email, or role..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={filterRole} onValueChange={setFilterRole}>
+                  <SelectTrigger className="w-[180px]">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Filter by role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {availableRoles.map(role => (
+                      <SelectItem key={role.id} value={role.id}>{role.display_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="suspended">Suspended</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Assigned</TableHead>
-                    <TableHead className="w-32 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((userRole) => {
-                    const roleStatus = userRole.admin_roles?.status || 'active';
-                    return (
-                      <TableRow key={userRole.id} className={roleStatus === 'suspended' ? 'opacity-60' : ''}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-                              <User className="h-4 w-4 text-primary" />
-                            </div>
-                            <div>
-                              <p className="font-medium">{userRole.profiles?.full_name || 'Unknown'}</p>
-                              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                <Mail className="h-3 w-3" />
-                                {userRole.profiles?.email || 'No email'}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800">
-                            {userRole.admin_roles?.display_name || 'Unknown Role'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {roleStatus === 'active' ? (
-                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Active</Badge>
-                          ) : (
-                            <Badge variant="destructive">Suspended</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {format(new Date(userRole.assigned_at), 'dd MMM yyyy')}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="View permissions"
-                              onClick={() => handleViewPermissions(userRole)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Change role"
-                              onClick={() => {
-                                setEditingUserRole(userRole);
-                                setNewRoleId(userRole.role_id);
-                                setIsEditOpen(true);
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            {userRole.user_id !== currentUser?.id && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive"
-                                title="Remove access"
-                                onClick={() => handleRemoveRole(userRole)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Assign Role
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Assign Admin Role</DialogTitle>
+                    <DialogDescription>Grant admin access to a registered user.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">User Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="user@example.com"
+                        value={newUserEmail}
+                        onChange={(e) => setNewUserEmail(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">User must have an existing account.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="role">Role</Label>
+                      <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableRoles.filter(r => r.status === 'active').map(role => (
+                            <SelectItem key={role.id} value={role.id}>{role.display_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={handleAddRole} disabled={isSubmitting}>
+                      {isSubmitting ? 'Assigning...' : 'Assign Role'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {/* Users Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {filteredUsers.length} Admin User{filteredUsers.length !== 1 ? 's' : ''}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">Loading users...</div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <h3 className="font-medium mb-1">No users found</h3>
+                    <p className="text-sm">
+                      {searchQuery ? 'Try adjusting your search' : 'Add your first admin user'}
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Assigned</TableHead>
+                        <TableHead className="w-32 text-right">Actions</TableHead>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.map((userRole) => {
+                        const roleStatus = userRole.admin_roles?.status || 'active';
+                        return (
+                          <TableRow key={userRole.id} className={roleStatus === 'suspended' ? 'opacity-60' : ''}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <User className="h-4 w-4 text-primary" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">{userRole.profiles?.full_name || 'Unknown'}</p>
+                                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                    <Mail className="h-3 w-3" />
+                                    {userRole.profiles?.email || 'No email'}
+                                  </p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {userRole.admin_roles?.display_name || 'Unknown Role'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {roleStatus === 'active' ? (
+                                <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Active</Badge>
+                              ) : (
+                                <Badge variant="destructive">Suspended</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4" />
+                                {format(new Date(userRole.assigned_at), 'dd MMM yyyy')}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title="View permissions"
+                                  onClick={() => handleViewPermissions(userRole)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title="Change role"
+                                  onClick={() => {
+                                    setEditingUserRole(userRole);
+                                    setNewRoleId(userRole.role_id);
+                                    setIsEditOpen(true);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                {userRole.user_id !== currentUser?.id && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    title="Remove access"
+                                    onClick={() => handleRemoveRole(userRole)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Invitations Tab */}
+          <TabsContent value="invitations">
+            <InvitationsTab
+              availableRoles={availableRoles}
+              currentUserId={currentUser?.id}
+            />
+          </TabsContent>
+        </Tabs>
 
         {/* View Permissions Dialog */}
         <Dialog open={isViewPermsOpen} onOpenChange={setIsViewPermsOpen}>
