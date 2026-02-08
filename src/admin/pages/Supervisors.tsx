@@ -9,13 +9,11 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
@@ -33,7 +31,7 @@ import { Loader2, UserPlus, Trash2, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface Supervisor {
-    id: string; // This is the UUID from auth.users or profiles
+    id: string;
     email: string;
     full_name: string;
     organization?: {
@@ -63,19 +61,19 @@ export default function Supervisors() {
     const fetchData = async () => {
         setIsLoading(true);
         try {
+            // Fetch profiles with full_name (correct column)
             const { data: profiles, error: profileError } = await supabase
                 .from('profiles')
-                .select(`
-                    id,
-                    first_name,
-                    last_name,
-                    email,
-                    organization_supervisors!supervisor_id(
-                        organization:organizations(id, name)
-                    )
-                `);
+                .select('id, full_name, email');
 
             if (profileError) throw profileError;
+
+            // Fetch organization_supervisors separately
+            const { data: assignments, error: assignError } = await (supabase
+                .from('organization_supervisors' as any)
+                .select('supervisor_id, organization_id') as any);
+
+            if (assignError) throw assignError;
 
             // Fetch Organizations for dropdown
             const { data: orgs, error: orgError } = await supabase
@@ -85,12 +83,26 @@ export default function Supervisors() {
 
             if (orgError) throw orgError;
 
-            const formattedSupervisors = profiles.map((p: any) => ({
-                id: p.id,
-                email: p.email,
-                full_name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email,
-                organization: p.organization_supervisors?.[0]?.organization || null
-            }));
+            // Build supervisor list with org assignments
+            const assignmentMap = new Map<string, string>();
+            (assignments || []).forEach((a: any) => {
+                assignmentMap.set(a.supervisor_id, a.organization_id);
+            });
+
+            const orgMap = new Map<string, Organization>();
+            (orgs || []).forEach((o: any) => {
+                orgMap.set(o.id, o);
+            });
+
+            const formattedSupervisors = (profiles || []).map((p: any) => {
+                const orgId = assignmentMap.get(p.id);
+                return {
+                    id: p.id,
+                    email: p.email,
+                    full_name: p.full_name || p.email,
+                    organization: orgId ? orgMap.get(orgId) || null : null
+                };
+            });
 
             setSupervisors(formattedSupervisors);
             setOrganizations(orgs || []);
@@ -110,16 +122,15 @@ export default function Supervisors() {
         if (!selectedSupervisor || !selectedOrg) return;
 
         try {
-            // Check if supervisor already has an org
             const existing = supervisors.find(s => s.id === selectedSupervisor);
             if (existing?.organization) {
-                await supabase.from('organization_supervisors').delete().eq('supervisor_id', selectedSupervisor);
+                await (supabase.from('organization_supervisors' as any).delete().eq('supervisor_id', selectedSupervisor) as any);
             }
 
-            const { error } = await supabase.from('organization_supervisors').insert({
+            const { error } = await (supabase.from('organization_supervisors' as any).insert({
                 supervisor_id: selectedSupervisor,
                 organization_id: selectedOrg
-            });
+            } as any) as any);
 
             if (error) throw error;
 
@@ -141,7 +152,7 @@ export default function Supervisors() {
     const handleRemoveAssignment = async (supervisorId: string) => {
         if (!confirm("Are you sure you want to remove this assignment?")) return;
         try {
-            const { error } = await supabase.from('organization_supervisors').delete().eq('supervisor_id', supervisorId);
+            const { error } = await (supabase.from('organization_supervisors' as any).delete().eq('supervisor_id', supervisorId) as any);
             if (error) throw error;
             toast({ title: "Assignment removed" });
             fetchData();

@@ -608,7 +608,7 @@ export default function CertificationApplication() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div
                                             className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.validity_period === '6_months' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
-                                            onClick={() => updateFormData('validity_period', '6_months') || updateFormData('application_fee', 1500)}
+                                            onClick={() => { updateFormData('validity_period', '6_months'); updateFormData('application_fee', 1500); }}
                                         >
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="font-bold text-foreground">6 Months</span>
@@ -619,7 +619,7 @@ export default function CertificationApplication() {
 
                                         <div
                                             className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.validity_period === '1_year' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
-                                            onClick={() => updateFormData('validity_period', '1_year') || updateFormData('application_fee', 3000)}
+                                            onClick={() => { updateFormData('validity_period', '1_year'); updateFormData('application_fee', 3000); }}
                                         >
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="font-bold text-foreground">1 Year</span>

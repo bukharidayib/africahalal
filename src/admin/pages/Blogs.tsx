@@ -16,14 +16,12 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
-    DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Edit, Trash2, Upload } from "lucide-react";
+import { Loader2, Plus, Edit, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 
@@ -60,13 +58,13 @@ export default function Blogs() {
     const fetchBlogs = async () => {
         setIsLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('blogs')
+            const { data, error } = await (supabase
+                .from('blogs' as any)
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false }) as any);
 
             if (error) throw error;
-            setBlogs(data || []);
+            setBlogs((data || []) as Blog[]);
         } catch (error: any) {
             toast({
                 variant: "destructive",
@@ -86,16 +84,16 @@ export default function Blogs() {
 
         try {
             if (editingId) {
-                const { error } = await supabase
-                    .from('blogs')
-                    .update(formData)
-                    .eq('id', editingId);
+                const { error } = await (supabase
+                    .from('blogs' as any)
+                    .update(formData as any)
+                    .eq('id', editingId) as any);
                 if (error) throw error;
                 toast({ title: "Blog updated" });
             } else {
-                const { error } = await supabase
-                    .from('blogs')
-                    .insert(formData);
+                const { error } = await (supabase
+                    .from('blogs' as any)
+                    .insert(formData as any) as any);
                 if (error) throw error;
                 toast({ title: "Blog created" });
             }
@@ -116,7 +114,7 @@ export default function Blogs() {
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure?")) return;
         try {
-            const { error } = await supabase.from('blogs').delete().eq('id', id);
+            const { error } = await (supabase.from('blogs' as any).delete().eq('id', id) as any);
             if (error) throw error;
             fetchBlogs();
         } catch (error: any) {

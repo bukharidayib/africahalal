@@ -48,7 +48,7 @@ export function useAdminAuth() {
     try {
       const { data, error } = await supabase
         .from('user_roles')
-        .select('role')
+        .select('role_id, admin_roles!inner(name)')
         .eq('user_id', userId)
         .limit(1)
         .single();
@@ -58,7 +58,9 @@ export function useAdminAuth() {
         return null;
       }
 
-      return data?.role as AdminRole;
+      // Extract role name from the joined admin_roles table
+      const roleName = (data as any)?.admin_roles?.name;
+      return roleName as AdminRole || null;
     } catch (err) {
       console.error('Failed to fetch user role:', err);
       return null;

@@ -4,10 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Calendar, Loader2 } from "lucide-react";
-// If react-markdown is not installed, we might fallback to simple text or danger-html. 
-// Assuming for now simple text rendering or user might need to install markdown renderer.
-// Simplest is to just render text for now or simple paragraphs.
-// Actually, let's just render standard HTML/Text.
 
 interface BlogPost {
     id: string;
@@ -15,7 +11,7 @@ interface BlogPost {
     content: string;
     image_url: string;
     published_at: string;
-    author_id: string; // potentially fetch author details
+    author_id: string;
 }
 
 export default function BlogDetail() {
@@ -29,15 +25,15 @@ export default function BlogDetail() {
 
     const fetchBlog = async () => {
         try {
-            const { data, error } = await supabase
-                .from('blogs')
+            const { data, error } = await (supabase
+                .from('blogs' as any)
                 .select('*')
                 .eq('slug', slug)
                 .eq('published', true)
-                .single();
+                .single() as any);
 
             if (error) throw error;
-            setBlog(data);
+            setBlog(data as BlogPost);
         } catch (error) {
             console.error("Error fetching blog", error);
         } finally {
@@ -65,7 +61,6 @@ export default function BlogDetail() {
     return (
         <Layout>
             <article className="min-h-screen pb-20">
-                {/* Cover Image */}
                 {blog.image_url ? (
                     <div className="w-full h-[400px] relative overflow-hidden">
                         <div className="absolute inset-0 bg-black/40 z-10" />
@@ -95,12 +90,7 @@ export default function BlogDetail() {
 
                 <div className="container max-w-3xl py-10">
                     <div className="prose prose-lg dark:prose-invert max-w-none">
-                        {/* Fallback for markdown: simple text with whitespace */}
                         <div className="whitespace-pre-wrap">{blog.content}</div>
-                        {/* 
-                  TODO: Enhance this with a Markdown renderer like 'react-markdown' or 'dompurify' if handling rich text.
-                  For now, assuming plain text or simple formatting.
-                */}
                     </div>
                 </div>
             </article>
