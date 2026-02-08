@@ -6,6 +6,7 @@ export interface DynamicPermission {
   name: string;
   category: string;
   description?: string;
+  action_type?: string;
 }
 
 export interface AdminRoleWithPermissions {
@@ -19,7 +20,7 @@ export interface AdminRoleWithPermissions {
   user_count?: number;
 }
 
-// Fetch all available permissions
+// Fetch all available permissions (now includes action_type)
 export async function fetchAllPermissions(): Promise<DynamicPermission[]> {
   const { data, error } = await supabase
     .from('permissions')
@@ -32,7 +33,39 @@ export async function fetchAllPermissions(): Promise<DynamicPermission[]> {
     return [];
   }
 
-  return data || [];
+  // Fetch action_type separately since it may not be in generated types yet
+  const { data: withActionType } = await supabase
+    .from('permissions')
+    .select('id, code, name, category, description')
+    .order('category', { ascending: true })
+    .order('name', { ascending: true });
+
+  // Try to get action_type via raw query
+  try {
+    const { data: rawPerms } = await supabase
+      .rpc('get_permissions_with_action_type' as any) as any;
+    if (rawPerms && Array.isArray(rawPerms)) {
+      return rawPerms;
+    }
+  } catch {
+    // Function doesn't exist, fall back
+  }
+
+  // Fallback: infer action_type from code
+  return (data || []).map(p => ({
+    ...p,
+    action_type: inferActionType(p.code),
+  }));
+}
+
+function inferActionType(code: string): string {
+  const action = code.split('.')[1];
+  if (!action) return 'special';
+  if (action === 'view') return 'read';
+  if (action === 'create') return 'create';
+  if (action === 'update') return 'update';
+  if (action === 'delete') return 'delete';
+  return 'special';
 }
 
 // Fetch all roles with their permissions
@@ -40,7 +73,6 @@ export async function fetchRolesWithPermissions(): Promise<AdminRoleWithPermissi
   const { data: roles, error: rolesError } = await supabase
     .from('admin_roles')
     .select('*')
-    .order('is_system_role', { ascending: false })
     .order('display_name', { ascending: true });
 
   if (rolesError) {
@@ -59,7 +91,7 @@ export async function fetchRolesWithPermissions(): Promise<AdminRoleWithPermissi
   }
 
   // Fetch user counts per role
-  const { data: userRoles, error: userRolesError } = await supabase
+  const { data: userRoles } = await supabase
     .from('user_roles')
     .select('role_id');
 
@@ -133,35 +165,6 @@ export async function checkUserPermission(userId: string, permissionCode: string
   return data || false;
 }
 
-// Convert dynamic permissions to legacy format for backward compatibility
-export function convertToLegacyPermissions(permissionCodes: string[]): Record<string, boolean> {
-  return {
-    canViewApplications: permissionCodes.includes('applications.view'),
-    canManageApplications: permissionCodes.includes('applications.manage'),
-    canViewCertificates: permissionCodes.includes('certificates.view'),
-    canIssueCertificates: permissionCodes.includes('certificates.issue'),
-    canViewInspections: permissionCodes.includes('inspections.view'),
-    canManageInspections: permissionCodes.includes('inspections.manage'),
-    canViewAuditLogs: permissionCodes.includes('audit_logs.view'),
-    canManageUsers: permissionCodes.includes('users.manage'),
-    canManageSettings: permissionCodes.includes('settings.manage'),
-    canViewEnforcement: permissionCodes.includes('enforcement.view'),
-    canManageEnforcement: permissionCodes.includes('enforcement.manage'),
-    canViewSupport: permissionCodes.includes('support.view'),
-    canRespondSupport: permissionCodes.includes('support.respond'),
-    canManageSupport: permissionCodes.includes('support.manage'),
-    canManageRoles: permissionCodes.includes('roles.manage'),
-    canViewDocumentation: permissionCodes.includes('documentation.view'),
-    canApproveDocumentation: permissionCodes.includes('documentation.approve'),
-    canViewShariahReview: permissionCodes.includes('shariah_review.view'),
-    canApproveShariahReview: permissionCodes.includes('shariah_review.approve'),
-    canViewFinance: permissionCodes.includes('finance.view'),
-    canManageFinance: permissionCodes.includes('finance.manage'),
-    canViewReports: permissionCodes.includes('reports.view'),
-    canExportReports: permissionCodes.includes('reports.export'),
-  };
-}
-
 // Save role permissions
 export async function saveRolePermissions(
   roleId: string,
@@ -230,13 +233,12 @@ export async function createRole(
   return data?.id || null;
 }
 
-// Delete role (non-system only)
+// Delete role (any role can be deleted now, safeguard is in UI)
 export async function deleteRole(roleId: string): Promise<boolean> {
   const { error } = await supabase
     .from('admin_roles')
     .delete()
-    .eq('id', roleId)
-    .eq('is_system_role', false);
+    .eq('id', roleId);
 
   if (error) {
     console.error('Error deleting role:', error);
