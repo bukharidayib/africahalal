@@ -1,163 +1,238 @@
 
 
-## Fix: Database Schema Mismatch, Broken DB Functions, RLS Recursion, and Build Errors
+# Enterprise RBAC + Workflow Admin Module
 
-### Root Cause Analysis
+## Current State Assessment
 
-After deep investigation, I found the core problem: **the database schema was migrated** from using an enum-based `role` column to a UUID-based `role_id` foreign key in the `user_roles` table, but **three critical layers were NOT updated**:
+The platform already has a solid foundation:
+- **5 system roles** in `admin_roles` table (super_admin, certification_officer, finance_officer, it_system_auditor, support_agent)
+- **21 permissions** in the `permissions` table across 6 categories
+- **Role Editor** page (`/admin/roles/:id`) with permission checkbox matrix
+- **User Management** page (`/admin/users`) with role assignment, role changes with reason, and audit logging
+- **Workflow Engine** (`workflowEngine.ts`) with basic resource+action permission mapping
+- **AdminLayout** that redirects unauthenticated users to `/admin/login`
+- **AdminSidebar** that filters nav items by permission
+- **Audit Logs** page showing immutable system activity
 
-1. **Database functions** (`has_role`, `get_user_role`, `get_user_permissions`) still reference the old `user_roles.role` column that no longer exists
-2. **Supabase TypeScript types** (`types.ts`) still describe the old schema
-3. **Frontend auth code** (`useAdminAuth.ts`) queries `select('role')` which doesn't exist
+### What's Missing (Gap Analysis)
 
-Additionally, there are **6 RLS policies on `user_roles`** - some of which self-reference `user_roles` inside their own policy, causing **infinite recursion**.
-
-This cascade means:
-- Admin login fails because `fetchUserRole` queries a non-existent column
-- Even if the query worked, RLS infinite recursion blocks it
-- The user is told "You do not have admin access" even though they DO have a `super_admin` role assigned
-
-### What's Actually in the Database
-
-```text
-user_roles table (ACTUAL):
-+------+----------+----------+-------------+----------+
-| id   | user_id  | role_id  | assigned_by | assigned_at |
-+------+----------+----------+-------------+----------+
-| uuid | uuid     | uuid FK  | uuid        | timestamp   |
-                      |
-                      v
-              admin_roles table:
-              +------+-------------+-------------------+
-              | id   | name        | display_name       |
-              +------+-------------+-------------------+
-              | uuid | super_admin | Super Administrator |
-              | uuid | cert_officer| Certification Off.  |
-              +------+-------------+-------------------+
-```
-
-But `types.ts` says `user_roles` has a `role` enum column (not `role_id` UUID).
-
-### Missing Tables in types.ts
-
-The database has these tables that are **missing from types.ts**:
-- `blogs` (exists in DB with: id, title, slug, excerpt, content, image_url, author_id, published, published_at, created_at, updated_at)
-- `organization_supervisors` (exists in DB with: id, organization_id, supervisor_id, assigned_at, assigned_by)
-
-### All Issues Found
-
-| Issue | File(s) | Impact |
-|-------|---------|--------|
-| DB functions use non-existent `role` column | `has_role()`, `get_user_role()`, `get_user_permissions()` | Admin login completely broken |
-| RLS infinite recursion on `user_roles` | 2 RLS policies self-reference the table | All user_roles queries fail |
-| types.ts out of sync | `src/integrations/supabase/types.ts` | All TypeScript build errors |
-| Auth hook queries wrong column | `useAdminAuth.ts` | "No admin access" error |
-| `UserManagement.tsx` column mismatch | Insert uses `role_id` but types expect `role` enum | Build error |
-| `Blogs.tsx` table not in types | `blogs` table missing from types | Build error |
-| `Supervisors.tsx` table not in types | `organization_supervisors` missing | Build error |
-| `BlogDetail.tsx` table not in types | Same `blogs` issue | Build error |
-| `Index.tsx` table not in types | Same `blogs` issue | Build error |
-| `CertificationApplication.tsx` void expression | `updateFormData()` returns void, used with `\|\|` | Build error |
-| `ComplianceCenter.tsx` deep type instantiation | Type recursion from missing table types | Build error |
-| `Supervisors.tsx` queries `first_name`/`last_name` | Profiles table only has `full_name` | Runtime error |
+| Requirement | Current State | Gap |
+|-------------|--------------|-----|
+| Role status (Active/Suspended) | No status column on `admin_roles` | Need `status` column + UI toggle |
+| Role suspension cascading to users | Not implemented | Need real-time access revocation |
+| Workflow stage permissions | No `workflow_stages` or `workflow_stage_permissions` tables | Need new tables + permission matrix UI |
+| Permission matrix by module/feature/CRUD/stage | Flat checkbox list grouped by category | Need structured matrix view |
+| High-risk permission warnings | Not implemented | Need UI warnings for sensitive permissions |
+| Self-approval prevention | `validate_dual_approval` function exists but not workflow-integrated | Need enforcement in workflow engine |
+| Admin override with reason | Partial (role changes require reason) | Extend to all override actions |
+| RBAC dashboard analytics | Basic stats only (applications, certificates) | Need role/permission/security analytics |
+| Documentation/Shariah Review/Finance modules in permissions | Not in permission list | Need new permissions seeded |
+| Forward-only stage progression | Not enforced | Need server-side stage validation |
+| One user = one role enforcement | Checked in UI only | Need DB constraint |
 
 ---
 
-### Implementation Plan
+## Implementation Plan
 
-#### Step 1: Fix Database Functions (SQL Migration)
+### Phase 1: Database Schema Extensions (SQL Migration)
 
-Replace the 3 broken functions that reference `user_roles.role` with versions that use `user_roles.role_id` joined to `admin_roles.name`:
+**1a. Add `status` column to `admin_roles`**
+```
+ALTER TABLE admin_roles ADD COLUMN status TEXT NOT NULL DEFAULT 'active'
+  CHECK (status IN ('active', 'suspended'));
+```
 
-**`get_user_role`**: Change from `SELECT role::TEXT` to join `admin_roles` via `role_id`
+**1b. Create `workflow_stages` table**
+Defines the system's certification workflow stages:
+- Application Submission
+- Documentation Review
+- Inspection
+- Shariah Review
+- Certificate Issuance
+- Surveillance & Renewal
 
-**`has_role`**: Change from `WHERE role = _role` to join and check `admin_roles.name`
+Columns: `id`, `name`, `system_code`, `display_name`, `stage_order`, `description`, `is_active`
 
-**`get_user_permissions`**: Change from `JOIN admin_roles ar ON ar.name = ur.role::TEXT` to `JOIN admin_roles ar ON ar.id = ur.role_id`
+**1c. Create `workflow_stage_permissions` table**
+Maps which roles can act at which stage with which actions:
+- `id`, `stage_id` (FK to workflow_stages), `role_id` (FK to admin_roles), `permission_id` (FK to permissions), `created_at`
 
-#### Step 2: Fix RLS Policies on `user_roles`
+**1d. Add new permissions for missing modules**
+Seed additional permissions for:
+- Documentation: `documentation.view`, `documentation.approve`, `documentation.upload`
+- Shariah Review: `shariah_review.view`, `shariah_review.submit`, `shariah_review.approve`
+- Finance: `finance.view`, `finance.manage`, `finance.approve`
+- Reports: `reports.view`, `reports.export`
 
-Drop the 2 recursion-causing policies and replace with policies that use the `is_admin_user()` SECURITY DEFINER function (which doesn't cause recursion):
+**1e. Add unique constraint for one-user-one-role**
+```
+ALTER TABLE user_roles ADD CONSTRAINT unique_user_role UNIQUE (user_id);
+```
+This enforces at the database level that each user can have only one role.
 
-- **"Admins can view all user roles"** (causes recursion) -- DROP and replace
-- **"Super Admins can manage user roles"** (causes recursion) -- DROP and replace
-- Keep the policies that use `has_role()` since that function will be fixed
+**1f. Create workflow validation function**
+A `SECURITY DEFINER` function `can_perform_workflow_action(user_id, stage_code, permission_code)` that checks:
+1. User has an active role (role status = 'active')
+2. User's role has the required permission
+3. User's role is allowed at the specified workflow stage
+4. User is not the same person who performed the previous stage (self-approval prevention)
 
-#### Step 3: Update Supabase Types
+**1g. Create role change logging trigger**
+A trigger on `user_roles` that auto-logs INSERT/UPDATE/DELETE to `audit_logs`.
 
-Update `types.ts` to:
-- Change `user_roles` to use `role_id: string` instead of `role: enum`
-- Add `blogs` table definition
-- Add `organization_supervisors` table definition
-- Add `support_agent` to the `admin_role` enum
+---
 
-#### Step 4: Fix `useAdminAuth.ts`
+### Phase 2: Enhanced Role Management Page
 
-Update `fetchUserRole` to query via `role_id` + join to `admin_roles`:
+**File: `src/admin/pages/RolesPermissions.tsx`** (extend existing)
 
+New features:
+- **Status badge** per role showing Active/Suspended with color coding
+- **Activate/Suspend toggle** button (admin only, with confirmation dialog + reason)
+- **User count per role** (already exists, keep)
+- **System Code** column in the table
+- **Warning banner** when suspending a role: "This will immediately revoke access for X users"
+- **Suspend confirmation dialog** with mandatory reason field
+
+Access: Restricted to users with `canManageRoles` permission (effectively `super_admin` or roles with `roles.manage`).
+
+---
+
+### Phase 3: Enhanced Permission Management with Matrix View
+
+**File: `src/admin/pages/RoleEditor.tsx`** (extend existing)
+
+Transform the flat checkbox list into a structured, enterprise-grade permission matrix:
+
+- **Module-level grouping** (Applications, Documentation, Inspections, Shariah Review, Finance, Certificates, Users, Reports, Audit Logs, System)
+- **Feature-level sub-items** under each module (e.g., under Inspections: View, Schedule, Create Report, Approve Report)
+- **CRUD indicators** shown as icons/tags on each permission
+- **High-risk permission warnings** - visual alert icons next to permissions like `certificate.issue`, `certificate.revoke`, `roles.manage`, `users.manage` with tooltip explaining the risk
+- **Select All / Deselect All per module** (already exists per category, will align)
+- **Disabled states** for system role restrictions
+
+**New Tab: "Workflow Stages"** in the Role Editor
+- A secondary tab showing which workflow stages this role can participate in
+- Checkbox matrix: Stages (rows) x Permissions (columns)
+- Only permissions relevant to each stage are shown
+- Clear visual indication of which stages this role is responsible for
+
+---
+
+### Phase 4: Enhanced User Management
+
+**File: `src/admin/pages/UserManagement.tsx`** (extend existing)
+
+New features:
+- **View User Permissions** button - opens a read-only dialog showing all permissions inherited from the user's role
+- **Role change confirmation dialog** enhanced with:
+  - Current role displayed
+  - New role selected
+  - Mandatory reason field (already exists)
+  - Impact warning: "This user will gain/lose access to X modules"
+- **Suspend/Deactivate user** action (removes their role assignment, with reason)
+- **Status indicator** showing if user's role is suspended (inherited from role status)
+- **Filter by role** dropdown
+- **Filter by status** (Active / Suspended)
+
+---
+
+### Phase 5: Workflow Permission Engine Enhancement
+
+**File: `src/admin/lib/workflowEngine.ts`** (rewrite)
+
+Enhanced WorkflowEngine class:
+- `canActInStage(userId, stageCode, permissionCode)` - checks stage + permission + role status
+- `canProgressStage(applicationId, userId, fromStage, toStage)` - validates forward-only progression
+- `isNotSelfApproving(applicationId, userId, stageCode)` - prevents self-approval by checking who acted in the previous stage
+- `getAvailableActions(userId, stageCode)` - returns all actions a user can perform at a given stage
+- `getRoleStages(roleId)` - returns which stages a role can participate in
+
+All methods use the server-side `can_perform_workflow_action` DB function for authoritative checks.
+
+**New File: `src/admin/hooks/useWorkflowPermission.ts`**
+React hook for UI-level permission enforcement:
 ```typescript
-const { data, error } = await supabase
-  .from('user_roles')
-  .select('role_id, admin_roles!inner(name)')
-  .eq('user_id', userId)
-  .limit(1)
-  .single();
-
-// Extract role name from the join
-return data?.admin_roles?.name as AdminRole;
+function useWorkflowPermission(stageCode: string, permissionCode: string) {
+  // Returns { isAllowed, isLoading, reason }
+}
 ```
-
-#### Step 5: Fix `UserManagement.tsx`
-
-Update the `UserRoleDetail` interface and queries to use `role_id` instead of the old `role` enum. Fix the insert statement to match the actual schema.
-
-#### Step 6: Fix `Supervisors.tsx`
-
-- Fix profile query to use `full_name` instead of `first_name`/`last_name`
-- Cast Supabase calls to work with the updated types
-
-#### Step 7: Fix `CertificationApplication.tsx`
-
-Replace `updateFormData(...) || updateFormData(...)` with proper sequential calls:
-
-```typescript
-onClick={() => {
-  updateFormData('validity_period', '6_months');
-  updateFormData('application_fee', 1500);
-}}
-```
-
-#### Step 8: Add `support_agent` to permissions.ts
-
-Update the `AdminRole` type and `rolePermissions` to include `support_agent`.
 
 ---
 
-### Files Changed Summary
+### Phase 6: RBAC Analytics Dashboard
 
-| Category | File | Change |
-|----------|------|--------|
-| SQL Migration | New migration file | Fix 3 DB functions + fix RLS policies |
-| Types | `src/integrations/supabase/types.ts` | Add `blogs`, `organization_supervisors`, fix `user_roles` |
-| Auth | `src/admin/hooks/useAdminAuth.ts` | Fix `fetchUserRole` to use `role_id` join |
-| Auth | `src/admin/lib/permissions.ts` | Add `support_agent` role |
-| Admin | `src/admin/pages/UserManagement.tsx` | Fix interface + queries for `role_id` |
-| Admin | `src/admin/pages/Supervisors.tsx` | Fix profile field names |
-| Admin | `src/admin/pages/Blogs.tsx` | Cast types for `blogs` table |
-| Public | `src/pages/BlogDetail.tsx` | Cast types for `blogs` table |
-| Public | `src/pages/Index.tsx` | Cast types for `blogs` table |
-| Client | `src/pages/client/CertificationApplication.tsx` | Fix void expression |
-| Client | `src/pages/client/ComplianceCenter.tsx` | Fix type instantiation |
+**File: `src/admin/pages/AdminDashboard.tsx`** (extend existing)
+
+Add new analytics cards (visible only to `super_admin` / users with `roles.manage`):
+- **Total Admin Users** count
+- **Users per Role** - small bar/list showing distribution
+- **Permission Coverage** - percentage of permissions assigned across all roles
+- **Roles by Status** - Active vs Suspended count
+- **Recent Role Changes** - last 5 role assignment/change audit logs
+- **Recent Security Events** - failed login attempts, unauthorized access attempts from audit logs
+
+Uses the existing Card/Badge/Table components consistent with current dashboard design.
 
 ---
 
-### Testing Checklist
+### Phase 7: Security & Access Control Hardening
 
-1. Navigate to `/admin/login` -- should show login form, no "You do not have admin access" error
-2. Login with `admin@ahis.org` -- should redirect to `/admin/dashboard`
-3. Navigate to `/admin/certificates`, `/admin/applications` -- should load without infinite spinner
-4. Logout -- should redirect immediately to `/admin/login`
-5. Visit homepage `/` -- blog section should load without errors
-6. Visit `/admin/blogs` -- should load and allow CRUD
-7. Visit `/admin/supervisors` -- should load supervisor list
+**Client-side:**
+- Every admin page wrapped in `AdminLayout` (already done) which checks `isAuthenticated`
+- Sidebar items filtered by permissions (already done)
+- Individual page sections guarded by specific permission checks
+
+**Server-side:**
+- All RLS policies already use `is_admin_user()` and `has_role()` SECURITY DEFINER functions
+- New `can_perform_workflow_action()` function for stage-based checks
+- Role status check added to `is_admin_user()` - suspended roles return false
+- `validate_dual_approval()` integrated with workflow engine
+
+**Audit logging:**
+- All role CRUD operations logged (via `log_audit` RPC)
+- All permission changes logged
+- All role assignments and changes logged with reason
+- Admin override actions flagged with `reason_code = 'admin_override'`
+
+---
+
+## File Changes Summary
+
+| Category | File | Action | Description |
+|----------|------|--------|-------------|
+| **Database** | New migration SQL | Create | Schema extensions: status column, workflow tables, new permissions, constraints, functions |
+| **Types** | `src/integrations/supabase/types.ts` | Modify | Add workflow_stages, workflow_stage_permissions table types; update admin_roles with status |
+| **Permissions** | `src/admin/lib/permissions.ts` | Modify | Add new permission keys for documentation, shariah, finance, reports |
+| **Workflow** | `src/admin/lib/workflowEngine.ts` | Rewrite | Full enterprise workflow engine with stage, self-approval, forward-only checks |
+| **Hooks** | `src/admin/hooks/useWorkflowPermission.ts` | Create | React hook for stage-based permission checks |
+| **Roles Page** | `src/admin/pages/RolesPermissions.tsx` | Modify | Add status column, activate/suspend with confirmation, system code display |
+| **Role Editor** | `src/admin/pages/RoleEditor.tsx` | Modify | Structured permission matrix, high-risk warnings, workflow stages tab |
+| **User Mgmt** | `src/admin/pages/UserManagement.tsx` | Modify | View permissions dialog, enhanced role change, status filters |
+| **Dashboard** | `src/admin/pages/AdminDashboard.tsx` | Modify | RBAC analytics section for admin users |
+| **Dynamic Perms** | `src/admin/lib/dynamicPermissions.ts` | Modify | Add workflow stage permission fetching and saving functions |
+| **Sidebar** | `src/admin/components/layout/AdminSidebar.tsx` | Modify | Add `canManageRoles` permission check for Roles nav item |
+| **Auth Hook** | `src/admin/hooks/useAdminAuth.ts` | Modify | Check role status (suspended roles denied access) |
+
+---
+
+## Design Constraints Compliance
+
+- All new UI uses existing components: Card, Table, Badge, Dialog, Button, Input, Select, Checkbox, Tabs, Separator
+- Same AdminLayout wrapper for all pages
+- Same typography (font-serif headings, text-muted-foreground descriptions)
+- Same spacing patterns (space-y-6, gap-4)
+- Same color scheme (primary, destructive, warning tones from existing pages)
+- No new design system or third-party UI library
+
+---
+
+## Technical Notes
+
+- The `admin_roles` table `status` field is checked inside `is_admin_user()` so suspended roles lose access across all RLS policies automatically
+- One-user-one-role is enforced at DB level with a UNIQUE constraint on `user_roles.user_id`
+- Workflow stages are system-defined (seeded via migration) and not editable via UI
+- Forward-only stage progression is enforced by comparing `stage_order` values
+- Self-approval prevention checks `application_status_history.changed_by` for the previous stage
+- All new permission codes follow the existing `module.action` naming convention
 
