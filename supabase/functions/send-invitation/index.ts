@@ -71,7 +71,7 @@ const handler = async (req: Request): Promise<Response> => {
     const appUrl = "https://africahalal.lovable.app";
 
     const emailResponse = await resend.emails.send({
-      from: "Africa Halal Integrity System <onboarding@resend.dev>",
+      from: "Africa Halal Integrity System <info@africanhalaal.com>",
       to: [email],
       subject: `You're Invited to Join AHIS as ${role_name}`,
       html: `
