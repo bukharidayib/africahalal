@@ -253,6 +253,48 @@ export type Database = {
         }
         Relationships: []
       }
+      blogs: {
+        Row: {
+          author_id: string | null
+          content: string
+          created_at: string | null
+          excerpt: string | null
+          id: string
+          image_url: string | null
+          published: boolean | null
+          published_at: string | null
+          slug: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          content: string
+          created_at?: string | null
+          excerpt?: string | null
+          id?: string
+          image_url?: string | null
+          published?: boolean | null
+          published_at?: string | null
+          slug: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          content?: string
+          created_at?: string | null
+          excerpt?: string | null
+          id?: string
+          image_url?: string | null
+          published?: boolean | null
+          published_at?: string | null
+          slug?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       certificate_history: {
         Row: {
           action: string
@@ -350,6 +392,7 @@ export type Database = {
       }
       certification_applications: {
         Row: {
+          application_fee: number | null
           application_number: string
           application_type: string
           assigned_officer_id: string | null
@@ -361,8 +404,10 @@ export type Database = {
           status: Database["public"]["Enums"]["application_status"]
           submitted_at: string | null
           updated_at: string
+          validity_period: string | null
         }
         Insert: {
+          application_fee?: number | null
           application_number: string
           application_type: string
           assigned_officer_id?: string | null
@@ -374,8 +419,10 @@ export type Database = {
           status?: Database["public"]["Enums"]["application_status"]
           submitted_at?: string | null
           updated_at?: string
+          validity_period?: string | null
         }
         Update: {
+          application_fee?: number | null
           application_number?: string
           application_type?: string
           assigned_officer_id?: string | null
@@ -387,6 +434,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["application_status"]
           submitted_at?: string | null
           updated_at?: string
+          validity_period?: string | null
         }
         Relationships: [
           {
@@ -808,6 +856,38 @@ export type Database = {
           },
         ]
       }
+      organization_supervisors: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          id: string
+          organization_id: string | null
+          supervisor_id: string | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          id?: string
+          organization_id?: string | null
+          supervisor_id?: string | null
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          id?: string
+          organization_id?: string | null
+          supervisor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_supervisors_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           address: string | null
@@ -1077,24 +1157,32 @@ export type Database = {
           assigned_at: string
           assigned_by: string | null
           id: string
-          role: Database["public"]["Enums"]["admin_role"]
+          role_id: string
           user_id: string
         }
         Insert: {
           assigned_at?: string
           assigned_by?: string | null
           id?: string
-          role: Database["public"]["Enums"]["admin_role"]
+          role_id: string
           user_id: string
         }
         Update: {
           assigned_at?: string
           assigned_by?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["admin_role"]
+          role_id?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "admin_roles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
