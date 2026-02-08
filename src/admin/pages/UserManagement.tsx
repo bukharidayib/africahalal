@@ -104,15 +104,19 @@ export default function UserManagement() {
       const { data, error } = await supabase
         .from('user_roles')
         .select(`
-          *,
+          id,
+          user_id,
+          role_id,
+          assigned_at,
+          assigned_by,
           admin_roles (id, display_name, name)
         `)
         .order('assigned_at', { ascending: false });
 
       if (error) throw error;
 
-      // Fetch profiles separately (Supabase join limitation or preference)
-      const userIds = (data || []).map(r => r.user_id);
+      // Fetch profiles separately
+      const userIds = ((data as any[]) || []).map((r: any) => r.user_id);
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
@@ -121,7 +125,7 @@ export default function UserManagement() {
 
         const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
-        const rolesWithProfiles = (data || []).map(r => ({
+        const rolesWithProfiles = ((data as any[]) || []).map((r: any) => ({
           ...r,
           profiles: profileMap.get(r.user_id),
         })) as UserRoleDetail[];
@@ -173,13 +177,13 @@ export default function UserManagement() {
       }
 
       // 3. Assign Role
-      const { error } = await supabase
+      const { error } = await (supabase
         .from('user_roles')
         .insert({
           user_id: profile.id,
           role_id: selectedRoleId,
           assigned_by: currentUser?.id,
-        });
+        } as any) as any);
 
       if (error) throw error;
 

@@ -97,33 +97,34 @@ export default function ComplianceCenter() {
             if (carError) throw carError;
             setCarItems(cars || []);
 
-            // Fetch Latest Inspection Report via related Inspections
-            // First get inspections for this org
-            const { data: inspections } = await supabase
-                .from('inspections')
+            // Fetch latest inspection report - use simpler query to avoid deep type instantiation
+            const { data: appIds } = await supabase
+                .from('certification_applications')
                 .select('id')
-                .eq('organization_id', organizationId); // Assuming inspections has organization_id directly, or via app?
+                .eq('organization_id', organizationId);
+            
+            let reports: any[] = [];
+            if (appIds && appIds.length > 0) {
+                const applicationIds = appIds.map(a => a.id);
+                const { data: inspectionData } = await supabase
+                    .from('inspections')
+                    .select('id')
+                    .in('application_id', applicationIds);
+                
+                if (inspectionData && inspectionData.length > 0) {
+                    const inspectionIds = inspectionData.map(i => i.id);
+                    const { data: reportData, error: reportError } = await supabase
+                        .from('inspection_reports')
+                        .select('*')
+                        .in('inspection_id', inspectionIds)
+                        .order('created_at', { ascending: false })
+                        .limit(1);
+                    
+                    if (reportError) throw reportError;
+                    reports = reportData || [];
+                }
+            }
 
-            // Wait, looking at previous migration, inspections connects to applications.
-            // Let's safe-bet fetch via application?
-            // "JOIN public.certification_applications ca ON ca.id = i.application_id"
-
-            // Easier way if we don't change DB structure:
-            const { data: reports, error: reportError } = await supabase
-                .from('inspection_reports')
-                .select(`
-                    *,
-                    inspection:inspections!inner(
-                        application:certification_applications!inner(
-                            organization_id
-                        )
-                    )
-                `)
-                .eq('inspection.application.organization_id', organizationId)
-                .order('created_at', { ascending: false })
-                .limit(1);
-
-            if (reportError) throw reportError;
             if (reports && reports.length > 0) {
                 setLatestReport(reports[0]);
             }

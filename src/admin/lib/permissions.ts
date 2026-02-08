@@ -1,5 +1,5 @@
 // Admin role types matching database enum
-export type AdminRole = 'super_admin' | 'certification_officer' | 'finance_officer' | 'it_system_auditor';
+export type AdminRole = 'super_admin' | 'certification_officer' | 'finance_officer' | 'it_system_auditor' | 'support_agent';
 
 export interface Permission {
   canViewApplications: boolean;
@@ -85,6 +85,23 @@ export const rolePermissions: Record<AdminRole, Permission> = {
     canManageEnforcement: false,
     canViewSupport: false,
     canRespondSupport: false,
+    canManageSupport: false,
+    canManageRoles: false,
+  },
+  support_agent: {
+    canViewApplications: false,
+    canManageApplications: false,
+    canViewCertificates: false,
+    canIssueCertificates: false,
+    canViewInspections: false,
+    canManageInspections: false,
+    canViewAuditLogs: false,
+    canManageUsers: false,
+    canManageSettings: false,
+    canViewEnforcement: false,
+    canManageEnforcement: false,
+    canViewSupport: true,
+    canRespondSupport: true,
     canManageSupport: false,
     canManageRoles: false,
   },

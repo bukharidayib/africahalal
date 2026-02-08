@@ -147,14 +147,14 @@ export default function Index() {
   }, []);
 
   const fetchBlogs = async () => {
-    const { data } = await supabase
-      .from('blogs')
+    const { data } = await (supabase
+      .from('blogs' as any)
       .select('*')
       .eq('published', true)
       .order('published_at', { ascending: false })
-      .limit(3);
+      .limit(3) as any);
 
-    if (data) setBlogs(data);
+    if (data) setBlogs(data as BlogPost[]);
   };
 
   return (
