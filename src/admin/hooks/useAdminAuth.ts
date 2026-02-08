@@ -48,7 +48,7 @@ export function useAdminAuth() {
     try {
       const { data, error } = await supabase
         .from('user_roles')
-        .select('role_id, admin_roles!inner(name)')
+        .select('role_id, admin_roles!inner(name, status)')
         .eq('user_id', userId)
         .limit(1)
         .single();
@@ -58,8 +58,17 @@ export function useAdminAuth() {
         return null;
       }
 
-      // Extract role name from the joined admin_roles table
-      const roleName = (data as any)?.admin_roles?.name;
+      // Extract role name and status from the joined admin_roles table
+      const roleData = (data as any)?.admin_roles;
+      const roleName = roleData?.name;
+      const roleStatus = roleData?.status;
+
+      // If role is suspended, deny access
+      if (roleStatus === 'suspended') {
+        console.warn('User role is suspended:', roleName);
+        return null;
+      }
+
       return roleName as AdminRole || null;
     } catch (err) {
       console.error('Failed to fetch user role:', err);

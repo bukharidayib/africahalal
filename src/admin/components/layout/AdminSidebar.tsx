@@ -87,7 +87,7 @@ const navItems: NavItem[] = [
     title: 'Roles & Permissions',
     href: '/admin/roles',
     icon: Key,
-    permission: 'canManageUsers',
+    permission: 'canManageRoles',
   },
   {
     title: 'Supervisors',
