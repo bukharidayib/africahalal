@@ -23,6 +23,7 @@ export type Database = {
           id: string
           is_system_role: boolean | null
           name: string
+          status: string
           updated_at: string | null
         }
         Insert: {
@@ -33,6 +34,7 @@ export type Database = {
           id?: string
           is_system_role?: boolean | null
           name: string
+          status?: string
           updated_at?: string | null
         }
         Update: {
@@ -43,6 +45,7 @@ export type Database = {
           id?: string
           is_system_role?: boolean | null
           name?: string
+          status?: string
           updated_at?: string | null
         }
         Relationships: []
@@ -1184,6 +1187,85 @@ export type Database = {
           },
         ]
       }
+      workflow_stage_permissions: {
+        Row: {
+          created_at: string
+          id: string
+          permission_id: string
+          role_id: string
+          stage_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          permission_id: string
+          role_id: string
+          stage_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          permission_id?: string
+          role_id?: string
+          stage_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_stage_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stage_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "admin_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stage_permissions_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_stages: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_name: string
+          id: string
+          is_active: boolean
+          name: string
+          stage_order: number
+          system_code: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_name: string
+          id?: string
+          is_active?: boolean
+          name: string
+          stage_order: number
+          system_code: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          stage_order?: number
+          system_code?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1195,6 +1277,22 @@ export type Database = {
           _role: Database["public"]["Enums"]["admin_role"]
         }
         Returns: string
+      }
+      can_perform_workflow_action: {
+        Args: {
+          _permission_code: string
+          _stage_code: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      check_self_approval: {
+        Args: {
+          _application_id: string
+          _current_stage: string
+          _user_id: string
+        }
+        Returns: boolean
       }
       generate_application_number: { Args: never; Returns: string }
       generate_certificate_number: { Args: never; Returns: string }
@@ -1226,6 +1324,10 @@ export type Database = {
       }
       validate_dual_approval: {
         Args: { _application_id: string; _approver_id: string }
+        Returns: boolean
+      }
+      validate_stage_progression: {
+        Args: { _from_stage: string; _to_stage: string }
         Returns: boolean
       }
     }

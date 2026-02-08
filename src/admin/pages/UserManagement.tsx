@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Shield,
-  Search,
-  Plus,
-  User,
-  Mail,
-  Calendar,
-  Trash2,
-  Edit,
-  AlertTriangle
+  Shield, Search, Plus, User, Mail, Calendar, Trash2, Edit,
+  AlertTriangle, Eye, Power, Filter,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,36 +9,22 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { useAdminAuthContext } from '../contexts/AdminAuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { fetchAllRoles, AdminRoleWithPermissions } from '../lib/dynamicPermissions';
+import { fetchAllRoles, fetchUserPermissions, AdminRoleWithPermissions } from '../lib/dynamicPermissions';
 
 interface UserRoleDetail {
   id: string;
@@ -56,6 +35,7 @@ interface UserRoleDetail {
     id: string;
     display_name: string;
     name: string;
+    status?: string;
   };
   profiles?: {
     email: string;
@@ -69,6 +49,8 @@ export default function UserManagement() {
   const [availableRoles, setAvailableRoles] = useState<AdminRoleWithPermissions[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterRole, setFilterRole] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
 
   // Create Dialog State
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -80,6 +62,12 @@ export default function UserManagement() {
   const [editingUserRole, setEditingUserRole] = useState<UserRoleDetail | null>(null);
   const [newRoleId, setNewRoleId] = useState('');
   const [changeReason, setChangeReason] = useState('');
+
+  // View Permissions Dialog
+  const [isViewPermsOpen, setIsViewPermsOpen] = useState(false);
+  const [viewPermsUser, setViewPermsUser] = useState<UserRoleDetail | null>(null);
+  const [viewPermsData, setViewPermsData] = useState<string[]>([]);
+  const [isLoadingPerms, setIsLoadingPerms] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -100,22 +88,16 @@ export default function UserManagement() {
 
   async function fetchUserRoles() {
     try {
-      // Fetch user roles with role details
       const { data, error } = await supabase
         .from('user_roles')
         .select(`
-          id,
-          user_id,
-          role_id,
-          assigned_at,
-          assigned_by,
+          id, user_id, role_id, assigned_at, assigned_by,
           admin_roles (id, display_name, name)
         `)
         .order('assigned_at', { ascending: false });
 
       if (error) throw error;
 
-      // Fetch profiles separately
       const userIds = ((data as any[]) || []).map((r: any) => r.user_id);
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
@@ -127,6 +109,10 @@ export default function UserManagement() {
 
         const rolesWithProfiles = ((data as any[]) || []).map((r: any) => ({
           ...r,
+          admin_roles: {
+            ...(r.admin_roles || {}),
+            status: (r.admin_roles as any)?.status || 'active',
+          },
           profiles: profileMap.get(r.user_id),
         })) as UserRoleDetail[];
 
@@ -134,26 +120,33 @@ export default function UserManagement() {
       } else {
         setUserRoles([]);
       }
-
     } catch (error) {
       console.error('Error fetching user roles:', error);
       toast.error('Failed to load users');
     }
   }
 
+  async function handleViewPermissions(userRole: UserRoleDetail) {
+    setViewPermsUser(userRole);
+    setIsViewPermsOpen(true);
+    setIsLoadingPerms(true);
+    try {
+      const perms = await fetchUserPermissions(userRole.user_id);
+      setViewPermsData(perms);
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
+      setViewPermsData([]);
+    } finally {
+      setIsLoadingPerms(false);
+    }
+  }
+
   async function handleAddRole() {
-    if (!newUserEmail.trim()) {
-      toast.error('Email is required');
-      return;
-    }
-    if (!selectedRoleId) {
-      toast.error('Role is required');
-      return;
-    }
+    if (!newUserEmail.trim()) { toast.error('Email is required'); return; }
+    if (!selectedRoleId) { toast.error('Role is required'); return; }
 
     setIsSubmitting(true);
     try {
-      // 1. Find user by email
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, email')
@@ -161,13 +154,10 @@ export default function UserManagement() {
         .single();
 
       if (profileError || !profile) {
-        toast.error('User not found', {
-          description: 'User must be signed up first.',
-        });
+        toast.error('User not found', { description: 'User must be signed up first.' });
         return;
       }
 
-      // 2. Check strict "One Role Per User" policy
       const existingRole = userRoles.find(r => r.user_id === profile.id);
       if (existingRole) {
         toast.error('User already has a role', {
@@ -176,7 +166,6 @@ export default function UserManagement() {
         return;
       }
 
-      // 3. Assign Role
       const { error } = await (supabase
         .from('user_roles')
         .insert({
@@ -187,7 +176,6 @@ export default function UserManagement() {
 
       if (error) throw error;
 
-      // 4. Audit Log
       await supabase.rpc('log_audit', {
         _action: 'role_assigned',
         _resource_type: 'user_roles',
@@ -196,7 +184,7 @@ export default function UserManagement() {
         _metadata: {
           email: newUserEmail,
           role_id: selectedRoleId,
-          role_name: availableRoles.find(r => r.id === selectedRoleId)?.display_name
+          role_name: availableRoles.find(r => r.id === selectedRoleId)?.display_name,
         },
       });
 
@@ -216,27 +204,23 @@ export default function UserManagement() {
   async function handleChangeRole() {
     if (!editingUserRole || !newRoleId) return;
     if (!changeReason.trim()) {
-      toast.error('Reason is required', {
-        description: 'Please explain why this user\'s role is being changed.',
-      });
+      toast.error('Reason is required', { description: "Please explain why this user's role is being changed." });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // Update user role
       const { error } = await supabase
         .from('user_roles')
         .update({
           role_id: newRoleId,
-          assigned_by: currentUser?.id, // track who changed it
-          assigned_at: new Date().toISOString() // update timestamp
+          assigned_by: currentUser?.id,
+          assigned_at: new Date().toISOString(),
         })
         .eq('id', editingUserRole.id);
 
       if (error) throw error;
 
-      // Log Audit
       await supabase.rpc('log_audit', {
         _action: 'role_changed',
         _resource_type: 'user_roles',
@@ -244,9 +228,11 @@ export default function UserManagement() {
         _reason_code: 'role_change',
         _metadata: {
           previous_role_id: editingUserRole.role_id,
+          previous_role_name: editingUserRole.admin_roles?.display_name,
           new_role_id: newRoleId,
-          reason: changeReason
-        }
+          new_role_name: availableRoles.find(r => r.id === newRoleId)?.display_name,
+          reason: changeReason,
+        },
       });
 
       toast.success('User role updated');
@@ -255,7 +241,6 @@ export default function UserManagement() {
       setChangeReason('');
       setNewRoleId('');
       fetchUserRoles();
-
     } catch (error) {
       console.error('Error changing role:', error);
       toast.error('Failed to update role');
@@ -270,7 +255,6 @@ export default function UserManagement() {
       return;
     }
 
-    // Use a confirm dialog or simpler confirm for now
     if (!confirm(`Are you sure you want to remove access for ${userRole.profiles?.full_name}?`)) return;
 
     try {
@@ -286,7 +270,7 @@ export default function UserManagement() {
         _resource_type: 'user_roles',
         _resource_id: userRole.user_id,
         _reason_code: 'admin_action',
-        _metadata: { role_id: userRole.role_id },
+        _metadata: { role_id: userRole.role_id, role_name: userRole.admin_roles?.display_name },
       });
 
       toast.success('Access removed successfully');
@@ -298,13 +282,23 @@ export default function UserManagement() {
   }
 
   const filteredUsers = userRoles.filter(ur => {
-    if (!searchQuery) return true;
-    const search = searchQuery.toLowerCase();
-    return (
-      ur.profiles?.email.toLowerCase().includes(search) ||
-      ur.profiles?.full_name.toLowerCase().includes(search) ||
-      ur.admin_roles?.display_name.toLowerCase().includes(search)
-    );
+    // Text search
+    if (searchQuery) {
+      const search = searchQuery.toLowerCase();
+      const matches =
+        ur.profiles?.email.toLowerCase().includes(search) ||
+        ur.profiles?.full_name.toLowerCase().includes(search) ||
+        ur.admin_roles?.display_name.toLowerCase().includes(search);
+      if (!matches) return false;
+    }
+    // Role filter
+    if (filterRole !== 'all' && ur.role_id !== filterRole) return false;
+    // Status filter
+    if (filterStatus !== 'all') {
+      const roleStatus = ur.admin_roles?.status || 'active';
+      if (roleStatus !== filterStatus) return false;
+    }
+    return true;
   });
 
   if (!permissions.canManageUsers) {
@@ -313,9 +307,7 @@ export default function UserManagement() {
         <div className="text-center py-12">
           <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h2 className="text-xl font-bold mb-2">Access Denied</h2>
-          <p className="text-muted-foreground">
-            You don't have permission to manage users.
-          </p>
+          <p className="text-muted-foreground">You don't have permission to manage users.</p>
         </div>
       </AdminLayout>
     );
@@ -328,9 +320,7 @@ export default function UserManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold font-serif">User Management</h1>
-            <p className="text-muted-foreground">
-              Manage admin users and assign roles.
-            </p>
+            <p className="text-muted-foreground">Manage admin users and assign roles.</p>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
@@ -342,9 +332,7 @@ export default function UserManagement() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Assign Admin Role</DialogTitle>
-                <DialogDescription>
-                  Grant admin access to a registered user.
-                </DialogDescription>
+                <DialogDescription>Grant admin access to a registered user.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -356,9 +344,7 @@ export default function UserManagement() {
                     value={newUserEmail}
                     onChange={(e) => setNewUserEmail(e.target.value)}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    User must have an existing account.
-                  </p>
+                  <p className="text-xs text-muted-foreground">User must have an existing account.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Role</Label>
@@ -367,19 +353,15 @@ export default function UserManagement() {
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableRoles.map(role => (
-                        <SelectItem key={role.id} value={role.id}>
-                          {role.display_name}
-                        </SelectItem>
+                      {availableRoles.filter(r => r.status === 'active').map(role => (
+                        <SelectItem key={role.id} value={role.id}>{role.display_name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Cancel
-                </Button>
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
                 <Button onClick={handleAddRole} disabled={isSubmitting}>
                   {isSubmitting ? 'Assigning...' : 'Assign Role'}
                 </Button>
@@ -391,14 +373,38 @@ export default function UserManagement() {
         {/* Filters */}
         <Card>
           <CardContent className="pt-6">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, email, or role..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, email, or role..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={filterRole} onValueChange={setFilterRole}>
+                <SelectTrigger className="w-[180px]">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {availableRoles.map(role => (
+                    <SelectItem key={role.id} value={role.id}>{role.display_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -412,9 +418,7 @@ export default function UserManagement() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Loading users...
-              </div>
+              <div className="text-center py-8 text-muted-foreground">Loading users...</div>
             ) : filteredUsers.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -429,70 +433,121 @@ export default function UserManagement() {
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Assigned</TableHead>
-                    <TableHead className="w-24 text-right">Actions</TableHead>
+                    <TableHead className="w-32 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.map((userRole) => (
-                    <TableRow key={userRole.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-                            <User className="h-4 w-4 text-primary" />
+                  {filteredUsers.map((userRole) => {
+                    const roleStatus = userRole.admin_roles?.status || 'active';
+                    return (
+                      <TableRow key={userRole.id} className={roleStatus === 'suspended' ? 'opacity-60' : ''}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+                              <User className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{userRole.profiles?.full_name || 'Unknown'}</p>
+                              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Mail className="h-3 w-3" />
+                                {userRole.profiles?.email || 'No email'}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">{userRole.profiles?.full_name || 'Unknown'}</p>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                              <Mail className="h-3 w-3" />
-                              {userRole.profiles?.email || 'No email'}
-                            </p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800">
+                            {userRole.admin_roles?.display_name || 'Unknown Role'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {roleStatus === 'active' ? (
+                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Active</Badge>
+                          ) : (
+                            <Badge variant="destructive">Suspended</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            {format(new Date(userRole.assigned_at), 'dd MMM yyyy')}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800">
-                          {userRole.admin_roles?.display_name || 'Unknown Role'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {format(new Date(userRole.assigned_at), 'dd MMM yyyy')}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setEditingUserRole(userRole);
-                              setNewRoleId(userRole.role_id);
-                              setIsEditOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          {userRole.user_id !== currentUser?.id && (
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => handleRemoveRole(userRole)}
+                              title="View permissions"
+                              onClick={() => handleViewPermissions(userRole)}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Change role"
+                              onClick={() => {
+                                setEditingUserRole(userRole);
+                                setNewRoleId(userRole.role_id);
+                                setIsEditOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {userRole.user_id !== currentUser?.id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                title="Remove access"
+                                onClick={() => handleRemoveRole(userRole)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
           </CardContent>
         </Card>
+
+        {/* View Permissions Dialog */}
+        <Dialog open={isViewPermsOpen} onOpenChange={setIsViewPermsOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>User Permissions</DialogTitle>
+              <DialogDescription>
+                Read-only view of permissions for {viewPermsUser?.profiles?.full_name} ({viewPermsUser?.admin_roles?.display_name})
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              {isLoadingPerms ? (
+                <p className="text-center text-muted-foreground py-4">Loading permissions...</p>
+              ) : viewPermsData.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No permissions assigned.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {viewPermsData.map(code => (
+                    <Badge key={code} variant="secondary" className="font-mono text-xs">
+                      {code}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewPermsOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Role Dialog */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
@@ -506,6 +561,11 @@ export default function UserManagement() {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <span className="text-muted-foreground">Current Role: </span>
+                <span className="font-semibold">{editingUserRole?.admin_roles?.display_name}</span>
+              </div>
+
               <div className="space-y-2">
                 <Label>New Role</Label>
                 <Select value={newRoleId} onValueChange={setNewRoleId}>
@@ -513,10 +573,8 @@ export default function UserManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableRoles.map(role => (
-                      <SelectItem key={role.id} value={role.id}>
-                        {role.display_name}
-                      </SelectItem>
+                    {availableRoles.filter(r => r.status === 'active').map(role => (
+                      <SelectItem key={role.id} value={role.id}>{role.display_name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

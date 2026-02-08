@@ -1,9 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DynamicPermission {
+  id?: string;
   code: string;
   name: string;
   category: string;
+  description?: string;
 }
 
 export interface AdminRoleWithPermissions {
@@ -12,6 +14,7 @@ export interface AdminRoleWithPermissions {
   display_name: string;
   description: string | null;
   is_system_role: boolean;
+  status?: string;
   permissions: DynamicPermission[];
   user_count?: number;
 }
@@ -20,7 +23,7 @@ export interface AdminRoleWithPermissions {
 export async function fetchAllPermissions(): Promise<DynamicPermission[]> {
   const { data, error } = await supabase
     .from('permissions')
-    .select('code, name, category')
+    .select('id, code, name, category, description')
     .order('category', { ascending: true })
     .order('name', { ascending: true });
 
@@ -48,7 +51,7 @@ export async function fetchRolesWithPermissions(): Promise<AdminRoleWithPermissi
   // Fetch all role-permission mappings
   const { data: mappings, error: mappingsError } = await supabase
     .from('role_permissions')
-    .select('role_id, permission_id, permissions(code, name, category)');
+    .select('role_id, permission_id, permissions(id, code, name, category)');
 
   if (mappingsError) {
     console.error('Error fetching role permissions:', mappingsError);
@@ -61,7 +64,6 @@ export async function fetchRolesWithPermissions(): Promise<AdminRoleWithPermissi
     .select('role_id');
 
   const roleCounts = (userRoles || []).reduce((acc, ur) => {
-    // @ts-ignore - role_id is dynamic now
     const id = ur.role_id;
     if (id) acc[id] = (acc[id] || 0) + 1;
     return acc;
@@ -76,6 +78,7 @@ export async function fetchRolesWithPermissions(): Promise<AdminRoleWithPermissi
 
     return {
       ...role,
+      status: (role as any).status || 'active',
       permissions: rolePermissions,
       user_count: roleCounts[role.id] || 0,
     };
@@ -94,7 +97,11 @@ export async function fetchAllRoles(): Promise<AdminRoleWithPermissions[]> {
     return [];
   }
 
-  return (data || []).map(r => ({ ...r, permissions: [] }));
+  return (data || []).map(r => ({
+    ...r,
+    status: (r as any).status || 'active',
+    permissions: [],
+  }));
 }
 
 // Fetch user's permissions from database
@@ -144,6 +151,14 @@ export function convertToLegacyPermissions(permissionCodes: string[]): Record<st
     canRespondSupport: permissionCodes.includes('support.respond'),
     canManageSupport: permissionCodes.includes('support.manage'),
     canManageRoles: permissionCodes.includes('roles.manage'),
+    canViewDocumentation: permissionCodes.includes('documentation.view'),
+    canApproveDocumentation: permissionCodes.includes('documentation.approve'),
+    canViewShariahReview: permissionCodes.includes('shariah_review.view'),
+    canApproveShariahReview: permissionCodes.includes('shariah_review.approve'),
+    canViewFinance: permissionCodes.includes('finance.view'),
+    canManageFinance: permissionCodes.includes('finance.manage'),
+    canViewReports: permissionCodes.includes('reports.view'),
+    canExportReports: permissionCodes.includes('reports.export'),
   };
 }
 
@@ -229,4 +244,78 @@ export async function deleteRole(roleId: string): Promise<boolean> {
   }
 
   return true;
+}
+
+// Update role status (activate/suspend)
+export async function updateRoleStatus(
+  roleId: string,
+  status: 'active' | 'suspended'
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('admin_roles')
+    .update({ status, updated_at: new Date().toISOString() } as any)
+    .eq('id', roleId);
+
+  if (error) {
+    console.error('Error updating role status:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Fetch workflow stage permissions for a role
+export async function fetchWorkflowStagePermissions(roleId: string): Promise<any[]> {
+  const { data, error } = await (supabase
+    .from('workflow_stage_permissions' as any)
+    .select(`
+      id,
+      stage_id,
+      role_id,
+      permission_id
+    `)
+    .eq('role_id', roleId) as any);
+
+  if (error) {
+    console.error('Error fetching workflow stage permissions:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// Save workflow stage permissions for a role
+export async function saveWorkflowStagePermissions(
+  roleId: string,
+  stagePermissions: Array<{ stage_id: string; permission_id: string }>
+): Promise<boolean> {
+  try {
+    // Delete existing
+    const { error: deleteError } = await (supabase
+      .from('workflow_stage_permissions' as any)
+      .delete()
+      .eq('role_id', roleId) as any);
+
+    if (deleteError) throw deleteError;
+
+    // Insert new
+    if (stagePermissions.length > 0) {
+      const inserts = stagePermissions.map(sp => ({
+        stage_id: sp.stage_id,
+        role_id: roleId,
+        permission_id: sp.permission_id,
+      }));
+
+      const { error: insertError } = await (supabase
+        .from('workflow_stage_permissions' as any)
+        .insert(inserts) as any);
+
+      if (insertError) throw insertError;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error saving workflow stage permissions:', error);
+    return false;
+  }
 }
