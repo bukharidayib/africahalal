@@ -1,166 +1,93 @@
 
 
-# Remove System Roles + Restructure Permissions to Enterprise CRUD Matrix
+# Implementation Plan
 
-## Overview
-
-This plan converts all roles from "System" to "Custom" (fully editable/deletable), restructures the permissions into a proper Module-level CRUD matrix with extra actions, and makes the auth system fully dynamic (no more hardcoded role-permission mapping).
+This plan covers four distinct features the user requested:
 
 ---
 
-## What Changes
+## 1. Fix Invitation Accept Link (404 Page)
 
-### 1. Database Migration (SQL)
+**Problem**: The invitation email links to `/auth/sign-up?email=...&invited=true`, but no such route exists. The actual route is `/auth/signup` (no hyphen).
 
-**a) Convert all roles to Custom**
-```sql
-UPDATE admin_roles SET is_system_role = false;
-```
-
-**b) Fix 2 RLS policies** that reference `is_system_role`
-- `blogs` table: "Admin full access for blogs" -- replace `ar.is_system_role = true` with `is_admin_user(auth.uid())`
-- `organization_supervisors` table: "Admin full access for supervisors" -- same fix
-
-**c) Add missing CRUD-level permissions** to fill the matrix properly. Currently many modules only have "view" and "manage". We need proper Create/Read/Update/Delete + module-specific extras:
-
-| Module | Existing | New Permissions to Add |
-|--------|----------|----------------------|
-| Applications | view, manage, assign | create, update, delete, approve, reject |
-| Documentation | view, approve, upload | create, update, delete |
-| Inspections | view, manage, schedule | create, update, delete, approve_report |
-| Shariah Review | view, submit, approve | create, update, delete |
-| Finance | view, manage, approve | create, update, delete |
-| Certificates | view, issue, revoke | create, update, delete |
-| Enforcement | view, manage | create, update, delete |
-| Support | view, respond, manage | create, update, delete |
-| Users & Roles | users.manage, roles.manage, audit_logs.view | users.create, users.view, users.update, users.delete, roles.view, roles.create, roles.update, roles.delete |
-| Reports | view, export | create, delete |
-| System | settings.manage | settings.view, settings.update |
-
-**d) Reorganize permission categories** for clarity:
-- Rename "Users & Roles" category to split into "Users" and "Roles"
-- Rename "Inspectors" to merge under "Inspections" module
-- Ensure every permission has a proper `description`
-
-**e) Tag permissions with CRUD type** by adding an `action_type` column to the `permissions` table:
-```sql
-ALTER TABLE permissions ADD COLUMN action_type TEXT DEFAULT 'special'
-  CHECK (action_type IN ('create', 'read', 'update', 'delete', 'special'));
-```
-This enables the UI to render a proper CRUD matrix where standard CRUD operations appear as columns and "special" actions (Approve, Issue, Revoke, etc.) appear separately.
+**Fix**:
+- Update the Edge Function `send-invitation/index.ts` to link to `/auth/signup?email=...&invited=true` instead of `/auth/sign-up`
+- Update `SignUp.tsx` to read the `email` and `invited` query params from the URL and pre-fill the email field
+- After successful signup of an invited user, update the `admin_invitations` record to `accepted` status
+- Redeploy the edge function
 
 ---
 
-### 2. Auth System -- Switch to Fully Dynamic Permissions
+## 2. Application Status Email Notifications
 
-**File: `src/admin/hooks/useAdminAuth.ts`**
+**Problem**: Clients don't receive email updates when their application status changes.
 
-The current auth hook uses a hardcoded `getPermissions(role)` lookup table. This means custom roles always get zero permissions regardless of their DB configuration.
+**What we'll build**:
+- A new Edge Function `send-status-notification` that sends professional HTML emails via Resend whenever an application status changes
+- The function will look up the organization's contact email and send a status-specific email
+- When status becomes `approved`, the email will include certificate details
+- Update `ApplicationDetail.tsx` to call this edge function after a successful status update
 
-Change: After fetching the user's role name, also call `get_user_permissions` RPC to get the actual permission codes from the database. Then use `convertToLegacyPermissions()` to build the Permission object.
+**Supported statuses** (replacing the current enum references in the UI):
+- Submitted, Under Review, Inspection Scheduled, Inspection Completed, Approved, Rejected, Suspended
 
-```
-Before: role -> getPermissions(role) [hardcoded map]
-After:  userId -> get_user_permissions(userId) -> convertToLegacyPermissions(codes)
-```
-
-**File: `src/admin/lib/permissions.ts`**
-
-- Keep the `Permission` interface (it's used everywhere for type safety)
-- Keep `getPermissions()` as a fallback only
-- Remove the hardcoded `rolePermissions` map -- it's no longer the source of truth
-- Add new permission keys to the `Permission` interface and `convertToLegacyPermissions()` for the new CRUD permissions
-- Update `HIGH_RISK_PERMISSIONS` array with the new permission codes
-
-**File: `src/admin/lib/dynamicPermissions.ts`**
-
-- Update `convertToLegacyPermissions()` to map all new CRUD permission codes
-- Add new keys for Create, Update, Delete permissions
+**Database change**: Rename enum values `awaiting_inspection` to map to "Inspection Scheduled" and `inspection_complete` to "Inspection Completed" in the UI labels. Remove `draft`, `pending_decision`, and `withdrawn` from the status update dropdown (keeping them in the enum for backward compatibility).
 
 ---
 
-### 3. Role Management Page -- Remove System Badge
+## 3. Streamline Application Status Options
 
-**File: `src/admin/pages/RolesPermissions.tsx`**
-
-- Remove the "Type" column that shows System/Custom badge
-- Remove the `is_system_role` check that prevents deletion of system roles -- ALL roles can now be deleted (with a safeguard: cannot delete a role if it has assigned users)
-- Keep the Status (Active/Suspended) column
-- Keep the Suspend/Activate toggle
-- Add safeguard: show warning and block deletion if role has users assigned
+**What changes**:
+- Update `STATUS_OPTIONS` in `ApplicationDetail.tsx` to only show: Submitted, Under Review, Inspection Scheduled, Inspection Completed, Approved, Rejected, Suspended
+- Update `statusConfig` labels to use "Inspection Scheduled" and "Inspection Completed"
+- Update `ApplicationTracker.tsx` to reflect the simplified 7-step flow
 
 ---
 
-### 4. Role Editor -- Enterprise Permission Matrix
+## 4. Supervisor Portal
 
-**File: `src/admin/pages/RoleEditor.tsx`**
+**What we'll build**: A separate portal at `/supervisor/*` routes with its own layout, sidebar, and pages.
 
-Replace the current flat checkbox grid with a structured CRUD matrix table:
+**Pages**:
+- **Dashboard** (`/supervisor/dashboard`): Overview of assigned organization, pending tasks, recent activity
+- **Support Tickets** (`/supervisor/support/tickets`): Create and view support tickets
+- **New Ticket** (`/supervisor/support/tickets/new`): Ticket creation form
+- **Ticket Detail** (`/supervisor/support/tickets/:id`): View ticket thread
+- **Live Chat** (`/supervisor/support/chat`): Real-time chat with AHIS support team via Supabase Realtime
 
-```
-+-------------------+--------+------+--------+--------+--------------------+
-| Module            | Create | Read | Update | Delete | Extra Actions      |
-+-------------------+--------+------+--------+--------+--------------------+
-| Applications      |  [x]   | [x]  |  [x]   |  [x]  | Assign, Approve,   |
-|                   |        |      |        |        | Reject             |
-+-------------------+--------+------+--------+--------+--------------------+
-| Documentation     |  [x]   | [x]  |  [x]   |  [x]  | Upload, Approve    |
-+-------------------+--------+------+--------+--------+--------------------+
-| Inspections       |  [x]   | [x]  |  [x]   |  [x]  | Schedule,          |
-|                   |        |      |        |        | Approve Report     |
-+-------------------+--------+------+--------+--------+--------------------+
-| Shariah Review    |  [x]   | [x]  |  [x]   |  [x]  | Submit, Approve    |
-+-------------------+--------+------+--------+--------+--------------------+
-| Finance           |  [x]   | [x]  |  [x]   |  [x]  | Approve            |
-+-------------------+--------+------+--------+--------+--------------------+
-| Certificates      |  [x]   | [x]  |  [x]   |  [x]  | Issue, Revoke      |
-+-------------------+--------+------+--------+--------+--------------------+
-| ... more modules                                                         |
-+-------------------+--------+------+--------+--------+--------------------+
-```
+**Components**:
+- `SupervisorLayout.tsx` - Layout wrapper with sidebar
+- `SupervisorSidebar.tsx` - Navigation sidebar
+- `SupervisorProtectedRoute.tsx` - Auth guard checking supervisor role via `organization_supervisors` table
 
-Features:
-- Each row is a Module (expandable/collapsible)
-- Standard CRUD columns with checkboxes
-- "Extra Actions" column shows module-specific permissions with individual checkboxes
-- High-risk permissions (Approve, Issue, Revoke, Manage Roles) show amber warning icons
-- "Select All" per row (toggles all CRUD + extras for that module)
-- Module permission count badge (e.g., "3/7")
-- Remove the System Role badge from the header
-- Keep the Workflow Stages tab unchanged
+**Auth flow**: Supervisors log in via the standard `/auth/signin` page and are redirected to `/supervisor/dashboard` based on their role in the `organization_supervisors` table.
 
 ---
 
-### 5. Minor UI Updates
+## Technical Details
 
-**File: `src/admin/pages/RoleEditor.tsx` (header section)**
-- Remove the "System Role" badge display
+### Files to Create
+- `supabase/functions/send-status-notification/index.ts` - Status change email edge function
+- `src/components/layout/SupervisorLayout.tsx` - Supervisor portal layout
+- `src/components/layout/SupervisorSidebar.tsx` - Supervisor navigation
+- `src/components/auth/SupervisorProtectedRoute.tsx` - Auth guard
+- `src/pages/supervisor/SupervisorDashboard.tsx` - Dashboard
+- `src/pages/supervisor/SupervisorTickets.tsx` - Ticket list
+- `src/pages/supervisor/SupervisorTicketNew.tsx` - Create ticket
+- `src/pages/supervisor/SupervisorTicketDetail.tsx` - Ticket detail
+- `src/pages/supervisor/SupervisorChat.tsx` - Live chat
 
-**File: `src/admin/lib/dynamicPermissions.ts`**
-- In `deleteRole()`, remove the `.eq('is_system_role', false)` filter so all roles are deletable
-- In `fetchRolesWithPermissions()`, remove `.order('is_system_role', ...)` since it no longer matters
+### Files to Modify
+- `supabase/functions/send-invitation/index.ts` - Fix signup URL
+- `src/pages/auth/SignUp.tsx` - Handle invitation query params, mark invitation accepted
+- `src/admin/pages/ApplicationDetail.tsx` - Add email notification on status change, update status options
+- `src/App.tsx` - Add supervisor portal routes
+- `src/components/ApplicationTracker.tsx` - Update to 7-step flow
+- `supabase/config.toml` - Register new edge function
 
----
-
-## Files Changed Summary
-
-| File | Action | Description |
-|------|--------|-------------|
-| New SQL migration | Create | Convert roles, fix RLS, add permissions, add `action_type` column |
-| `src/integrations/supabase/types.ts` | Modify | Add `action_type` to permissions table type |
-| `src/admin/hooks/useAdminAuth.ts` | Modify | Fetch dynamic permissions from DB instead of hardcoded map |
-| `src/admin/lib/permissions.ts` | Modify | Add new Permission keys, update `convertToLegacyPermissions`, remove hardcoded rolePermissions |
-| `src/admin/lib/dynamicPermissions.ts` | Modify | Update `convertToLegacyPermissions`, remove `is_system_role` filters, update `deleteRole` |
-| `src/admin/pages/RolesPermissions.tsx` | Modify | Remove Type column, allow all roles to be deleted with safeguards |
-| `src/admin/pages/RoleEditor.tsx` | Rewrite | Enterprise CRUD permission matrix table, remove System Role badge |
-
----
-
-## Security Notes
-
-- The `is_admin_user()` DB function does NOT reference `is_system_role` -- it only checks `ar.status = 'active'`, so converting roles to custom has zero impact on RLS security
-- The `has_role()` function checks by role name, not by `is_system_role`, so no impact
-- Only 2 RLS policies reference `is_system_role` (blogs and organization_supervisors) -- both will be fixed to use `is_admin_user()` instead
-- Safeguard: roles with assigned users cannot be deleted (prevents orphaning)
-- All permission changes continue to be audit-logged
+### Edge Function: send-status-notification
+- Accepts: `application_id`, `new_status`, `application_number`, `organization_name`, `contact_email`
+- Sends status-specific HTML email from `info@africanhalaal.com`
+- For `approved` status: includes certificate number and congratulations message
+- For `rejected`/`suspended`: includes reason and next steps guidance
 
