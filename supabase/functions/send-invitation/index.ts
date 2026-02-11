@@ -108,7 +108,7 @@ const handler = async (req: Request): Promise<Response> => {
               </p>
               
               <div style="text-align:center;margin:32px 0;">
-                <a href="${appUrl}/auth/sign-up?email=${encodeURIComponent(email)}&invited=true" 
+                <a href="${appUrl}/auth/signup?email=${encodeURIComponent(email)}&invited=true" 
                    style="display:inline-block;background:#1a5c2e;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;">
                   Accept Invitation
                 </a>

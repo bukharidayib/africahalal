@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Mail, Lock, Loader2, Chrome, ArrowLeft, Building2, User, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,15 @@ export default function SignUp() {
     const [nrcError, setNrcError] = useState("");
     const navigate = useNavigate();
     const { toast } = useToast();
+    const [searchParams] = useSearchParams();
+    const isInvited = searchParams.get("invited") === "true";
+
+    useEffect(() => {
+        const invitedEmail = searchParams.get("email");
+        if (invitedEmail) {
+            setEmail(invitedEmail);
+        }
+    }, [searchParams]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -54,23 +63,35 @@ export default function SignUp() {
             }
 
             if (authData.user) {
-                // 2. Create organization (Simplified for now, in a real app this might be a separate step or handled by a trigger)
-                const { error: orgError } = await supabase
-                    .from('organizations')
-                    .insert({
-                        name: companyName,
-                        registration_number: "PENDING", // Initial value
-                        sector: "Food & Beverage", // Default sector
-                    });
+                // 2. Create organization (Simplified for now)
+                if (!isInvited) {
+                    const { error: orgError } = await supabase
+                        .from('organizations')
+                        .insert({
+                            name: companyName,
+                            registration_number: "PENDING",
+                            sector: "Food & Beverage",
+                        });
 
-                if (orgError) {
-                    console.error("Error creating organization:", orgError);
+                    if (orgError) {
+                        console.error("Error creating organization:", orgError);
+                    }
                 }
 
-                // 3. Profiles table is likely updated via trigger, but we ensure basic feedback
+                // 3. If invited, mark invitation as accepted
+                if (isInvited) {
+                    await supabase
+                        .from('admin_invitations')
+                        .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+                        .eq('email', email)
+                        .eq('status', 'pending');
+                }
+
                 toast({
                     title: "Account Created",
-                    description: "Please check your email to verify your account.",
+                    description: isInvited
+                        ? "Your admin account has been created. You can now sign in."
+                        : "Please check your email to verify your account.",
                 });
                 navigate("/auth/signin");
             }
@@ -192,7 +213,7 @@ export default function SignUp() {
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         className="pl-10 h-11 border-border focus-visible:ring-primary"
-                                        disabled={isLoading}
+                                        disabled={isLoading || isInvited}
                                     />
                                 </div>
                             </div>

@@ -21,19 +21,16 @@ interface ApplicationTrackerProps {
 }
 
 const STEPS = [
-  { key: 'draft', label: 'Draft', icon: FileText },
   { key: 'submitted', label: 'Submitted', icon: Send },
-  { key: 'under_review', label: 'Review', icon: Search },
-  { key: 'awaiting_inspection', label: 'Inspection', icon: ClipboardCheck },
-  { key: 'pending_decision', label: 'Decision', icon: Scale },
+  { key: 'under_review', label: 'Under Review', icon: Search },
+  { key: 'awaiting_inspection', label: 'Inspection Scheduled', icon: ClipboardCheck },
+  { key: 'inspection_complete', label: 'Inspection Completed', icon: ClipboardCheck },
   { key: 'approved', label: 'Approved', icon: BadgeCheck },
 ];
 
-const FINAL_STATUSES = ['approved', 'rejected', 'suspended', 'withdrawn'];
+const FINAL_STATUSES = ['approved', 'rejected', 'suspended'];
 
 function getStepIndex(status: string): number {
-  // Map inspection_complete to awaiting_inspection for visual purposes
-  if (status === 'inspection_complete') return 3;
   const idx = STEPS.findIndex(s => s.key === status);
   return idx >= 0 ? idx : 0;
 }
@@ -43,13 +40,11 @@ function getNextStepText(status: string): string {
     case 'draft': return 'Complete and submit your application';
     case 'submitted': return 'Awaiting officer review';
     case 'under_review': return 'Application under review by certification officer';
-    case 'awaiting_inspection': return 'Inspection scheduled or in progress';
-    case 'inspection_complete': return 'Inspection complete, awaiting decision';
-    case 'pending_decision': return 'Final certification decision pending';
+    case 'awaiting_inspection': return 'Inspection has been scheduled';
+    case 'inspection_complete': return 'Inspection completed, awaiting decision';
     case 'approved': return 'Certification approved! Certificate issued.';
     case 'rejected': return 'Application was rejected';
     case 'suspended': return 'Certification suspended';
-    case 'withdrawn': return 'Application withdrawn';
     default: return 'Processing...';
   }
 }

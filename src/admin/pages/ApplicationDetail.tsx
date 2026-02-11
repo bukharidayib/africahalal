@@ -69,21 +69,19 @@ interface Document {
 const STATUS_OPTIONS: { value: ApplicationStatus; label: string }[] = [
   { value: 'submitted', label: 'Submitted' },
   { value: 'under_review', label: 'Under Review' },
-  { value: 'awaiting_inspection', label: 'Awaiting Inspection' },
-  { value: 'inspection_complete', label: 'Inspection Complete' },
-  { value: 'pending_decision', label: 'Pending Decision' },
+  { value: 'awaiting_inspection', label: 'Inspection Scheduled' },
+  { value: 'inspection_complete', label: 'Inspection Completed' },
   { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'suspended', label: 'Suspended' },
-  { value: 'withdrawn', label: 'Withdrawn' },
 ];
 
 const statusConfig: Record<ApplicationStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Draft', variant: 'outline' },
   submitted: { label: 'Submitted', variant: 'default' },
   under_review: { label: 'Under Review', variant: 'secondary' },
-  awaiting_inspection: { label: 'Awaiting Inspection', variant: 'secondary' },
-  inspection_complete: { label: 'Inspection Complete', variant: 'secondary' },
+  awaiting_inspection: { label: 'Inspection Scheduled', variant: 'secondary' },
+  inspection_complete: { label: 'Inspection Completed', variant: 'secondary' },
   pending_decision: { label: 'Pending Decision', variant: 'default' },
   approved: { label: 'Approved', variant: 'default' },
   rejected: { label: 'Rejected', variant: 'destructive' },
@@ -273,6 +271,25 @@ export default function ApplicationDetail() {
           title: 'Certificate Generated',
           description: `A new certificate ${certNumber} has been issued.`,
         });
+      }
+
+      // Send status notification email
+      try {
+        const contactEmail = application.organizations?.contact_email;
+        if (contactEmail) {
+          await supabase.functions.invoke('send-status-notification', {
+            body: {
+              application_id: application.id,
+              new_status: newStatus,
+              application_number: application.application_number,
+              organization_name: application.organizations?.name || 'Unknown',
+              contact_email: contactEmail,
+              reason: statusReason || undefined,
+            },
+          });
+        }
+      } catch (emailError) {
+        console.error('Failed to send status notification email:', emailError);
       }
 
       toast({
