@@ -63,6 +63,14 @@ import AdminSupportChatSession from "./admin/pages/AdminSupportChatSession";
 import RolesPermissions from "./admin/pages/RolesPermissions";
 import RoleEditor from "./admin/pages/RoleEditor";
 
+// Supervisor Portal
+import { SupervisorProtectedRoute } from "./components/auth/SupervisorProtectedRoute";
+import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
+import SupervisorTickets from "./pages/supervisor/SupervisorTickets";
+import SupervisorTicketNew from "./pages/supervisor/SupervisorTicketNew";
+import SupervisorTicketDetail from "./pages/supervisor/SupervisorTicketDetail";
+import SupervisorChat from "./pages/supervisor/SupervisorChat";
+
 const queryClient = new QueryClient();
 
 function AdminProviderWrapper() {
@@ -139,6 +147,13 @@ const App = () => (
               <Route path="roles" element={<RolesPermissions />} />
               <Route path="roles/:id" element={<RoleEditor />} />
             </Route>
+
+            {/* Supervisor Portal Routes */}
+            <Route path="/supervisor/dashboard" element={<SupervisorProtectedRoute><SupervisorDashboard /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/support/tickets" element={<SupervisorProtectedRoute><SupervisorTickets /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/support/tickets/new" element={<SupervisorProtectedRoute><SupervisorTicketNew /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/support/tickets/:id" element={<SupervisorProtectedRoute><SupervisorTicketDetail /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/support/chat" element={<SupervisorProtectedRoute><SupervisorChat /></SupervisorProtectedRoute>} />
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
