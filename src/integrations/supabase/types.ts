@@ -849,6 +849,114 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          invoice_id: string
+          metadata: Json | null
+          performed_by: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          invoice_id: string
+          metadata?: Json | null
+          performed_by?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          metadata?: Json | null
+          performed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_activity_log_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          amount: number
+          application_id: string | null
+          certificate_id: string | null
+          created_at: string
+          currency: string
+          description: string | null
+          due_date: string
+          fee_type: string
+          id: string
+          invoice_number: string
+          organization_id: string
+          paid_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          application_id?: string | null
+          certificate_id?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          due_date: string
+          fee_type: string
+          id?: string
+          invoice_number: string
+          organization_id: string
+          paid_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          application_id?: string | null
+          certificate_id?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          due_date?: string
+          fee_type?: string
+          id?: string
+          invoice_number?: string
+          organization_id?: string
+          paid_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "certification_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_certificate_id_fkey"
+            columns: ["certificate_id"]
+            isOneToOne: false
+            referencedRelation: "certificates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       non_conformance_notices: {
         Row: {
           application_id: string
@@ -985,6 +1093,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      payment_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          gateway_response: Json | null
+          id: string
+          invoice_id: string
+          paid_by: string | null
+          payment_method: string | null
+          status: string
+          transaction_reference: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          gateway_response?: Json | null
+          id?: string
+          invoice_id: string
+          paid_by?: string | null
+          payment_method?: string | null
+          status?: string
+          transaction_reference?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          gateway_response?: Json | null
+          id?: string
+          invoice_id?: string
+          paid_by?: string | null
+          payment_method?: string | null
+          status?: string
+          transaction_reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_transactions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       permissions: {
         Row: {
@@ -1349,6 +1504,7 @@ export type Database = {
       }
       generate_application_number: { Args: never; Returns: string }
       generate_certificate_number: { Args: never; Returns: string }
+      generate_invoice_number: { Args: never; Returns: string }
       generate_ncn_number: { Args: never; Returns: string }
       generate_ticket_number: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: string[] }
