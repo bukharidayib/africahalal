@@ -9,7 +9,8 @@ import {
     ChevronRight,
     ShieldCheck,
     FolderOpen,
-    HeadphonesIcon
+    HeadphonesIcon,
+    Receipt
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,7 @@ const navigation = [
     { name: "My Documents", href: "/client/documents", icon: Files },
     { name: "Inspections", href: "/client/inspections", icon: ClipboardCheck },
     { name: "Certificate Vault", href: "/client/certificates", icon: Award },
+    { name: "Billing & Payments", href: "/client/billing", icon: Receipt },
     { name: "Support Center", href: "/client/support", icon: HeadphonesIcon },
 ];
 

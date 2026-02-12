@@ -12,6 +12,7 @@ import {
   Shield,
   MessageSquare,
   Key,
+  Receipt,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAdminAuthContext } from '../../contexts/AdminAuthContext';
@@ -65,6 +66,12 @@ const navItems: NavItem[] = [
     href: '/admin/enforcement',
     icon: AlertTriangle,
     permission: 'canViewEnforcement',
+  },
+  {
+    title: 'Billing & Invoices',
+    href: '/admin/billing',
+    icon: Receipt,
+    permission: 'canViewApplications',
   },
   {
     title: 'Support Center',

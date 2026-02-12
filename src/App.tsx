@@ -38,6 +38,9 @@ import SupportTicketNew from "./pages/client/SupportTicketNew";
 import SupportTicketDetail from "./pages/client/SupportTicketDetail";
 import SupportFAQ from "./pages/client/SupportFAQ";
 import SupportChat from "./pages/client/SupportChat";
+import BillingDashboard from "./pages/client/BillingDashboard";
+import BillingInvoices from "./pages/client/BillingInvoices";
+import BillingInvoiceDetail from "./pages/client/BillingInvoiceDetail";
 
 // Admin Portal
 import { AdminAuthProvider } from "./admin/contexts/AdminAuthContext";
@@ -62,6 +65,7 @@ import AdminSupportChats from "./admin/pages/AdminSupportChats";
 import AdminSupportChatSession from "./admin/pages/AdminSupportChatSession";
 import RolesPermissions from "./admin/pages/RolesPermissions";
 import RoleEditor from "./admin/pages/RoleEditor";
+import AdminBilling from "./admin/pages/AdminBilling";
 
 // Supervisor Portal
 import { SupervisorProtectedRoute } from "./components/auth/SupervisorProtectedRoute";
@@ -122,6 +126,9 @@ const App = () => (
             <Route path="/client/support/tickets/:id" element={<ProtectedRoute><SupportTicketDetail /></ProtectedRoute>} />
             <Route path="/client/support/faq" element={<ProtectedRoute><SupportFAQ /></ProtectedRoute>} />
             <Route path="/client/support/chat" element={<ProtectedRoute><SupportChat /></ProtectedRoute>} />
+            <Route path="/client/billing" element={<ProtectedRoute><BillingDashboard /></ProtectedRoute>} />
+            <Route path="/client/billing/invoices" element={<ProtectedRoute><BillingInvoices /></ProtectedRoute>} />
+            <Route path="/client/billing/invoices/:id" element={<ProtectedRoute><BillingInvoiceDetail /></ProtectedRoute>} />
 
             {/* Admin Portal Routes - Layout route pattern ensures provider wraps all children */}
             <Route path="/admin" element={<AdminProviderWrapper />}>
@@ -146,6 +153,7 @@ const App = () => (
               <Route path="support/chats/:id" element={<AdminSupportChatSession />} />
               <Route path="roles" element={<RolesPermissions />} />
               <Route path="roles/:id" element={<RoleEditor />} />
+              <Route path="billing" element={<AdminBilling />} />
             </Route>
 
             {/* Supervisor Portal Routes */}
