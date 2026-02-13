@@ -40,8 +40,9 @@ interface Invoice {
   created_at: string;
   paid_at: string | null;
   organization_id: string;
+  application_id: string | null;
   organizations?: { name: string } | null;
-  certification_applications?: { application_number: string } | null;
+  certification_applications?: { application_number: string; validity_period: string | null } | null;
 }
 
 interface BillingStats {
@@ -69,6 +70,7 @@ export default function AdminBilling() {
     description: '',
     amount: '',
     due_date: '',
+    validity_period: '',
   });
   const [isCreating, setIsCreating] = useState(false);
 
@@ -79,7 +81,7 @@ export default function AdminBilling() {
 
   // Edit dialog
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
-  const [editForm, setEditForm] = useState({ organization_id: '', fee_type: '', description: '', amount: '', due_date: '', status: '' });
+  const [editForm, setEditForm] = useState({ organization_id: '', fee_type: '', description: '', amount: '', due_date: '', status: '', validity_period: '' });
   const [isSaving, setIsSaving] = useState(false);
 
   // Delete dialog
@@ -106,7 +108,7 @@ export default function AdminBilling() {
     try {
       const [invRes, orgRes] = await Promise.all([
         supabase.from('invoices')
-          .select('*, organizations(name), certification_applications(application_number)')
+          .select('*, organizations(name), certification_applications(application_number, validity_period)')
           .order('created_at', { ascending: false }),
         supabase.from('organizations').select('id, name').order('name'),
       ]);
@@ -146,7 +148,7 @@ export default function AdminBilling() {
       if (error) throw error;
       toast({ title: 'Invoice Created', description: `Invoice ${invNum} has been created.` });
       setShowCreate(false);
-      setNewInvoice({ organization_id: '', fee_type: 'certification', description: '', amount: '', due_date: '' });
+      setNewInvoice({ organization_id: '', fee_type: 'certification', description: '', amount: '', due_date: '', validity_period: '' });
       fetchData();
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -177,6 +179,7 @@ export default function AdminBilling() {
       amount: String(inv.amount),
       due_date: inv.due_date,
       status: inv.status,
+      validity_period: inv.certification_applications?.validity_period || '',
     });
   };
 
@@ -195,6 +198,14 @@ export default function AdminBilling() {
       if (editForm.status === 'paid' && editInvoice.status !== 'paid') updateData.paid_at = new Date().toISOString();
       const { error } = await supabase.from('invoices').update(updateData).eq('id', editInvoice.id);
       if (error) throw error;
+      // Sync validity period to linked application
+      if (editInvoice.application_id && editForm.validity_period) {
+        const appFee = editForm.validity_period === '6_months' ? 1500 : editForm.validity_period === '1_year' ? 3000 : null;
+        await supabase.from('certification_applications').update({
+          validity_period: editForm.validity_period,
+          ...(appFee ? { application_fee: appFee } : {}),
+        }).eq('id', editInvoice.application_id);
+      }
       await supabase.from('invoice_activity_log').insert({
         invoice_id: editInvoice.id,
         action: 'invoice_edited',
@@ -275,6 +286,19 @@ export default function AdminBilling() {
                       <SelectItem value="renewal">Renewal Fee</SelectItem>
                       <SelectItem value="inspection">Inspection Fee</SelectItem>
                       <SelectItem value="other">Other Service Charge</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Certification Validity Period</Label>
+                  <Select value={newInvoice.validity_period} onValueChange={(v) => {
+                    const amount = v === '6_months' ? '1500' : v === '1_year' ? '3000' : newInvoice.amount;
+                    setNewInvoice(p => ({ ...p, validity_period: v, amount }));
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Select validity period (optional)" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="6_months">6 Months (ZMW 1,500)</SelectItem>
+                      <SelectItem value="1_year">1 Year (ZMW 3,000)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -472,6 +496,19 @@ export default function AdminBilling() {
                     <SelectItem value="renewal">Renewal Fee</SelectItem>
                     <SelectItem value="inspection">Inspection Fee</SelectItem>
                     <SelectItem value="other">Other Service Charge</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Certification Validity Period</Label>
+                <Select value={editForm.validity_period} onValueChange={(v) => {
+                  const amount = v === '6_months' ? '1500' : v === '1_year' ? '3000' : editForm.amount;
+                  setEditForm(p => ({ ...p, validity_period: v, amount }));
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Select validity period (optional)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="6_months">6 Months (ZMW 1,500)</SelectItem>
+                    <SelectItem value="1_year">1 Year (ZMW 3,000)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
