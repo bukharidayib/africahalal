@@ -159,7 +159,7 @@ export default function BillingInvoices() {
                       <TableCell className="font-mono text-sm">{inv.invoice_number}</TableCell>
                       <TableCell>{feeTypeLabel(inv.fee_type)}</TableCell>
                       <TableCell className="max-w-[200px] truncate">{inv.description || "—"}</TableCell>
-                      <TableCell className="font-semibold">${Number(inv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="font-semibold">ZMW {Number(inv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>{format(new Date(inv.due_date), 'dd MMM yyyy')}</TableCell>
                       <TableCell>{statusBadge(inv.status)}</TableCell>
                       <TableCell>

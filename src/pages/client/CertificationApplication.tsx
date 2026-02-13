@@ -421,7 +421,7 @@ export default function CertificationApplication() {
                     fee_type: 'application_fee',
                     description: `Halal Certification Application Fee - ${validityLabel} Validity (${applicationNumber})`,
                     amount: formData.application_fee,
-                    currency: 'USD',
+                    currency: 'ZMW',
                     due_date: dueDate.toISOString().split('T')[0],
                     status: 'pending',
                 });

@@ -119,7 +119,7 @@ export default function BillingDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{isLoading ? "..." : `$${stats.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div>
+              <div className="text-2xl font-bold">{isLoading ? "..." : `ZMW ${stats.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div>
               <p className="text-xs text-muted-foreground">All time payments received</p>
             </CardContent>
           </Card>
@@ -131,7 +131,7 @@ export default function BillingDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{isLoading ? "..." : `$${stats.totalPending.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div>
+              <div className="text-2xl font-bold">{isLoading ? "..." : `ZMW ${stats.totalPending.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div>
               <p className="text-xs text-muted-foreground">Awaiting payment</p>
             </CardContent>
           </Card>
@@ -143,7 +143,7 @@ export default function BillingDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{isLoading ? "..." : `$${stats.totalOverdue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div>
+              <div className="text-2xl font-bold">{isLoading ? "..." : `ZMW ${stats.totalOverdue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div>
               <p className="text-xs text-muted-foreground">Past due date</p>
             </CardContent>
           </Card>
@@ -194,7 +194,7 @@ export default function BillingDashboard() {
                     <TableRow key={inv.id}>
                       <TableCell className="font-mono text-sm">{inv.invoice_number}</TableCell>
                       <TableCell>{feeTypeLabel(inv.fee_type)}</TableCell>
-                      <TableCell className="font-semibold">${Number(inv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="font-semibold">ZMW {Number(inv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>{format(new Date(inv.due_date), 'dd MMM yyyy')}</TableCell>
                       <TableCell>{statusBadge(inv.status)}</TableCell>
                       <TableCell>
