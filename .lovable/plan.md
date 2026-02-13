@@ -1,50 +1,93 @@
 
 
-# Fix: Client Dashboard Showing Other Organizations' Data
+# Implementation Plan
 
-## Problem
-The new user `bukharipanel@gmail.com` (org: Bukhari Foods Co.) sees 3 certificates and stats that don't belong to them. This is caused by an overly permissive RLS policy on the `certificates` table.
+This plan covers four changes: fix the dashboard greeting, add a welcome email on signup, send status emails when applications are submitted, and include certificate details in the approval email.
 
-## Root Cause
+---
 
-The `certificates` table has this RLS policy:
+## 1. Dashboard Greeting -- Show User's Name Instead of Business Name
+
+**File: `src/pages/client/ClientDashboard.tsx`**
+
+Line 190 currently shows: `Marhaban, {organizationName || userName || 'Welcome'}`
+
+Change priority to show the user's name first:
+`Marhaban, {userName || 'Welcome'}`
+
+Remove `organizationName` from the greeting (keep fetching it if used elsewhere on the page, but the greeting should always show the authenticated user's `full_name`).
+
+---
+
+## 2. Welcome Email on Signup (New Edge Function)
+
+**New file: `supabase/functions/send-welcome-email/index.ts`**
+
+Create a Resend-powered edge function that sends a professional HTML welcome email:
+- From: `Africa Halal Integrity System <info@africanhalaal.com>`
+- Subject: "Welcome to Africa Halal Integrity System"
+- Body: Personalized greeting with the user's full name, brief intro about the platform, link to the client dashboard, and support contact
+
+**File: `src/pages/auth/SignUp.tsx`**
+
+After successful signup (line ~113, after `authData.user` is confirmed), invoke the new edge function:
 ```
-"Public can verify certificates" → USING (true)
+await supabase.functions.invoke('send-welcome-email', {
+  body: { full_name: fullName, email }
+});
 ```
-This allows **any user** (including anonymous) to read **all certificates**. While this was intended for the public `/verify` page, it also leaks all certificate data into the client dashboard.
 
-The client dashboard queries `certificates` without any filter, and since the public policy returns everything, the user sees all 3 certificates from another organization.
+---
 
-## Solution
+## 3. Status Email on Application Submission
 
-### Database Migration
+**File: `src/pages/client/CertificationApplication.tsx`**
 
-1. **Drop** the overly permissive `"Public can verify certificates"` policy
-2. **Create** a scoped public verification policy that only exposes minimal fields needed for verification (certificate_number, status, expiry_date) — but since RLS operates at row level (not column level), we need a different approach:
-   - Create a `verify_certificate` database function (SECURITY DEFINER) that takes a certificate number and returns only the public verification fields
-   - The public verify page will call this function instead of querying the table directly
-   - This way the base table policy restricts clients to their own org's certificates only
+After the application is successfully inserted and audited (around line 408, before the success toast), call the existing `send-status-notification` edge function:
 
-Alternatively, since the public verify page only needs to look up by certificate number, we can:
-- **Drop** the `"Public can verify certificates"` policy  
-- **Replace** it with a narrower policy scoped to anon users that is acceptable, OR create a SECURITY DEFINER function for verification lookups
+```typescript
+try {
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('name, contact_email')
+    .eq('id', organization_id)
+    .single();
 
-The simplest safe approach:
-- Drop `"Public can verify certificates" USING (true)`
-- Create a SECURITY DEFINER function `verify_certificate_public(cert_number text)` that returns limited certificate info for the public verify page
-- Update the `/verify` page code to call this function instead of querying the table directly
+  await supabase.functions.invoke('send-status-notification', {
+    body: {
+      application_id: appData.id,
+      new_status: 'submitted',
+      application_number: applicationNumber,
+      organization_name: org?.name || formData.entity_name,
+      contact_email: org?.contact_email || user.email,
+    }
+  });
+} catch (emailErr) {
+  console.error('Failed to send submission email:', emailErr);
+}
+```
 
-### Code Changes
+This uses the already-existing edge function which handles "submitted" status with the right messaging. No new edge function needed for this.
 
-1. **`src/pages/Verify.tsx`** and **`src/pages/VerifyPublic.tsx`**: Update to use the new `verify_certificate_public` RPC function instead of direct table queries
+The admin `ApplicationDetail.tsx` already sends status emails for all subsequent status changes (under_review, inspection_scheduled, etc.), so those are already covered.
 
-### Files Modified
-- Database migration (drop public policy, create verification function)
-- `src/pages/Verify.tsx` — use RPC for public verification
-- `src/pages/VerifyPublic.tsx` — use RPC for public verification
+---
 
-### Result
-- Client dashboard will only show certificates belonging to the user's organization
-- Public certificate verification still works via the secure function
-- No data leakage between organizations
+## 4. Approved Status Email Already Includes Certificate
+
+The existing `send-status-notification` edge function (lines 82-107) already handles this: when `new_status === "approved"`, it fetches the certificate from the database and includes certificate number, scope, issue/expiry dates in the email. No changes needed here -- this is already working.
+
+---
+
+## Technical Summary
+
+### New Files
+- `supabase/functions/send-welcome-email/index.ts` -- Welcome email via Resend
+
+### Modified Files
+- `src/pages/client/ClientDashboard.tsx` -- Line 190: show `userName` instead of `organizationName`
+- `src/pages/auth/SignUp.tsx` -- Call welcome email after signup
+- `src/pages/client/CertificationApplication.tsx` -- Call status notification after submission
+
+### No Database Changes Required
 
