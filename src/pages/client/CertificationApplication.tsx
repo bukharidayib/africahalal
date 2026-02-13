@@ -407,6 +407,27 @@ export default function CertificationApplication() {
                 }
             });
 
+            // Send submission status email (fire and forget)
+            try {
+                const { data: org } = await supabase
+                    .from('organizations')
+                    .select('name, contact_email')
+                    .eq('id', organization_id)
+                    .single();
+
+                await supabase.functions.invoke('send-status-notification', {
+                    body: {
+                        application_id: appData.id,
+                        new_status: 'submitted',
+                        application_number: applicationNumber,
+                        organization_name: org?.name || formData.entity_name,
+                        contact_email: org?.contact_email || user.email,
+                    }
+                });
+            } catch (emailErr) {
+                console.error('Failed to send submission email:', emailErr);
+            }
+
             toast({
                 title: "Application Submitted Successfully",
                 description: `Application ${applicationNumber} has been sent for review.`,
