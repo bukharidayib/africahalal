@@ -1,5 +1,5 @@
 import { AdminLayout } from '../components/layout/AdminLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, Clock, AlertTriangle, CheckCircle2, Loader2, Search,
-  Receipt, Plus, FileText
+  Receipt, Plus, Eye, Pencil, Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -20,8 +20,13 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose
 } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 
 interface Invoice {
   id: string;
@@ -34,6 +39,7 @@ interface Invoice {
   due_date: string;
   created_at: string;
   paid_at: string | null;
+  organization_id: string;
   organizations?: { name: string } | null;
   certification_applications?: { application_number: string } | null;
 }
@@ -65,6 +71,20 @@ export default function AdminBilling() {
     due_date: '',
   });
   const [isCreating, setIsCreating] = useState(false);
+
+  // View dialog
+  const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
+  const [activityLog, setActivityLog] = useState<any[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(false);
+
+  // Edit dialog
+  const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
+  const [editForm, setEditForm] = useState({ organization_id: '', fee_type: '', description: '', amount: '', due_date: '', status: '' });
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Delete dialog
+  const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -124,7 +144,6 @@ export default function AdminBilling() {
         due_date: newInvoice.due_date,
       });
       if (error) throw error;
-
       toast({ title: 'Invoice Created', description: `Invoice ${invNum} has been created.` });
       setShowCreate(false);
       setNewInvoice({ organization_id: '', fee_type: 'certification', description: '', amount: '', due_date: '' });
@@ -136,25 +155,74 @@ export default function AdminBilling() {
     }
   };
 
-  const handleUpdateStatus = async (invoiceId: string, newStatus: string) => {
+  const handleOpenView = async (inv: Invoice) => {
+    setViewInvoice(inv);
+    setLoadingActivity(true);
     try {
-      const updateData: any = { status: newStatus };
-      if (newStatus === 'paid') updateData.paid_at = new Date().toISOString();
-      const { error } = await supabase.from('invoices').update(updateData).eq('id', invoiceId);
+      const { data } = await supabase.from('invoice_activity_log')
+        .select('*')
+        .eq('invoice_id', inv.id)
+        .order('created_at', { ascending: false });
+      setActivityLog(data || []);
+    } catch { setActivityLog([]); }
+    finally { setLoadingActivity(false); }
+  };
+
+  const handleOpenEdit = (inv: Invoice) => {
+    setEditInvoice(inv);
+    setEditForm({
+      organization_id: inv.organization_id,
+      fee_type: inv.fee_type,
+      description: inv.description || '',
+      amount: String(inv.amount),
+      due_date: inv.due_date,
+      status: inv.status,
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editInvoice) return;
+    setIsSaving(true);
+    try {
+      const updateData: any = {
+        organization_id: editForm.organization_id,
+        fee_type: editForm.fee_type,
+        description: editForm.description || null,
+        amount: parseFloat(editForm.amount),
+        due_date: editForm.due_date,
+        status: editForm.status,
+      };
+      if (editForm.status === 'paid' && editInvoice.status !== 'paid') updateData.paid_at = new Date().toISOString();
+      const { error } = await supabase.from('invoices').update(updateData).eq('id', editInvoice.id);
       if (error) throw error;
-
-      // Log activity
       await supabase.from('invoice_activity_log').insert({
-        invoice_id: invoiceId,
-        action: `status_changed_to_${newStatus}`,
+        invoice_id: editInvoice.id,
+        action: 'invoice_edited',
         performed_by: (await supabase.auth.getUser()).data.user?.id,
+        metadata: { changes: editForm },
       });
-
-      toast({ title: 'Updated', description: `Invoice status updated to ${newStatus}.` });
+      toast({ title: 'Updated', description: 'Invoice updated successfully.' });
+      setEditInvoice(null);
       fetchData();
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
-    }
+    } finally { setIsSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteInvoice) return;
+    setIsDeleting(true);
+    try {
+      // Delete activity log first
+      await supabase.from('invoice_activity_log').delete().eq('invoice_id', deleteInvoice.id);
+      const { error } = await supabase.from('invoices').delete().eq('id', deleteInvoice.id);
+      if (error) throw error;
+      toast({ title: 'Deleted', description: `Invoice ${deleteInvoice.invoice_number} has been deleted.` });
+      setDeleteInvoice(null);
+      fetchData();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally { setIsDeleting(false); }
   };
 
   const statusBadge = (status: string) => {
@@ -189,17 +257,13 @@ export default function AdminBilling() {
               <Button><Plus className="mr-2 h-4 w-4" /> Create Invoice</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Invoice</DialogTitle>
-              </DialogHeader>
+              <DialogHeader><DialogTitle>Create New Invoice</DialogTitle></DialogHeader>
               <div className="space-y-4 py-4">
                 <div>
                   <Label>Organization *</Label>
                   <Select value={newInvoice.organization_id} onValueChange={(v) => setNewInvoice(p => ({ ...p, organization_id: v }))}>
                     <SelectTrigger><SelectValue placeholder="Select organization" /></SelectTrigger>
-                    <SelectContent>
-                      {orgs.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
-                    </SelectContent>
+                    <SelectContent>{orgs.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div>
@@ -243,46 +307,30 @@ export default function AdminBilling() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Paid</CardTitle>
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-              </div>
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30"><CheckCircle2 className="h-4 w-4 text-green-600" /></div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isLoading ? '...' : `$${stats.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div>
-            </CardContent>
+            <CardContent><div className="text-2xl font-bold">{isLoading ? '...' : `$${stats.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div></CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
-              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                <Clock className="h-4 w-4 text-amber-600" />
-              </div>
+              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30"><Clock className="h-4 w-4 text-amber-600" /></div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isLoading ? '...' : `$${stats.totalPending.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div>
-            </CardContent>
+            <CardContent><div className="text-2xl font-bold">{isLoading ? '...' : `$${stats.totalPending.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div></CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Overdue</CardTitle>
-              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-              </div>
+              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30"><AlertTriangle className="h-4 w-4 text-red-600" /></div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isLoading ? '...' : `$${stats.totalOverdue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div>
-            </CardContent>
+            <CardContent><div className="text-2xl font-bold">{isLoading ? '...' : `$${stats.totalOverdue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div></CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Invoices</CardTitle>
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                <Receipt className="h-4 w-4 text-blue-600" />
-              </div>
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30"><Receipt className="h-4 w-4 text-blue-600" /></div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isLoading ? '...' : stats.invoiceCount}</div>
-            </CardContent>
+            <CardContent><div className="text-2xl font-bold">{isLoading ? '...' : stats.invoiceCount}</div></CardContent>
           </Card>
         </div>
 
@@ -324,7 +372,7 @@ export default function AdminBilling() {
                     <TableHead>Amount</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -337,20 +385,17 @@ export default function AdminBilling() {
                       <TableCell>{format(new Date(inv.due_date), 'dd MMM yyyy')}</TableCell>
                       <TableCell>{statusBadge(inv.status)}</TableCell>
                       <TableCell>
-                        <Select
-                          value={inv.status}
-                          onValueChange={(v) => handleUpdateStatus(inv.id, v)}
-                        >
-                          <SelectTrigger className="w-[120px] h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="paid">Paid</SelectItem>
-                            <SelectItem value="overdue">Overdue</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenView(inv)} title="View">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEdit(inv)} title="Edit">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteInvoice(inv)} title="Delete">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -359,6 +404,130 @@ export default function AdminBilling() {
             )}
           </CardContent>
         </Card>
+
+        {/* View Invoice Dialog */}
+        <Dialog open={!!viewInvoice} onOpenChange={(open) => !open && setViewInvoice(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader><DialogTitle>Invoice Details</DialogTitle></DialogHeader>
+            {viewInvoice && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div><span className="text-muted-foreground">Invoice #</span><p className="font-mono font-semibold">{viewInvoice.invoice_number}</p></div>
+                  <div><span className="text-muted-foreground">Status</span><div className="mt-1">{statusBadge(viewInvoice.status)}</div></div>
+                  <div><span className="text-muted-foreground">Client</span><p className="font-medium">{viewInvoice.organizations?.name || '—'}</p></div>
+                  <div><span className="text-muted-foreground">Fee Type</span><p>{feeTypeLabel(viewInvoice.fee_type)}</p></div>
+                  <div><span className="text-muted-foreground">Amount</span><p className="font-bold text-lg">${Number(viewInvoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
+                  <div><span className="text-muted-foreground">Currency</span><p>{viewInvoice.currency}</p></div>
+                  <div><span className="text-muted-foreground">Due Date</span><p>{format(new Date(viewInvoice.due_date), 'dd MMM yyyy')}</p></div>
+                  <div><span className="text-muted-foreground">Created</span><p>{format(new Date(viewInvoice.created_at), 'dd MMM yyyy')}</p></div>
+                  {viewInvoice.paid_at && <div><span className="text-muted-foreground">Paid At</span><p>{format(new Date(viewInvoice.paid_at), 'dd MMM yyyy HH:mm')}</p></div>}
+                </div>
+                {viewInvoice.description && (
+                  <div><span className="text-sm text-muted-foreground">Description</span><p className="text-sm">{viewInvoice.description}</p></div>
+                )}
+                <Separator />
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Activity Log</h4>
+                  {loadingActivity ? (
+                    <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                  ) : activityLog.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No activity recorded.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {activityLog.map((log) => (
+                        <div key={log.id} className="flex justify-between text-xs border-b pb-1">
+                          <span className="capitalize">{log.action.replace(/_/g, ' ')}</span>
+                          <span className="text-muted-foreground">{format(new Date(log.created_at), 'dd MMM yyyy HH:mm')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setViewInvoice(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Invoice Dialog */}
+        <Dialog open={!!editInvoice} onOpenChange={(open) => !open && setEditInvoice(null)}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit Invoice</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Organization *</Label>
+                <Select value={editForm.organization_id} onValueChange={(v) => setEditForm(p => ({ ...p, organization_id: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{orgs.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Fee Type *</Label>
+                <Select value={editForm.fee_type} onValueChange={(v) => setEditForm(p => ({ ...p, fee_type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="certification">Certification Fee</SelectItem>
+                    <SelectItem value="renewal">Renewal Fee</SelectItem>
+                    <SelectItem value="inspection">Inspection Fee</SelectItem>
+                    <SelectItem value="other">Other Service Charge</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Amount (USD) *</Label>
+                <Input type="number" step="0.01" min="0" value={editForm.amount} onChange={(e) => setEditForm(p => ({ ...p, amount: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Due Date *</Label>
+                <Input type="date" value={editForm.due_date} onChange={(e) => setEditForm(p => ({ ...p, due_date: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Status *</Label>
+                <Select value={editForm.status} onValueChange={(v) => setEditForm(p => ({ ...p, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Textarea value={editForm.description} onChange={(e) => setEditForm(p => ({ ...p, description: e.target.value }))} placeholder="Optional description..." />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditInvoice(null)}>Cancel</Button>
+              <Button onClick={handleSaveEdit} disabled={isSaving}>
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation */}
+        <AlertDialog open={!!deleteInvoice} onOpenChange={(open) => !open && setDeleteInvoice(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete invoice <span className="font-mono font-semibold">{deleteInvoice?.invoice_number}</span>? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Governance */}
         <div className="text-xs text-muted-foreground text-center border-t pt-4">

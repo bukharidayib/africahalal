@@ -596,6 +596,41 @@ export type Database = {
         }
         Relationships: []
       }
+      client_businesses: {
+        Row: {
+          created_at: string
+          entity_name: string
+          id: string
+          organization_id: string | null
+          pacra_number: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_name: string
+          id?: string
+          organization_id?: string | null
+          pacra_number: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_name?: string
+          id?: string
+          organization_id?: string | null
+          pacra_number?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_businesses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       corrective_actions: {
         Row: {
           evidence_files: string[] | null
@@ -1221,6 +1256,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          nrc: string | null
           organization_id: string | null
           phone: string | null
           updated_at: string
@@ -1230,6 +1266,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          nrc?: string | null
           organization_id?: string | null
           phone?: string | null
           updated_at?: string
@@ -1239,6 +1276,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          nrc?: string | null
           organization_id?: string | null
           phone?: string | null
           updated_at?: string

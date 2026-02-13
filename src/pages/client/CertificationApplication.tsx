@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ClientLayout } from "@/components/layout/ClientLayout";
 import {
     Check,
@@ -32,7 +32,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
     Dialog,
     DialogContent,
@@ -73,8 +73,18 @@ export default function CertificationApplication() {
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
     const [ingredientModalOpen, setIngredientModalOpen] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+    const [businesses, setBusinesses] = useState<{ id: string; entity_name: string; pacra_number: string }[]>([]);
+    const [selectedBusinessId, setSelectedBusinessId] = useState("");
     const { toast } = useToast();
     const navigate = useNavigate();
+
+    useEffect(() => {
+        const fetchBusinesses = async () => {
+            const { data } = await supabase.from('client_businesses').select('id, entity_name, pacra_number').order('entity_name');
+            setBusinesses(data || []);
+        };
+        fetchBusinesses();
+    }, []);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -458,27 +468,37 @@ export default function CertificationApplication() {
                         {currentStep === 1 && (
                             <div className="space-y-6 animate-in fade-in duration-300">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="entity" className="text-foreground">Registered Entity Name *</Label>
-                                        <Input
-                                            id="entity"
-                                            placeholder="Full Legal Name"
-                                            className="h-11"
-                                            value={formData.entity_name}
-                                            onChange={(e) => updateFormData('entity_name', e.target.value)}
+                                    <div className="space-y-2 md:col-span-2">
+                                        <Label className="text-foreground">Select Business Entity *</Label>
+                                        <Select
+                                            value={selectedBusinessId}
+                                            onValueChange={(v) => {
+                                                setSelectedBusinessId(v);
+                                                const biz = businesses.find(b => b.id === v);
+                                                if (biz) {
+                                                    updateFormData('entity_name', biz.entity_name);
+                                                    updateFormData('registration_number', biz.pacra_number);
+                                                }
+                                            }}
                                             disabled={isLoading}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="reg" className="text-foreground">Business Registration No. *</Label>
-                                        <Input
-                                            id="reg"
-                                            placeholder="e.g. REG-12345"
-                                            className="h-11"
-                                            value={formData.registration_number}
-                                            onChange={(e) => updateFormData('registration_number', e.target.value)}
-                                            disabled={isLoading}
-                                        />
+                                        >
+                                            <SelectTrigger className="h-11">
+                                                <SelectValue placeholder="Select your registered business" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {businesses.map(b => (
+                                                    <SelectItem key={b.id} value={b.id}>
+                                                        {b.entity_name} — {b.pacra_number}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {businesses.length === 0 && (
+                                            <p className="text-xs text-muted-foreground">
+                                                No businesses registered.{" "}
+                                                <Link to="/client/businesses" className="text-primary underline">Register a business first</Link>
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="space-y-2 md:col-span-2">
                                         <Label htmlFor="address" className="text-foreground">Physical Address of Establishment *</Label>
