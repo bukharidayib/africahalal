@@ -1,93 +1,114 @@
 
-
 # Implementation Plan
 
-This plan covers four distinct features the user requested:
+This plan covers four areas: Admin Billing CRUD dialogs, Sign Up page redesign, Client business entity management, and Reset Password functionality.
 
 ---
 
-## 1. Fix Invitation Accept Link (404 Page)
+## 1. Admin Billing -- Full CRUD Dialogs
 
-**Problem**: The invitation email links to `/auth/sign-up?email=...&invited=true`, but no such route exists. The actual route is `/auth/signup` (no hyphen).
+The current `AdminBilling.tsx` only has a Create dialog and inline status dropdown. We need to add proper View, Edit, and Delete dialogs.
 
-**Fix**:
-- Update the Edge Function `send-invitation/index.ts` to link to `/auth/signup?email=...&invited=true` instead of `/auth/sign-up`
-- Update `SignUp.tsx` to read the `email` and `invited` query params from the URL and pre-fill the email field
-- After successful signup of an invited user, update the `admin_invitations` record to `accepted` status
-- Redeploy the edge function
+**Changes to `src/admin/pages/AdminBilling.tsx`:**
+- **View Dialog**: Clicking an invoice number opens a detail dialog showing all invoice fields, activity log, and payment transactions
+- **Edit Dialog**: An "Edit" button per row opens a dialog to modify organization, fee type, amount, due date, description, and status
+- **Delete Dialog**: A "Delete" button with a confirmation AlertDialog that removes the invoice (requires adding a DELETE RLS policy)
+- Add an Actions column with View/Edit/Delete icon buttons
+- Each action in its own Dialog/AlertDialog component
 
----
-
-## 2. Application Status Email Notifications
-
-**Problem**: Clients don't receive email updates when their application status changes.
-
-**What we'll build**:
-- A new Edge Function `send-status-notification` that sends professional HTML emails via Resend whenever an application status changes
-- The function will look up the organization's contact email and send a status-specific email
-- When status becomes `approved`, the email will include certificate details
-- Update `ApplicationDetail.tsx` to call this edge function after a successful status update
-
-**Supported statuses** (replacing the current enum references in the UI):
-- Submitted, Under Review, Inspection Scheduled, Inspection Completed, Approved, Rejected, Suspended
-
-**Database change**: Rename enum values `awaiting_inspection` to map to "Inspection Scheduled" and `inspection_complete` to "Inspection Completed" in the UI labels. Remove `draft`, `pending_decision`, and `withdrawn` from the status update dropdown (keeping them in the enum for backward compatibility).
+**Database change**: Add DELETE policy on `invoices` table for admin users so they can remove invoices.
 
 ---
 
-## 3. Streamline Application Status Options
+## 2. Sign Up Page Redesign
 
-**What changes**:
-- Update `STATUS_OPTIONS` in `ApplicationDetail.tsx` to only show: Submitted, Under Review, Inspection Scheduled, Inspection Completed, Approved, Rejected, Suspended
-- Update `statusConfig` labels to use "Inspection Scheduled" and "Inspection Completed"
-- Update `ApplicationTracker.tsx` to reflect the simplified 7-step flow
+The current SignUp page is titled "Register Business" with Company Name as the first field. It needs to become a user registration page.
 
----
+**Changes to `src/pages/auth/SignUp.tsx`:**
+- Change title from "Register Business" to "Create Account"
+- Remove the Company Name field entirely (business registration moves to the client portal)
+- Keep fields: **Full Name**, **Phone Number** (new), **NRC**, **Email**, **Password**, **Confirm Password** (new)
+- **Strong Password Validation**: Real-time strength indicator checking: min 8 chars, uppercase, lowercase, number, special character
+- **Generate Strong Password** button: Generates a random 16-char password with mixed characters, auto-fills both password fields
+- **Show/Hide password** toggle for both fields
+- Password match validation on confirm password field
+- Remove the organization creation logic from handleSubmit (no longer creating org on signup)
+- Add `phone` field to the Supabase auth metadata and update the profile after signup
 
-## 4. Supervisor Portal
-
-**What we'll build**: A separate portal at `/supervisor/*` routes with its own layout, sidebar, and pages.
-
-**Pages**:
-- **Dashboard** (`/supervisor/dashboard`): Overview of assigned organization, pending tasks, recent activity
-- **Support Tickets** (`/supervisor/support/tickets`): Create and view support tickets
-- **New Ticket** (`/supervisor/support/tickets/new`): Ticket creation form
-- **Ticket Detail** (`/supervisor/support/tickets/:id`): View ticket thread
-- **Live Chat** (`/supervisor/support/chat`): Real-time chat with AHIS support team via Supabase Realtime
-
-**Components**:
-- `SupervisorLayout.tsx` - Layout wrapper with sidebar
-- `SupervisorSidebar.tsx` - Navigation sidebar
-- `SupervisorProtectedRoute.tsx` - Auth guard checking supervisor role via `organization_supervisors` table
-
-**Auth flow**: Supervisors log in via the standard `/auth/signin` page and are redirected to `/supervisor/dashboard` based on their role in the `organization_supervisors` table.
+**Database change**: The `profiles` table already has a `phone` column, so no migration needed. We need to add an `nrc` column to profiles.
 
 ---
 
-## Technical Details
+## 3. Client Business Entity Registration
 
-### Files to Create
-- `supabase/functions/send-status-notification/index.ts` - Status change email edge function
-- `src/components/layout/SupervisorLayout.tsx` - Supervisor portal layout
-- `src/components/layout/SupervisorSidebar.tsx` - Supervisor navigation
-- `src/components/auth/SupervisorProtectedRoute.tsx` - Auth guard
-- `src/pages/supervisor/SupervisorDashboard.tsx` - Dashboard
-- `src/pages/supervisor/SupervisorTickets.tsx` - Ticket list
-- `src/pages/supervisor/SupervisorTicketNew.tsx` - Create ticket
-- `src/pages/supervisor/SupervisorTicketDetail.tsx` - Ticket detail
-- `src/pages/supervisor/SupervisorChat.tsx` - Live chat
+Each client can own multiple companies. We need a new "My Businesses" section in the client portal where they register entities, and then select one when applying.
 
-### Files to Modify
-- `supabase/functions/send-invitation/index.ts` - Fix signup URL
-- `src/pages/auth/SignUp.tsx` - Handle invitation query params, mark invitation accepted
-- `src/admin/pages/ApplicationDetail.tsx` - Add email notification on status change, update status options
-- `src/App.tsx` - Add supervisor portal routes
-- `src/components/ApplicationTracker.tsx` - Update to 7-step flow
-- `supabase/config.toml` - Register new edge function
+**New table `client_businesses`:**
+- `id` (uuid, PK)
+- `user_id` (uuid, FK to auth.users, NOT NULL)
+- `entity_name` (text, NOT NULL)
+- `pacra_number` (text, NOT NULL, unique per user)
+- `created_at` (timestamptz)
+- `organization_id` (uuid, FK to organizations, nullable -- linked after admin processing)
 
-### Edge Function: send-status-notification
-- Accepts: `application_id`, `new_status`, `application_number`, `organization_name`, `contact_email`
-- Sends status-specific HTML email from `info@africanhalaal.com`
-- For `approved` status: includes certificate number and congratulations message
-- For `rejected`/`suspended`: includes reason and next steps guidance
+RLS: Users can only manage their own businesses.
 
+**New page `src/pages/client/MyBusinesses.tsx`:**
+- List of registered businesses with entity name and PACRA number
+- Add Business dialog (entity name + PACRA number)
+- Edit and Delete dialogs
+- Navigation added to ClientSidebar
+
+**Changes to `src/pages/client/CertificationApplication.tsx`:**
+- Step 1 "Establishment Details" -- replace the free-text entity name and registration number fields with a dropdown that loads from `client_businesses`
+- The dropdown populates entity_name and registration_number automatically
+- Keep address, employees, and city fields as manual input
+- Add a "Register New Business" link that navigates to My Businesses page
+
+**Route addition in `App.tsx`:**
+- `/client/businesses` -> `MyBusinesses`
+
+**Sidebar update in `ClientSidebar.tsx`:**
+- Add "My Businesses" nav item with Building2 icon, placed after Dashboard
+
+---
+
+## 4. Reset Password -- Working End-to-End
+
+The current `ForgotPassword.tsx` is a UI mockup -- it uses `setTimeout` instead of calling Supabase. We need to make it functional.
+
+**Changes to `src/pages/auth/ForgotPassword.tsx`:**
+- Replace the simulated timeout with `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/auth/reset-password' })`
+- Track the email in state so the success message can reference it
+
+**New page `src/pages/auth/ResetPassword.tsx`:**
+- Listens for the Supabase auth recovery event via `onAuthStateChange`
+- Shows a form with New Password and Confirm Password fields
+- Same strong password validation and generator as SignUp
+- Calls `supabase.auth.updateUser({ password })` to set the new password
+- On success, redirects to `/auth/signin`
+
+**Route addition in `App.tsx`:**
+- `/auth/reset-password` -> `ResetPassword`
+
+---
+
+## Technical Summary
+
+### Database Migration
+- Add `nrc` column (text, nullable) to `profiles` table
+- Create `client_businesses` table with RLS policies
+- Add DELETE policy on `invoices` for admin users
+
+### New Files
+- `src/pages/client/MyBusinesses.tsx` -- Business entity management
+- `src/pages/auth/ResetPassword.tsx` -- New password form after email link
+
+### Modified Files
+- `src/admin/pages/AdminBilling.tsx` -- Add View/Edit/Delete dialogs
+- `src/pages/auth/SignUp.tsx` -- Redesign to user signup with strong password
+- `src/pages/auth/ForgotPassword.tsx` -- Connect to Supabase auth
+- `src/pages/client/CertificationApplication.tsx` -- Business dropdown in Step 1
+- `src/components/layout/ClientSidebar.tsx` -- Add My Businesses nav item
+- `src/App.tsx` -- Add new routes
+- `src/integrations/supabase/types.ts` -- Update types for new table
