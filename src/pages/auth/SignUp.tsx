@@ -114,6 +114,11 @@ export default function SignUp() {
                 // Update profile with phone and nrc
                 await supabase.from('profiles').update({ phone, nrc }).eq('id', authData.user.id);
 
+                // Send welcome email (fire and forget)
+                supabase.functions.invoke('send-welcome-email', {
+                    body: { full_name: fullName, email }
+                }).catch(err => console.error('Welcome email failed:', err));
+
                 if (isInvited) {
                     await supabase.from('admin_invitations')
                         .update({ status: 'accepted', accepted_at: new Date().toISOString() })

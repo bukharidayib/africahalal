@@ -187,7 +187,7 @@ export default function ClientDashboard() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold font-serif tracking-tight text-foreground">
-                            Marhaban, {organizationName || userName || 'Welcome'}
+                            Marhaban, {userName || 'Welcome'}
                         </h1>
                         <p className="text-muted-foreground mt-1 text-sm">
                             Here is what's happening with your certification journey today.
