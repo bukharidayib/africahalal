@@ -407,6 +407,28 @@ export default function CertificationApplication() {
                 }
             });
 
+            // Create invoice for application fee
+            try {
+                const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number');
+                const validityLabel = formData.validity_period === '6_months' ? '6 Months' : '1 Year';
+                const dueDate = new Date();
+                dueDate.setDate(dueDate.getDate() + 30);
+
+                await supabase.from('invoices').insert({
+                    invoice_number: invoiceNumber || `AHIS-INV-${Date.now()}`,
+                    organization_id: organization_id,
+                    application_id: appData.id,
+                    fee_type: 'application_fee',
+                    description: `Halal Certification Application Fee - ${validityLabel} Validity (${applicationNumber})`,
+                    amount: formData.application_fee,
+                    currency: 'USD',
+                    due_date: dueDate.toISOString().split('T')[0],
+                    status: 'pending',
+                });
+            } catch (invoiceErr) {
+                console.error('Failed to create invoice:', invoiceErr);
+            }
+
             // Send submission status email (fire and forget)
             try {
                 const { data: org } = await supabase
