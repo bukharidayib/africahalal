@@ -10,49 +10,49 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SignIn() {
-    const [isLoading, setIsLoading] = useState(false);
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const navigate = useNavigate();
-    const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
 
-        try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-            if (error) {
-                toast({
-                    variant: "destructive",
-                    title: "System Error",
-                    description: error.message,
-                });
-                return;
-            }
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "System Error",
+          description: error.message
+        });
+        return;
+      }
 
-            toast({
-                title: "Authentication Successful",
-                description: "Welcome to the AHI Client Portal.",
-            });
-            navigate("/client/dashboard");
-        } catch (error: any) {
-            toast({
-                variant: "destructive",
-                title: "Unexpected Error",
-                description: "An unexpected error occurred during sign-in.",
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    };
+      toast({
+        title: "Authentication Successful",
+        description: "Welcome to the AHI Client Portal."
+      });
+      navigate("/client/dashboard");
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Unexpected Error",
+        description: "An unexpected error occurred during sign-in."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    return (
-        <div className="flex min-h-screen bg-background">
+  return (
+    <div className="flex min-h-screen bg-background">
             {/* Left Side - Form */}
             <div className="flex w-full flex-col justify-center px-4 py-12 sm:px-6 lg:w-1/2 lg:px-20 xl:px-24">
                 <div className="mx-auto w-full max-w-sm lg:w-96">
@@ -83,15 +83,15 @@ export default function SignIn() {
                                 <div className="relative">
                                     <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
-                                        id="email"
-                                        type="email"
-                                        placeholder="name@company.com"
-                                        required
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className="pl-10 h-11 border-border focus-visible:ring-primary"
-                                        disabled={isLoading}
-                                    />
+                    id="email"
+                    type="email"
+                    placeholder="name@company.com"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10 h-11 border-border focus-visible:ring-primary"
+                    disabled={isLoading} />
+
                                 </div>
                             </div>
 
@@ -99,24 +99,24 @@ export default function SignIn() {
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="password">Password</Label>
                                     <Link
-                                        to="/auth/forgot-password"
-                                        className="text-xs font-medium text-secondary hover:text-secondary/80 underline-offset-4 hover:underline"
-                                    >
+                    to="/auth/forgot-password"
+                    className="text-xs font-medium text-secondary hover:text-secondary/80 underline-offset-4 hover:underline">
+
                                         Forgot password?
                                     </Link>
                                 </div>
                                 <div className="relative">
                                     <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
-                                        id="password"
-                                        type="password"
-                                        placeholder="••••••••"
-                                        required
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="pl-10 h-11 border-border focus-visible:ring-primary"
-                                        disabled={isLoading}
-                                    />
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10 h-11 border-border focus-visible:ring-primary"
+                    disabled={isLoading} />
+
                                 </div>
                             </div>
 
@@ -143,7 +143,7 @@ export default function SignIn() {
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
-                            <Button variant="outline" className="w-full h-11 border-border hover:bg-accent transition-all font-medium" onClick={() => { }}>
+                            <Button variant="outline" className="w-full h-11 border-border hover:bg-accent transition-all font-medium" onClick={() => {}}>
                                 <Chrome className="mr-2 h-4 w-4 text-red-500" />
                                 Sign in with Google
                             </Button>
@@ -152,7 +152,7 @@ export default function SignIn() {
                         <p className="text-center text-sm text-muted-foreground pt-4">
                             Don't have a portal account?{""}
                             <Link to="/auth/signup" className="ml-1 font-semibold text-primary hover:text-primary/80 underline-offset-4 hover:underline">
-                                Register your business
+                                Create Account
                             </Link>
                         </p>
                     </div>
@@ -163,10 +163,10 @@ export default function SignIn() {
             <div className="hidden lg:relative lg:block lg:w-1/2 border-l">
                 <div className="absolute inset-0 h-full w-full bg-primary/20 mix-blend-multiply" />
                 <img
-                    className="absolute inset-0 h-full w-full object-cover"
-                    src="/auth-bg.png"
-                    alt="African Halal Certification"
-                />
+          className="absolute inset-0 h-full w-full object-cover"
+          src="/auth-bg.png"
+          alt="African Halal Certification" />
+
                 <div className="absolute inset-0 flex items-end justify-center p-12 bg-gradient-to-t from-primary via-primary/40 to-transparent">
                     <div className="max-w-md text-center text-white space-y-4">
                         <h3 className="text-3xl font-bold font-serif leading-tight">
@@ -183,6 +183,6 @@ export default function SignIn() {
                     </div>
                 </div>
             </div>
-        </div>
-    );
+        </div>);
+
 }
