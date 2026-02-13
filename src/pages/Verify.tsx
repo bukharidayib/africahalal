@@ -56,7 +56,6 @@ export default function Verify() {
       );
 
       scanner.render((decodedText) => {
-        // Expected format: https://.../verify?id=UUID
         try {
           const url = new URL(decodedText);
           const scannedId = url.searchParams.get("id");
@@ -65,13 +64,11 @@ export default function Verify() {
             setIsScannerActive(false);
             handleVerify(scannedId, 'id');
           } else {
-            // Might be just the ID itself
             scanner.clear();
             setIsScannerActive(false);
             handleVerify(decodedText, 'id');
           }
         } catch (e) {
-          // If not a URL, try as raw ID
           scanner.clear();
           setIsScannerActive(false);
           handleVerify(decodedText, 'id');
@@ -97,22 +94,34 @@ export default function Verify() {
     setVerificationResult("searching");
 
     try {
-      let query = supabase
-        .from('certificates')
-        .select('*, organizations(name, registration_number)');
+      let data: any = null;
 
       if (type === 'id') {
-        query = query.eq('id', valueToUse);
+        const { data: result, error } = await supabase.rpc('verify_certificate_by_id', {
+          cert_id: valueToUse
+        });
+        if (error) throw error;
+        data = result && result.length > 0 ? result[0] : null;
       } else {
-        query = query.eq('certificate_number', valueToUse);
+        const { data: result, error } = await supabase.rpc('verify_certificate_public', {
+          cert_number: valueToUse
+        });
+        if (error) throw error;
+        data = result && result.length > 0 ? result[0] : null;
       }
 
-      const { data, error } = await query.maybeSingle();
-
-      if (error) throw error;
-
       if (data) {
-        setCertificate(data);
+        setCertificate({
+          certificate_number: data.certificate_number,
+          status: data.status,
+          issue_date: data.issue_date,
+          expiry_date: data.expiry_date,
+          scope: data.scope,
+          organizations: {
+            name: data.organization_name,
+            registration_number: data.organization_registration_number
+          }
+        });
         setVerificationResult("valid");
         toast({
           title: "Certificate Verified",
