@@ -21,6 +21,7 @@ import BlogDetail from "./pages/BlogDetail";
 import SignIn from "./pages/auth/SignIn";
 import SignUp from "./pages/auth/SignUp";
 import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
 // Client Portal
@@ -41,6 +42,7 @@ import SupportChat from "./pages/client/SupportChat";
 import BillingDashboard from "./pages/client/BillingDashboard";
 import BillingInvoices from "./pages/client/BillingInvoices";
 import BillingInvoiceDetail from "./pages/client/BillingInvoiceDetail";
+import MyBusinesses from "./pages/client/MyBusinesses";
 
 // Admin Portal
 import { AdminAuthProvider } from "./admin/contexts/AdminAuthContext";
@@ -110,10 +112,12 @@ const App = () => (
             <Route path="/auth/signin" element={<SignIn />} />
             <Route path="/auth/signup" element={<SignUp />} />
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route path="/verify-certificate" element={<VerifyPublic />} />
 
             {/* Client Portal Protected Routes */}
             <Route path="/client/dashboard" element={<ProtectedRoute><ClientDashboard /></ProtectedRoute>} />
+            <Route path="/client/businesses" element={<ProtectedRoute><MyBusinesses /></ProtectedRoute>} />
             <Route path="/client/apply" element={<ProtectedRoute><CertificationApplication /></ProtectedRoute>} />
             <Route path="/client/applications" element={<ProtectedRoute><MyApplications /></ProtectedRoute>} />
             <Route path="/client/applications/:id" element={<ProtectedRoute><ClientApplicationDetail /></ProtectedRoute>} />

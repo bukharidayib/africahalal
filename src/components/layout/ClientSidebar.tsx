@@ -10,7 +10,8 @@ import {
     ShieldCheck,
     FolderOpen,
     HeadphonesIcon,
-    Receipt
+    Receipt,
+    Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,7 @@ import { useState } from "react";
 
 const navigation = [
     { name: "Dashboard", href: "/client/dashboard", icon: LayoutDashboard },
+    { name: "My Businesses", href: "/client/businesses", icon: Building2 },
     { name: "Apply Now", href: "/client/apply", icon: FileText },
     { name: "My Applications", href: "/client/applications", icon: FolderOpen },
     { name: "My Documents", href: "/client/documents", icon: Files },
