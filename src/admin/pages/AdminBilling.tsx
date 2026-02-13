@@ -279,7 +279,7 @@ export default function AdminBilling() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Amount (USD) *</Label>
+                  <Label>Amount (ZMW) *</Label>
                   <Input type="number" step="0.01" min="0" value={newInvoice.amount} onChange={(e) => setNewInvoice(p => ({ ...p, amount: e.target.value }))} />
                 </div>
                 <div>
@@ -309,21 +309,21 @@ export default function AdminBilling() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Paid</CardTitle>
               <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30"><CheckCircle2 className="h-4 w-4 text-green-600" /></div>
             </CardHeader>
-            <CardContent><div className="text-2xl font-bold">{isLoading ? '...' : `$${stats.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div></CardContent>
+            <CardContent><div className="text-2xl font-bold">{isLoading ? '...' : `ZMW ${stats.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div></CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
               <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30"><Clock className="h-4 w-4 text-amber-600" /></div>
             </CardHeader>
-            <CardContent><div className="text-2xl font-bold">{isLoading ? '...' : `$${stats.totalPending.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div></CardContent>
+            <CardContent><div className="text-2xl font-bold">{isLoading ? '...' : `ZMW ${stats.totalPending.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div></CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Overdue</CardTitle>
               <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30"><AlertTriangle className="h-4 w-4 text-red-600" /></div>
             </CardHeader>
-            <CardContent><div className="text-2xl font-bold">{isLoading ? '...' : `$${stats.totalOverdue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div></CardContent>
+            <CardContent><div className="text-2xl font-bold">{isLoading ? '...' : `ZMW ${stats.totalOverdue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</div></CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -381,7 +381,7 @@ export default function AdminBilling() {
                       <TableCell className="font-mono text-sm">{inv.invoice_number}</TableCell>
                       <TableCell>{inv.organizations?.name || '—'}</TableCell>
                       <TableCell>{feeTypeLabel(inv.fee_type)}</TableCell>
-                      <TableCell className="font-semibold">${Number(inv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="font-semibold">ZMW {Number(inv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>{format(new Date(inv.due_date), 'dd MMM yyyy')}</TableCell>
                       <TableCell>{statusBadge(inv.status)}</TableCell>
                       <TableCell>
@@ -416,8 +416,8 @@ export default function AdminBilling() {
                   <div><span className="text-muted-foreground">Status</span><div className="mt-1">{statusBadge(viewInvoice.status)}</div></div>
                   <div><span className="text-muted-foreground">Client</span><p className="font-medium">{viewInvoice.organizations?.name || '—'}</p></div>
                   <div><span className="text-muted-foreground">Fee Type</span><p>{feeTypeLabel(viewInvoice.fee_type)}</p></div>
-                  <div><span className="text-muted-foreground">Amount</span><p className="font-bold text-lg">${Number(viewInvoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
-                  <div><span className="text-muted-foreground">Currency</span><p>{viewInvoice.currency}</p></div>
+                  <div><span className="text-muted-foreground">Amount</span><p className="font-bold text-lg">ZMW {Number(viewInvoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
+                  <div><span className="text-muted-foreground">Currency</span><p>ZMW</p></div>
                   <div><span className="text-muted-foreground">Due Date</span><p>{format(new Date(viewInvoice.due_date), 'dd MMM yyyy')}</p></div>
                   <div><span className="text-muted-foreground">Created</span><p>{format(new Date(viewInvoice.created_at), 'dd MMM yyyy')}</p></div>
                   {viewInvoice.paid_at && <div><span className="text-muted-foreground">Paid At</span><p>{format(new Date(viewInvoice.paid_at), 'dd MMM yyyy HH:mm')}</p></div>}
@@ -476,7 +476,7 @@ export default function AdminBilling() {
                 </Select>
               </div>
               <div>
-                <Label>Amount (USD) *</Label>
+                <Label>Amount (ZMW) *</Label>
                 <Input type="number" step="0.01" min="0" value={editForm.amount} onChange={(e) => setEditForm(p => ({ ...p, amount: e.target.value }))} />
               </div>
               <div>

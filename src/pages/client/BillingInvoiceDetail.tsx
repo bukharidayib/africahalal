@@ -181,7 +181,7 @@ export default function BillingInvoiceDetail() {
                       )}
                     </div>
                     <p className="text-xl font-bold">
-                      ${Number(invoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      ZMW {Number(invoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
@@ -194,12 +194,12 @@ export default function BillingInvoiceDetail() {
                 <div className="w-64 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>${Number(invoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <span>ZMW {Number(invoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold text-lg">
                     <span>Total</span>
-                    <span>${Number(invoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} {invoice.currency}</span>
+                    <span>ZMW {Number(invoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               </div>
