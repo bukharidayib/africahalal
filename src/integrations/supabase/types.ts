@@ -1577,6 +1577,30 @@ export type Database = {
         Args: { _from_stage: string; _to_stage: string }
         Returns: boolean
       }
+      verify_certificate_by_id: {
+        Args: { cert_id: string }
+        Returns: {
+          certificate_number: string
+          expiry_date: string
+          issue_date: string
+          organization_name: string
+          organization_registration_number: string
+          scope: string
+          status: Database["public"]["Enums"]["certificate_status"]
+        }[]
+      }
+      verify_certificate_public: {
+        Args: { cert_number: string }
+        Returns: {
+          certificate_number: string
+          expiry_date: string
+          issue_date: string
+          organization_name: string
+          organization_registration_number: string
+          scope: string
+          status: Database["public"]["Enums"]["certificate_status"]
+        }[]
+      }
     }
     Enums: {
       admin_role:

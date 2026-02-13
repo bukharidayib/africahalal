@@ -38,23 +38,23 @@ export default function VerifyPublic() {
 
         setIsSearching(true);
         try {
-            const { data, error } = await supabase
-                .from('certificates')
-                .select('*, organizations(name, registration_number)')
-                .eq('certificate_number', certId)
-                .maybeSingle();
+            const { data, error } = await supabase.rpc('verify_certificate_public', {
+                cert_number: certId
+            });
 
             if (error) throw error;
 
-            if (data) {
+            const cert = data && data.length > 0 ? data[0] : null;
+
+            if (cert) {
                 setResult({
                     valid: true,
-                    id: data.certificate_number,
-                    entity: data.organizations?.name || "African Halal Institute Certified Partner",
-                    scope: data.scope,
-                    issueDate: new Date(data.issue_date).toLocaleDateString(),
-                    expiryDate: new Date(data.expiry_date).toLocaleDateString(),
-                    status: data.status,
+                    id: cert.certificate_number,
+                    entity: cert.organization_name || "African Halal Institute Certified Partner",
+                    scope: cert.scope,
+                    issueDate: new Date(cert.issue_date).toLocaleDateString(),
+                    expiryDate: new Date(cert.expiry_date).toLocaleDateString(),
+                    status: cert.status,
                     type: "Standard Halal Accreditation"
                 });
             } else {
