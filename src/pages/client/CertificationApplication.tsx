@@ -141,6 +141,23 @@ export default function CertificationApplication() {
                 categories: app.scope ? app.scope.split(', ') : [],
             }));
 
+            // Load documents
+            const { data: docs } = await supabase
+                .from('application_documents')
+                .select('document_type, file_name, file_path, file_size')
+                .eq('application_id', id);
+            if (docs && docs.length > 0) {
+                setFormData(prev => ({
+                    ...prev,
+                    uploadedFiles: docs.map((d: any) => ({
+                        documentId: d.document_type,
+                        fileName: d.file_name,
+                        filePath: d.file_path,
+                        fileSize: d.file_size || 0,
+                    })),
+                }));
+            }
+
             // Load products and ingredients
             const { data: prods } = await supabase
                 .from('application_products')
