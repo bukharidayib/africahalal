@@ -27,10 +27,13 @@ export default function SignIn() {
       });
 
       if (error) {
+        const isUnconfirmed = error.message?.toLowerCase().includes("email not confirmed");
         toast({
           variant: "destructive",
-          title: "System Error",
-          description: error.message
+          title: isUnconfirmed ? "Email Not Verified" : "System Error",
+          description: isUnconfirmed
+            ? "Please check your inbox and click the confirmation link before signing in."
+            : error.message,
         });
         return;
       }
