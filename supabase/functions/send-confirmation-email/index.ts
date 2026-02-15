@@ -28,8 +28,9 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
     // Generate the confirmation link
+    // Use magiclink type to generate a verification link for existing users
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: "signup",
+      type: "magiclink",
       email,
       options: {
         redirectTo: redirect_to || "https://africahalal.lovable.app/auth/signin",
