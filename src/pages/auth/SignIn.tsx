@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, Loader2, Chrome, ArrowLeft } from "lucide-react";
+import { Mail, Lock, Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -133,21 +133,6 @@ export default function SignIn() {
                             </Button>
                         </form>
 
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                <Separator className="w-full" />
-                            </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-background px-2 text-muted-foreground tracking-widest font-medium">Or continue with</span>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4">
-                            <Button variant="outline" className="w-full h-11 border-border hover:bg-accent transition-all font-medium" onClick={() => {}}>
-                                <Chrome className="mr-2 h-4 w-4 text-red-500" />
-                                Sign in with Google
-                            </Button>
-                        </div>
 
                         <p className="text-center text-sm text-muted-foreground pt-4">
                             Don't have a portal account?{""}

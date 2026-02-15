@@ -14,7 +14,8 @@ import {
     Trash2,
     Loader2,
     Beaker,
-    FileCheck
+    FileCheck,
+    Save
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,7 +33,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import {
     Dialog,
     DialogContent,
@@ -70,13 +71,16 @@ interface UploadedFile {
 export default function CertificationApplication() {
     const [currentStep, setCurrentStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
+    const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
     const [ingredientModalOpen, setIngredientModalOpen] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const [businesses, setBusinesses] = useState<{ id: string; entity_name: string; pacra_number: string }[]>([]);
     const [selectedBusinessId, setSelectedBusinessId] = useState("");
+    const [draftId, setDraftId] = useState<string | null>(null);
     const { toast } = useToast();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
     useEffect(() => {
         const fetchBusinesses = async () => {
@@ -84,7 +88,14 @@ export default function CertificationApplication() {
             setBusinesses(data || []);
         };
         fetchBusinesses();
-    }, []);
+
+        // Load draft if draft param is present
+        const draftParam = searchParams.get('draft');
+        if (draftParam) {
+            setDraftId(draftParam);
+            loadDraft(draftParam);
+        }
+    }, [searchParams]);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -109,6 +120,134 @@ export default function CertificationApplication() {
         brand: "",
         category: ""
     });
+
+    const loadDraft = async (id: string) => {
+        try {
+            const { data: app, error } = await supabase
+                .from('certification_applications')
+                .select(`*, organizations(name, registration_number, address, country)`)
+                .eq('id', id)
+                .eq('status', 'draft')
+                .single();
+            if (error || !app) return;
+
+            const org = app.organizations as any;
+            setFormData(prev => ({
+                ...prev,
+                entity_name: org?.name || '',
+                registration_number: org?.registration_number || '',
+                address: org?.address || '',
+                country: org?.country || '',
+                categories: app.scope ? app.scope.split(', ') : [],
+            }));
+
+            // Load products and ingredients
+            const { data: prods } = await supabase
+                .from('application_products')
+                .select('id, name, brand, category, ingredients:product_ingredients(id, ingredient_name, percentage, source, is_halal_certified, supplier_name)')
+                .eq('application_id', id);
+            if (prods) {
+                setFormData(prev => ({
+                    ...prev,
+                    products: prods.map((p: any) => ({
+                        id: p.id,
+                        name: p.name,
+                        brand: p.brand,
+                        category: p.category || 'General',
+                        ingredients: (p.ingredients || []).map((i: any) => ({
+                            ingredient_name: i.ingredient_name,
+                            percentage: i.percentage,
+                            source: i.source,
+                            is_halal_certified: i.is_halal_certified,
+                            supplier_name: i.supplier_name,
+                        })),
+                    })),
+                }));
+            }
+
+            toast({ title: "Draft Loaded", description: "Continue editing your draft application." });
+        } catch (e) {
+            console.error('Failed to load draft:', e);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (!formData.entity_name && !formData.registration_number) {
+            toast({ variant: "destructive", title: "Missing Info", description: "Please fill in at least the business details before saving." });
+            return;
+        }
+
+        setIsSavingDraft(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Not authenticated");
+
+            const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single();
+            let organization_id = profile?.organization_id;
+
+            if (!organization_id) {
+                if (!formData.registration_number) throw new Error("Registration number required");
+                const { data: orgData, error: orgError } = await supabase.from('organizations').select('id').eq('registration_number', formData.registration_number).single();
+                if (orgError && orgError.code === 'PGRST116') {
+                    const newOrgId = crypto.randomUUID();
+                    await supabase.from('organizations').insert({ id: newOrgId, name: formData.entity_name, registration_number: formData.registration_number, sector: formData.categories[0] || "General", address: formData.address, country: formData.country });
+                    organization_id = newOrgId;
+                    await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
+                } else if (orgError) {
+                    throw orgError;
+                } else {
+                    organization_id = orgData.id;
+                }
+            }
+
+            if (draftId) {
+                // Update existing draft
+                await supabase.from('certification_applications').update({
+                    scope: formData.categories.join(', '),
+                    sector: formData.categories[0] || 'General',
+                    updated_at: new Date().toISOString(),
+                }).eq('id', draftId);
+
+                // Delete old products and re-insert
+                await supabase.from('application_products').delete().eq('application_id', draftId);
+                for (const product of formData.products) {
+                    const { data: pd } = await supabase.from('application_products').insert({ application_id: draftId, name: product.name, brand: product.brand, category: product.category }).select('id').single();
+                    if (pd && product.ingredients.length > 0) {
+                        await supabase.from('product_ingredients').insert(product.ingredients.map(i => ({ product_id: pd.id, ingredient_name: i.ingredient_name, percentage: i.percentage, source: i.source, is_halal_certified: i.is_halal_certified, supplier_name: i.supplier_name })));
+                    }
+                }
+
+                toast({ title: "Draft Saved", description: "Your application draft has been updated." });
+            } else {
+                // Create new draft
+                const { data: appNum } = await supabase.rpc('generate_application_number');
+                const { data: appData, error: appErr } = await supabase.from('certification_applications').insert({
+                    organization_id,
+                    application_type: "Full Certification",
+                    sector: formData.categories[0] || "General",
+                    scope: formData.categories.join(', '),
+                    application_number: appNum || `APP-${Date.now()}`,
+                    status: 'draft',
+                }).select('id').single();
+                if (appErr) throw appErr;
+
+                setDraftId(appData.id);
+
+                for (const product of formData.products) {
+                    const { data: pd } = await supabase.from('application_products').insert({ application_id: appData.id, name: product.name, brand: product.brand, category: product.category }).select('id').single();
+                    if (pd && product.ingredients.length > 0) {
+                        await supabase.from('product_ingredients').insert(product.ingredients.map(i => ({ product_id: pd.id, ingredient_name: i.ingredient_name, percentage: i.percentage, source: i.source, is_halal_certified: i.is_halal_certified, supplier_name: i.supplier_name })));
+                    }
+                }
+
+                toast({ title: "Draft Saved", description: "Your application has been saved as a draft." });
+            }
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Save Failed", description: error.message });
+        } finally {
+            setIsSavingDraft(false);
+        }
+    };
 
     const handleNext = () => {
         if (!validateStep(currentStep)) return;
@@ -325,33 +464,63 @@ export default function CertificationApplication() {
                 }
             }
 
-            // Generate application number
-            const { data: appNumberData } = await supabase.rpc('generate_application_number');
-            const applicationNumber = appNumberData || `APP-${Date.now()}`;
+            let applicationNumber: string;
+            let appId: string;
 
-            // Insert Application
-            const { data: appData, error: appError } = await supabase
-                .from('certification_applications')
-                .insert({
-                    organization_id,
-                    application_type: "Full Certification",
-                    sector: formData.categories[0] || "General",
-                    scope: formData.categories.join(', '),
-                    application_number: applicationNumber,
-                    status: 'submitted',
-                    submitted_at: new Date().toISOString()
-                })
-                .select('id')
-                .single();
+            if (draftId) {
+                // Update existing draft to submitted
+                const { data: existingApp } = await supabase
+                    .from('certification_applications')
+                    .select('application_number')
+                    .eq('id', draftId)
+                    .single();
 
-            if (appError) throw appError;
+                applicationNumber = existingApp?.application_number || `APP-${Date.now()}`;
+
+                const { error: updateErr } = await supabase
+                    .from('certification_applications')
+                    .update({
+                        status: 'submitted',
+                        submitted_at: new Date().toISOString(),
+                        scope: formData.categories.join(', '),
+                        sector: formData.categories[0] || "General",
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', draftId);
+                if (updateErr) throw updateErr;
+                appId = draftId;
+
+                // Clear old products and re-insert
+                await supabase.from('application_products').delete().eq('application_id', draftId);
+            } else {
+                // Generate application number
+                const { data: appNumberData } = await supabase.rpc('generate_application_number');
+                applicationNumber = appNumberData || `APP-${Date.now()}`;
+
+                // Insert Application
+                const { data: appData, error: appError } = await supabase
+                    .from('certification_applications')
+                    .insert({
+                        organization_id,
+                        application_type: "Full Certification",
+                        sector: formData.categories[0] || "General",
+                        scope: formData.categories.join(', '),
+                        application_number: applicationNumber,
+                        status: 'submitted',
+                        submitted_at: new Date().toISOString()
+                    })
+                    .select('id')
+                    .single();
+                if (appError) throw appError;
+                appId = appData.id;
+            }
 
             // Insert Products and Ingredients
             for (const product of formData.products) {
                 const { data: productData, error: productError } = await supabase
                     .from('application_products')
                     .insert({
-                        application_id: appData.id,
+                        application_id: appId,
                         name: product.name,
                         brand: product.brand,
                         category: product.category
@@ -385,7 +554,7 @@ export default function CertificationApplication() {
                 await supabase
                     .from('application_documents')
                     .insert({
-                        application_id: appData.id,
+                        application_id: appId,
                         document_type: file.documentId,
                         file_name: file.fileName,
                         file_path: file.filePath,
@@ -398,7 +567,7 @@ export default function CertificationApplication() {
             await supabase.rpc('log_audit', {
                 _action: 'application_submitted',
                 _resource_type: 'certification_applications',
-                _resource_id: appData.id,
+                _resource_id: appId,
                 _metadata: {
                     step: 'submission',
                     products_count: formData.products.length,
@@ -417,7 +586,7 @@ export default function CertificationApplication() {
                 await supabase.from('invoices').insert({
                     invoice_number: invoiceNumber || `AHIS-INV-${Date.now()}`,
                     organization_id: organization_id,
-                    application_id: appData.id,
+                    application_id: appId,
                     fee_type: 'application_fee',
                     description: `Halal Certification Application Fee - ${validityLabel} Validity (${applicationNumber})`,
                     amount: formData.application_fee,
@@ -439,7 +608,7 @@ export default function CertificationApplication() {
 
                 await supabase.functions.invoke('send-status-notification', {
                     body: {
-                        application_id: appData.id,
+                        application_id: appId,
                         new_status: 'submitted',
                         application_number: applicationNumber,
                         organization_name: org?.name || formData.entity_name,
@@ -886,32 +1055,54 @@ export default function CertificationApplication() {
                             </Button>
 
                             {currentStep < steps.length ? (
-                                <Button
-                                    onClick={handleNext}
-                                    disabled={isLoading}
-                                    className="h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-bold group"
-                                >
-                                    Continue
-                                    <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                                </Button>
+                                <div className="flex gap-3">
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleSaveDraft}
+                                        disabled={isLoading || isSavingDraft}
+                                        className="h-11 font-bold"
+                                    >
+                                        {isSavingDraft ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                        Save Draft
+                                    </Button>
+                                    <Button
+                                        onClick={handleNext}
+                                        disabled={isLoading}
+                                        className="h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-bold group"
+                                    >
+                                        Continue
+                                        <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                                    </Button>
+                                </div>
                             ) : (
-                                <Button
-                                    onClick={handleSubmit}
-                                    disabled={isLoading}
-                                    className="h-11 bg-secondary text-secondary-foreground hover:bg-secondary/90 font-bold px-8 shadow-lg shadow-secondary/20"
-                                >
-                                    {isLoading ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Submitting...
-                                        </>
-                                    ) : (
-                                        <>
-                                            Final Submit & Lock
-                                            <Upload className="ml-2 h-4 w-4" />
-                                        </>
-                                    )}
-                                </Button>
+                                <div className="flex gap-3">
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleSaveDraft}
+                                        disabled={isLoading || isSavingDraft}
+                                        className="h-11 font-bold"
+                                    >
+                                        {isSavingDraft ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                        Save Draft
+                                    </Button>
+                                    <Button
+                                        onClick={handleSubmit}
+                                        disabled={isLoading}
+                                        className="h-11 bg-secondary text-secondary-foreground hover:bg-secondary/90 font-bold px-8 shadow-lg shadow-secondary/20"
+                                    >
+                                        {isLoading ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Submitting...
+                                            </>
+                                        ) : (
+                                            <>
+                                                Final Submit & Lock
+                                                <Upload className="ml-2 h-4 w-4" />
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
                             )}
                         </div>
                     </CardContent>

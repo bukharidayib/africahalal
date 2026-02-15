@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Mail, Lock, Loader2, Chrome, ArrowLeft, User, FileText, Phone, Eye, EyeOff, Wand2 } from "lucide-react";
+import { Mail, Lock, Loader2, ArrowLeft, User, FileText, Phone, Eye, EyeOff, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
+
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -254,17 +254,6 @@ export default function SignUp() {
                             </Button>
                         </form>
 
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center" aria-hidden="true"><Separator className="w-full" /></div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-background px-2 text-muted-foreground tracking-widest font-medium">Or register with</span>
-                            </div>
-                        </div>
-
-                        <Button variant="outline" className="w-full h-11 font-medium" onClick={() => { }}>
-                            <Chrome className="mr-2 h-4 w-4 text-red-500" />
-                            Sign up with Google
-                        </Button>
 
                         <p className="text-center text-sm text-muted-foreground pt-4">
                             Already have an account?
