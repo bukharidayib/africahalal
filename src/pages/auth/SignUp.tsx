@@ -114,15 +114,10 @@ export default function SignUp() {
                 // Update profile with phone and nrc
                 await supabase.from('profiles').update({ phone, nrc }).eq('id', authData.user.id);
 
-                // Send confirmation email via Resend (branded)
+                // Send invitation/confirmation email via Resend (branded)
                 supabase.functions.invoke('send-confirmation-email', {
                     body: { full_name: fullName, email, redirect_to: window.location.origin + '/auth/signin' }
                 }).catch(err => console.error('Confirmation email failed:', err));
-
-                // Send welcome email (fire and forget)
-                supabase.functions.invoke('send-welcome-email', {
-                    body: { full_name: fullName, email }
-                }).catch(err => console.error('Welcome email failed:', err));
 
                 if (isInvited) {
                     await supabase.from('admin_invitations')
