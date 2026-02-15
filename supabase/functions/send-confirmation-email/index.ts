@@ -50,7 +50,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "Africa Halal Integrity System <info@africanhalaal.com>",
       to: [email],
-      subject: "Confirm Your Email — Africa Halal Integrity System",
+      subject: "You're Invited — Africa Halal Integrity System",
       html: `
         <!DOCTYPE html>
         <html>
@@ -63,7 +63,7 @@ const handler = async (req: Request): Promise<Response> => {
             <!-- Header -->
             <div style="background:linear-gradient(135deg,#1a5c2e,#2d7a45);padding:32px 40px;text-align:center;">
               <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Africa Halal Integrity System</h1>
-              <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Email Confirmation</p>
+              <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Account Invitation</p>
             </div>
             
             <!-- Body -->
@@ -73,30 +73,19 @@ const handler = async (req: Request): Promise<Response> => {
               </p>
               
               <p style="color:#3f3f46;font-size:15px;line-height:1.7;margin:0 0 16px;">
-                Thank you for registering with the <strong>Africa Halal Integrity System (AHIS)</strong>. To complete your registration and activate your account, please confirm your email address by clicking the button below.
+                You have been invited to join the <strong>Africa Halal Integrity System (AHIS)</strong>. Please accept this invitation by clicking the button below to verify your email address and activate your account.
               </p>
 
               <div style="text-align:center;margin:32px 0;">
                 <a href="${confirmationUrl}" 
                    style="display:inline-block;background:#1a5c2e;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;">
-                  Confirm My Email
+                  Accept Invitation
                 </a>
               </div>
-
-              <p style="color:#3f3f46;font-size:14px;line-height:1.7;margin:0 0 16px;">
-                Once confirmed, you'll be able to sign in and access your dashboard to:
-              </p>
-
-              <ul style="color:#3f3f46;font-size:14px;line-height:2;margin:0 0 24px;padding-left:20px;">
-                <li>Submit Halal certification applications</li>
-                <li>Upload compliance documents</li>
-                <li>Track your certification progress</li>
-                <li>Manage your certificates</li>
-              </ul>
               
               <div style="background:#fefce8;border:1px solid #fef08a;border-radius:8px;padding:16px;margin:24px 0;">
                 <p style="color:#854d0e;font-size:13px;line-height:1.5;margin:0;">
-                  <strong>⚠ Important:</strong> This confirmation link expires in 24 hours. If you did not create an account, please ignore this email.
+                  <strong>⚠ Important:</strong> This invitation link expires in 24 hours. If you did not request this, please ignore this email.
                 </p>
               </div>
 

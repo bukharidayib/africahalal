@@ -38,6 +38,20 @@ export default function SignIn() {
         return;
       }
 
+      // Send welcome email on first login (fire and forget)
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) {
+        const lastSignIn = userData.user.last_sign_in_at;
+        const createdAt = userData.user.created_at;
+        // If first sign-in (last_sign_in_at is very close to now, meaning this is the first time)
+        const profile = await supabase.from('profiles').select('full_name').eq('id', userData.user.id).single();
+        if (lastSignIn && new Date(lastSignIn).getTime() - new Date(createdAt).getTime() < 60000 * 5) {
+          supabase.functions.invoke('send-welcome-email', {
+            body: { full_name: profile.data?.full_name || '', email }
+          }).catch(err => console.error('Welcome email failed:', err));
+        }
+      }
+
       toast({
         title: "Authentication Successful",
         description: "Welcome to the AHI Client Portal."
