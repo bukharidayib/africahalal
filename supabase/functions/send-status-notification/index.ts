@@ -108,9 +108,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     const appUrl = "https://africahalal.lovable.app";
 
+    const allRecipients = [contact_email, "admin@africanhalaal.com", "operations@africanhalaal.com"].filter(Boolean);
+
     const emailResponse = await resend.emails.send({
       from: "Africa Halal Integrity System <info@africanhalaal.com>",
-      to: [contact_email],
+      to: allRecipients,
       subject: `Application ${application_number} - Status Update: ${statusLabel}`,
       html: `
         <!DOCTYPE html>
