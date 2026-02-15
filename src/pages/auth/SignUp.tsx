@@ -125,11 +125,12 @@ export default function SignUp() {
                         .eq('email', email).eq('status', 'pending');
                 }
 
+                // Sign out immediately — user must confirm email first
+                await supabase.auth.signOut();
+
                 toast({
-                    title: "Account Created",
-                    description: isInvited
-                        ? "Your admin account has been created. You can now sign in."
-                        : "Please check your email to verify your account.",
+                    title: "Account Created — Check Your Email",
+                    description: "We've sent you a confirmation email. Please click the link to verify your account before signing in.",
                 });
                 navigate("/auth/signin");
             }
