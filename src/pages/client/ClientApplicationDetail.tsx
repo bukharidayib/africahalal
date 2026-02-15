@@ -229,6 +229,13 @@ export default function ClientApplicationDetail() {
                         </div>
                         <p className="text-muted-foreground">{application.application_type}</p>
                     </div>
+                    {application.status === 'draft' && (
+                        <Button asChild className="gap-2">
+                            <Link to={`/client/apply?draft=${application.id}`}>
+                                Continue & Submit
+                            </Link>
+                        </Button>
+                    )}
                 </div>
 
                 {/* Tabs */}

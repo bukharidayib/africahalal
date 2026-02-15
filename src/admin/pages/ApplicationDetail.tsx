@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Calendar, FileText, Clock, CheckCircle2,
-  XCircle, AlertCircle, User, MapPin, Loader2, Save, History
+  XCircle, AlertCircle, User, MapPin, Loader2, Save, History,
+  Brain, ShieldAlert, ShieldCheck, HelpCircle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -99,6 +100,9 @@ export default function ApplicationDetail() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [aiResults, setAiResults] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
 
   const [newStatus, setNewStatus] = useState<ApplicationStatus | ''>('');
   const [statusReason, setStatusReason] = useState('');
@@ -156,6 +160,13 @@ export default function ApplicationDetail() {
       if (!docsError) {
         setDocuments(docsData || []);
       }
+
+      // Fetch products with ingredients
+      const { data: prodsData } = await supabase
+        .from('application_products')
+        .select('id, name, brand, category, ingredients:product_ingredients(id, ingredient_name, percentage, source, is_halal_certified, supplier_name)')
+        .eq('application_id', id);
+      setProducts(prodsData || []);
 
     } catch (error: any) {
       toast({
@@ -311,6 +322,27 @@ export default function ApplicationDetail() {
     }
   }
 
+  const handleAnalyzeIngredients = async () => {
+    if (products.length === 0) {
+      toast({ variant: 'destructive', title: 'No Products', description: 'No products found for this application.' });
+      return;
+    }
+    setIsAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-ingredients', {
+        body: { products },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setAiResults(data);
+      toast({ title: 'Analysis Complete', description: data.summary || 'Ingredient analysis finished.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Analysis Failed', description: e.message });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <AdminLayout>
@@ -362,6 +394,7 @@ export default function ApplicationDetail() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="status">Status Update</TabsTrigger>
+            <TabsTrigger value="ai-analysis" className="gap-1"><Brain className="h-4 w-4" />AI Analysis</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
           </TabsList>
@@ -514,6 +547,78 @@ export default function ApplicationDetail() {
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   Update Status
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* AI Analysis Tab */}
+          <TabsContent value="ai-analysis">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Brain className="h-5 w-5" />
+                  AI-Powered Ingredient Analysis
+                </CardTitle>
+                <CardDescription>
+                  Use AI to detect Haram or suspicious ingredients across all products in this application.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <Button onClick={handleAnalyzeIngredients} disabled={isAnalyzing} className="gap-2">
+                  {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+                  {isAnalyzing ? 'Analyzing...' : aiResults ? 'Re-Analyze Ingredients' : 'Analyze Ingredients'}
+                </Button>
+
+                {aiResults && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 text-center">
+                        <ShieldCheck className="h-6 w-6 text-green-600 mx-auto mb-1" />
+                        <p className="text-2xl font-bold text-green-700 dark:text-green-400">{aiResults.halal_count || 0}</p>
+                        <p className="text-xs text-green-600 font-medium">Halal</p>
+                      </div>
+                      <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-center">
+                        <ShieldAlert className="h-6 w-6 text-red-600 mx-auto mb-1" />
+                        <p className="text-2xl font-bold text-red-700 dark:text-red-400">{aiResults.haram_count || 0}</p>
+                        <p className="text-xs text-red-600 font-medium">Haram</p>
+                      </div>
+                      <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-center">
+                        <HelpCircle className="h-6 w-6 text-amber-600 mx-auto mb-1" />
+                        <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{aiResults.unknown_count || 0}</p>
+                        <p className="text-xs text-amber-600 font-medium">Unknown</p>
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">{aiResults.summary}</p>
+
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted">
+                          <tr>
+                            <th className="px-4 py-2 text-left font-semibold">Product</th>
+                            <th className="px-4 py-2 text-left font-semibold">Ingredient</th>
+                            <th className="px-4 py-2 text-center font-semibold">Status</th>
+                            <th className="px-4 py-2 text-left font-semibold">Reasoning</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(aiResults.results || []).map((r: any, i: number) => (
+                            <tr key={i} className="border-t hover:bg-muted/50">
+                              <td className="px-4 py-2 font-medium">{r.product_name}</td>
+                              <td className="px-4 py-2">{r.ingredient_name}</td>
+                              <td className="px-4 py-2 text-center">
+                                <Badge variant={r.classification === 'halal' ? 'default' : r.classification === 'haram' ? 'destructive' : 'secondary'}>
+                                  {r.classification.toUpperCase()}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-2 text-muted-foreground text-xs">{r.reasoning}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

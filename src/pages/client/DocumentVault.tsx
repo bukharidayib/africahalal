@@ -12,7 +12,8 @@ import {
     CheckCircle2,
     AlertCircle,
     ShieldCheck,
-    FileText
+    FileText,
+    Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,7 +98,8 @@ export default function DocumentVault() {
                 .select(`
                     *,
                     certification_applications (
-                        application_number
+                        application_number,
+                        organizations (name)
                     )
                 `)
                 .order('uploaded_at', { ascending: false });
@@ -289,6 +291,12 @@ export default function DocumentVault() {
                                     <CardDescription className="text-xs uppercase font-mono tracking-tighter mt-1">
                                         {doc.document_type}
                                     </CardDescription>
+                                    {doc.certification_applications?.organizations?.name && (
+                                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                            <Building2 className="h-3 w-3" />
+                                            {doc.certification_applications.organizations.name}
+                                        </p>
+                                    )}
                                 </CardHeader>
 
                                 <CardContent className="space-y-4">

@@ -18,11 +18,24 @@ export default function ForgotPassword() {
         if (!email) return;
         setIsLoading(true);
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin + '/auth/reset-password',
-            });
-            if (error) {
-                toast({ variant: "destructive", title: "Error", description: error.message });
+            const response = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-password-reset`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                    },
+                    body: JSON.stringify({
+                        email,
+                        redirect_to: window.location.origin + '/auth/reset-password',
+                    }),
+                }
+            );
+
+            const data = await response.json();
+            if (!response.ok) {
+                toast({ variant: "destructive", title: "Error", description: data.error || "Failed to send reset email." });
             } else {
                 setIsSubmitted(true);
             }
