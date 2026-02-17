@@ -1,41 +1,35 @@
 
 
-## Problem 1: Application Status Stays "Draft" After Submit
+# Fix: Assign All Permissions to Super Administrator Role
 
-**Root Cause:** When a client submits a draft application, the code tries to UPDATE the `certification_applications` table (changing status from 'draft' to 'submitted'). However, the RLS policies on this table do NOT allow clients to UPDATE records -- only admins/officers can. The update silently fails, so the status remains 'draft'.
+## The Problem
 
-**Fix:** Add an RLS policy on `certification_applications` that allows clients to update their own organization's applications, but ONLY when the current status is 'draft' (to prevent clients from changing status on submitted applications).
+The entire admin portal is currently broken for all users, including the Super Administrator. When you log in as `admin@africanhalaal.com`, you see only the Dashboard link in the sidebar, and most dashboard content is hidden. This is because:
 
-SQL migration:
-```text
-CREATE POLICY "Clients can update own draft applications"
-  ON certification_applications FOR UPDATE
-  USING (
-    status = 'draft'
-    AND organization_id IN (
-      SELECT profiles.organization_id FROM profiles WHERE profiles.id = auth.uid()
-    )
-  );
-```
+- The `role_permissions` table (which links roles to permissions) is **completely empty** -- it has 0 rows
+- Even though the "Super Administrator" role exists and is assigned to your account, it has no permissions attached
+- Every page and sidebar item checks permissions before showing content, so everything is hidden
 
----
+## What Will Be Fixed
 
-## Problem 2: Send Status Update Emails to Client AND Admin Emails
+A single SQL migration will insert all 70 permissions into the `role_permissions` table for the Super Administrator role. After this:
 
-**Current State:** The `send-status-notification` edge function only sends emails to the client's contact email. You want every status change (from submission through final status) to also notify `admin@africanhalaal.com` and `operations@africanhalaal.com`.
+- All sidebar menu items will appear (Applications, Certificates, Inspections, Users, Roles, etc.)
+- All dashboard stats, cards, and quick actions will be visible
+- You will be able to access Roles & Permissions to manage other roles (like CIDO)
+- You will be able to assign permissions to other roles through the Permission Matrix UI
 
-**Fix:** Update the `send-status-notification` edge function to send to all three recipients: the client contact email + the two admin emails.
+## Technical Details
 
-Changes to `supabase/functions/send-status-notification/index.ts`:
-- Change the `to` field in `resend.emails.send()` from `[contact_email]` to `[contact_email, "admin@africanhalaal.com", "operations@africanhalaal.com"]`
-- For the admin copies, adjust the greeting to reference the organization name and application number so admins have full context
+**Migration SQL:**
+- Query all permission IDs from the `permissions` table
+- Insert a row into `role_permissions` for each permission, linked to the Super Administrator role ID (`bfeb6e6a-83f1-42be-9f89-1f3a5fe967e1`)
+- Use `ON CONFLICT DO NOTHING` to make the migration safe to re-run
 
----
+**No code changes required** -- the frontend already reads permissions dynamically. Once the database has the correct data, everything will work.
 
-## Summary of Changes
-
-| File | Change |
-|------|--------|
-| New SQL migration | Add RLS policy allowing clients to update their own draft applications |
-| `supabase/functions/send-status-notification/index.ts` | Add `admin@africanhalaal.com` and `operations@africanhalaal.com` as CC/recipients on every status notification email |
+| Change | Details |
+|--------|---------|
+| New SQL migration | Insert all 70 permissions for Super Administrator role into `role_permissions` |
+| Files modified | 0 application code files -- this is purely a data fix |
 
