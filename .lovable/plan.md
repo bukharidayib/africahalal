@@ -1,177 +1,182 @@
 
-# Fix: Align Workflow Stages with Your 7 Application Statuses and Make Permissions Work End-to-End
+# Enhancement: Full Status Email Notifications + PDF Certificate Attachment on Approval
 
-## What You Have vs. What You Need
+## Current State Assessment
 
-### The Problem in Plain Language
+After reading all relevant files, here is exactly what already works and what is missing:
 
-Your system has a **mismatch** in three places:
+### What Already Works
+- `send-status-notification` edge function exists and sends branded HTML emails via Resend for all 7 statuses
+- `ApplicationDetail.tsx` already calls this function immediately after every status update
+- For `approved` status, the email already includes a green certificate details block (number, scope, dates) in the email body
+- The certificate record is created in the `certificates` table before the email is sent
 
-**1. Workflow Stages in the database (6 stages — wrong names):**
-```
-Stage 1: APPLICATION      → Application Submission
-Stage 2: DOC_REVIEW       → Documentation Review
-Stage 3: INSPECTION       → Inspection
-Stage 4: SHARIAH          → Shariah Review        ← not one of your 7 statuses
-Stage 5: CERT_ISSUE       → Certificate Issuance
-Stage 6: SURVEILLANCE     → Surveillance & Renewal ← not one of your 7 statuses
-```
-
-**2. Your 7 application statuses (what you actually use):**
-```
-submitted
-under_review
-awaiting_inspection   (displayed as "Inspection Scheduled")
-inspection_complete   (displayed as "Inspection Completed")
-approved
-rejected
-suspended
-```
-
-**3. The Workflow Stage Permissions — barely configured:**
-- `super_admin` has **zero** workflow stage assignments — meaning even super admins technically fail the strict `can_perform_workflow_action()` check
-- `cido` only has DOC_REVIEW and APPLICATION stages — incomplete
-
-These three layers need to be aligned so that:
-- A role's permissions tell WHAT they can do
-- The workflow stage assignments tell AT WHICH STAGE they can do it
-- The application status tells WHERE in the process an application is
+### What Is Missing / Broken
+1. **No PDF certificate attached to the approval email** — the email shows certificate details as text, but the client does not receive an actual downloadable PDF certificate file
+2. **No congratulations-style dedicated approval email** — the approved email uses the same template as all status updates (a generic "status changed" layout)
+3. The PDF is currently generated only in the browser (via `html-to-image` + `jsPDF`) — this approach cannot work inside an edge function
 
 ---
 
-## The Full Fix: 3 Parts
+## The Solution: Serverside PDF Generation via Resend's PDF Attachment Support
+
+Resend supports sending emails with **base64-encoded file attachments**. The edge function can generate a clean, professional certificate PDF using pure HTML-to-PDF rendering — no browser needed.
+
+The approach:
+- Generate an HTML certificate document server-side in the edge function
+- Use a headless PDF approach: encode the certificate HTML as a base64 PDF using a Deno-compatible PDF library or a data-URI PDF workaround
+- Attach it to the Resend email as `attachments: [{ filename, content (base64) }]`
+
+**Best available approach for Deno edge functions:** Use `jsPDF` via `npm:jspdf` (Deno supports npm specifiers) to build a clean multi-section PDF certificate server-side. This is the same library used in the browser, but now runs in the Deno runtime inside the edge function.
 
 ---
 
-### Part 1 — Replace the 6 Workflow Stages with Your Exact 7 Statuses (Database Migration)
-
-The workflow stages need to match your actual application lifecycle exactly. We will:
-- Delete all existing workflow stages and their permissions
-- Insert 7 new stages that perfectly match your 7 application statuses
-
-**New workflow stages (matching your business flow):**
-
-| Stage Order | System Code | Display Name | Maps to Application Status |
-|-------------|-------------|--------------|---------------------------|
-| 1 | `SUBMITTED` | Submitted | `submitted` |
-| 2 | `UNDER_REVIEW` | Under Review | `under_review` |
-| 3 | `INSPECTION_SCHEDULED` | Inspection Scheduled | `awaiting_inspection` |
-| 4 | `INSPECTION_COMPLETED` | Inspection Completed | `inspection_complete` |
-| 5 | `APPROVED` | Approved | `approved` |
-| 6 | `REJECTED` | Rejected | `rejected` |
-| 7 | `SUSPENDED` | Suspended | `suspended` |
-
-**Why this is the right approach:** The workflow stage system is designed to control WHO can do WHAT at each point in the process. By naming stages after your actual statuses, the Role Editor becomes intuitive — when you open Stage 3 "Inspection Scheduled", you know exactly which applications are in that stage and what permissions are needed.
+## Detailed Plan: 3 Changes
 
 ---
 
-### Part 2 — Seed Correct Workflow Stage Permissions for Both Roles (Database Migration)
+### Change 1 — Upgrade `send-status-notification` Edge Function
 
-After creating the correct stages, we need to assign permissions to roles at each stage. This is the data currently missing from `workflow_stage_permissions`.
+**File:** `supabase/functions/send-status-notification/index.ts`
 
-**For `super_admin` — full access at every stage:**
+#### 1a. Split into two email paths
 
-| Stage | Permissions Assigned |
-|-------|---------------------|
-| Submitted | applications.view, applications.update, applications.manage |
-| Under Review | applications.view, applications.update, applications.approve, applications.reject, documentation.view, documentation.approve |
-| Inspection Scheduled | applications.view, inspections.view, inspections.manage, inspections.schedule |
-| Inspection Completed | applications.view, inspections.view, inspections.approve_report, applications.update |
-| Approved | applications.view, certificates.view, certificates.issue, certificates.update |
-| Rejected | applications.view, applications.update |
-| Suspended | applications.view, applications.update, certificates.update, certificates.revoke |
+**For all non-approved statuses:** Keep the existing branded status update email template (no changes needed — it already works perfectly).
 
-**For `cido` — appropriate access based on their role (Certification and Inspection Delivery Officer):**
+**For `approved` status only:** Send a completely separate **congratulations email** with:
+- A celebratory green header: "🎉 Congratulations — Your Halal Certification is Approved!"
+- Certificate details prominently displayed
+- A "Download Certificate" button linking to the Certificate Vault in the client portal
+- The actual **PDF certificate attached** to the email
 
-| Stage | Permissions Assigned |
-|-------|---------------------|
-| Submitted | applications.view |
-| Under Review | applications.view, applications.update, documentation.view, documentation.approve |
-| Inspection Scheduled | applications.view, inspections.view, inspections.schedule, inspections.manage |
-| Inspection Completed | applications.view, inspections.view, inspections.approve_report, applications.update |
-| Approved | applications.view, certificates.view, certificates.issue |
-| Rejected | applications.view |
-| Suspended | applications.view |
+#### 1b. Generate the PDF certificate server-side
 
-**Important note:** The `cido` role already has the right global permissions. The workflow stage assignments above tell the system at WHICH stage those permissions can actually be exercised.
+Inside the edge function, when status is `approved`:
 
----
+1. Fetch the certificate record from the `certificates` table (certificate_number, scope, issue_date, expiry_date, qr_hash)
+2. Build the certificate as a PDF using `jsPDF` (via `npm:jspdf`):
+   - A4 portrait page (210 × 297mm)
+   - African Halal branding header (green gradient background, title)
+   - "This is to certify that" + Organization name (large, prominent)
+   - Certification scope in a styled box
+   - Certificate number, issue date, expiry date in a grid
+   - Verification QR code URL printed as text (QR image not possible server-side without extra library)
+   - Footer with "African Halal Certification Board" and standard reference
+3. Call `pdf.output('arraybuffer')` → convert to base64 string
+4. Pass to Resend `attachments: [{ filename: 'Certificate-{number}.pdf', content: base64string }]`
 
-### Part 3 — Fix the ApplicationDetail Status Update Panel (Code)
+#### 1c. Congratulations email template (approved only)
 
-Currently the Status Update dropdown in `ApplicationDetail.tsx` shows an option called `"awaiting_inspection"` mapped to label `"Inspection Scheduled"` — which is correct. However, the dropdown **does not enforce any workflow permission check** before letting any admin change any status. We need to:
-
-1. Map each application status to its corresponding new workflow stage code so the UI can check permissions
-2. Show which status transitions are allowed for the current user based on their role's workflow stage permissions
-3. Disable status options the current user's role is not permitted to set
-
-**Status → Stage mapping (for permission enforcement):**
 ```
-submitted           → SUBMITTED
-under_review        → UNDER_REVIEW
-awaiting_inspection → INSPECTION_SCHEDULED
-inspection_complete → INSPECTION_COMPLETED
-approved            → APPROVED
-rejected            → REJECTED
-suspended           → SUSPENDED
+Subject: 🎉 Congratulations! Your Halal Certificate is Ready — {application_number}
+
+Header: Celebratory green gradient with trophy/checkmark
+Body:
+  - "Dear {organization_name},"
+  - "We are delighted to inform you that your Halal Certification application has been approved..."
+  - Certificate details card (number, scope, validity period, expiry)
+  - CTA button: "View Your Certificate Vault" → https://africahalal.lovable.app/client/certificates
+  - "Your certificate is also attached to this email as a PDF for your records."
+  - CC: admin@africanhalaal.com, operations@africanhalaal.com
 ```
 
----
+#### 1d. Keep existing generic status email for all other statuses
 
-### Part 4 — Update the ApplicationTracker Client Component (Code)
-
-The `ApplicationTracker.tsx` shown to clients currently only shows 5 steps in the visual stepper (skipping Rejected and Suspended as separate visual states). We need to ensure it correctly reflects all 7 statuses so clients always see an accurate picture.
-
-The tracker currently has:
-```
-Submitted → Under Review → Inspection Scheduled → Inspection Completed → Approved
-```
-
-This is fine as a happy-path flow — but the status labels displayed at the bottom (next step text) need to be complete and accurate for all 7 statuses including Rejected and Suspended.
+No changes to the non-approved email path — it already handles all 7 statuses with the correct messages, colors, and CC list.
 
 ---
 
-## Technical Summary of All Changes
+### Change 2 — Update `ApplicationDetail.tsx` to Pass Certificate Data
 
-### Database Migration (SQL)
-```sql
--- 1. Remove old workflow_stage_permissions (they reference old stage IDs)
--- 2. Remove old workflow_stages (the 6 mismatched ones)
--- 3. Insert 7 new workflow stages matching your application statuses
--- 4. Insert workflow_stage_permissions for super_admin at all 7 stages
--- 5. Insert workflow_stage_permissions for cido at all 7 stages
-```
+**File:** `src/admin/pages/ApplicationDetail.tsx`
 
-### Code Changes
+Currently, in `handleStatusUpdate()`, when status changes to `approved`:
+1. The certificate is created in the DB (lines 331–344)
+2. Then the email is sent (lines 352–369)
 
-| File | What Changes |
-|------|-------------|
-| `src/admin/pages/ApplicationDetail.tsx` | Add permission checking per stage before allowing status transitions; map status values to stage codes |
-| `src/components/ApplicationTracker.tsx` | Minor: ensure all 7 status labels show correctly for client-facing view |
+The edge function already fetches the certificate from the DB using `application_id`. This means **no changes are needed** in `ApplicationDetail.tsx` for the certificate data — the edge function already handles it.
+
+However, there is one small improvement to make: the email is currently sent **immediately after the status update** but **before `fetchApplicationDetails()` is called**. This is fine because the certificate is inserted into the DB before the email call. The ordering is correct.
+
+**The only change needed:** Pass an additional `certificate_number` field in the email body payload so the edge function can use it as the PDF filename without needing an extra DB lookup. This is a minor optimization.
 
 ---
 
-## What This Means in Practice After the Fix
+### Change 3 — Improve the Non-Approved Status Emails (Minor)
 
-**When a CIDO user opens an application and tries to change status:**
-1. The system checks their role's `workflow_stage_permissions` for the **target status's stage**
-2. If they have `applications.update` at that stage → the option is available
-3. If they don't → the option is grayed out with a tooltip explaining why
+The existing status email body already works. One small addition to make each status email feel more personalized:
 
-**When a Super Admin opens an application:**
-- All status options are available (they have permissions at every stage)
+Add a **"What happens next?"** section specific to each status:
 
-**In the Role Editor → Workflow Stages tab:**
-- You will now see 7 stages matching your exact business process
-- Each stage shows checkboxes for what permissions that role can exercise there
-- This is fully manageable by any Super Admin going forward
+| Status | Next Step Text |
+|--------|---------------|
+| `submitted` | "Our team will review your application within 3-5 business days." |
+| `under_review` | "An officer has been assigned and will contact you if additional documents are needed." |
+| `awaiting_inspection` | "Please prepare your facility. An inspector will contact you to confirm the exact date." |
+| `inspection_complete` | "The findings are under review. A decision will be made within 5 business days." |
+| `rejected` | "You may contact our support team to discuss reapplication guidelines." |
+| `suspended` | "Immediate action is required. Contact support@africanhalaal.com urgently." |
+
+This makes the emails more informative and reduces inbound support queries.
+
+---
+
+## Technical Architecture
+
+```text
+Admin clicks "Update Status" → approved
+         │
+         ▼
+ApplicationDetail.tsx
+  1. UPDATE certification_applications SET status = 'approved'
+  2. Log audit
+  3. INSERT INTO certificates (creates record with cert number)
+  4. supabase.functions.invoke('send-status-notification', { body: { application_id, new_status: 'approved', ... } })
+         │
+         ▼
+send-status-notification Edge Function (Deno)
+  ├── Detects new_status === 'approved'
+  ├── Fetches certificate from DB (certificate_number, scope, issue_date, expiry_date, qr_hash)
+  ├── Generates PDF using jsPDF (npm:jspdf)
+  │     ├── Page 1: Full certificate layout
+  │     └── pdf.output('arraybuffer') → base64
+  └── Resend.emails.send({
+        to: [contact_email, admin@, operations@],
+        subject: "🎉 Congratulations! Your Halal Certificate is Ready",
+        html: <congratulations email template>,
+        attachments: [{
+          filename: "Certificate-{number}.pdf",
+          content: base64pdf
+        }]
+      })
+         │
+         ▼
+Client receives:
+  ✅ Beautiful congratulations HTML email
+  ✅ PDF certificate attached (downloadable)
+  ✅ Link to Certificate Vault in client portal
+```
 
 ---
 
 ## Files to Change
 
-| File | Type | Description |
+| File | Type | What Changes |
 |------|------|-------------|
-| New migration SQL | Database | Replace 6 old stages with 7 correct ones + seed all stage permissions for both roles |
-| `src/admin/pages/ApplicationDetail.tsx` | Code | Add per-status permission gating in the status update panel |
-| `src/components/ApplicationTracker.tsx` | Code | Ensure all 7 statuses render correctly in the client-facing tracker |
+| `supabase/functions/send-status-notification/index.ts` | Edge Function | Add PDF generation with `npm:jspdf`, split email into two paths (approved = congratulations + PDF attachment; all others = existing status update email), add "What happens next?" section to non-approved emails |
+| `src/admin/pages/ApplicationDetail.tsx` | Code (minor) | Pass `certificate_number` in the email invocation payload (minor optimization — avoids one extra DB lookup in the edge function) |
+
+---
+
+## Why jsPDF in Deno (Not Puppeteer/HTML2PDF)
+
+Puppeteer requires a full Chromium browser — impossible in Supabase edge functions (Deno). Other headless PDF libraries have no Deno support. `jsPDF` is a pure JavaScript PDF construction library with full npm compatibility and no browser dependency. It runs natively in Deno via `npm:jspdf`. The certificate will be built programmatically with styled text, boxes, and lines — matching the design language of the existing `CertificateTemplate.tsx`.
+
+The PDF will include:
+- Green header bar with "AFRICAN HALAL INTEGRITY SYSTEM" title
+- Organization name (large, centered)
+- "has been assessed and found to be in compliance with AHI Halal Standards"
+- Scope box
+- Certificate number, issue date, expiry date
+- "Verification URL: https://africahalal.lovable.app/verify?id={qr_hash}"
+- Footer: "Authorized by African Halal Certification Board"
