@@ -47,6 +47,7 @@ import MyBusinesses from "./pages/client/MyBusinesses";
 // Admin Portal
 import { AdminAuthProvider } from "./admin/contexts/AdminAuthContext";
 import AdminLogin from "./admin/pages/AdminLogin";
+import AdminRegister from "./admin/pages/AdminRegister";
 import AdminDashboard from "./admin/pages/AdminDashboard";
 import Applications from "./admin/pages/Applications";
 import Certificates from "./admin/pages/Certificates";
@@ -137,6 +138,7 @@ const App = () => (
             {/* Admin Portal Routes - Layout route pattern ensures provider wraps all children */}
             <Route path="/admin" element={<AdminProviderWrapper />}>
               <Route path="login" element={<AdminLogin />} />
+              <Route path="register" element={<AdminRegister />} />
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="applications" element={<Applications />} />
               <Route path="applications/:id" element={<ApplicationDetail />} />
