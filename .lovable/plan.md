@@ -1,93 +1,86 @@
 
-# Fix Admin Invitation Email & Admin Onboarding Flow
+# Fix Admin Invitation: Email Link + Admin Registration Page
 
-## Problems Found (Deep Investigation)
+## What Was Found (Root Cause Analysis)
 
-### Problem 1: Wrong Signup Destination for Invited Admins
-The invitation email sends a link to `/auth/signup?email=...&invited=true` — this is the **client portal** signup page. It asks for NRC number (a Zambian national ID), which admin staff don't have as a requirement. After creating their account, the page redirects them to `/auth/signin` (the client portal sign-in), not `/admin/login`. Admin users never land on the right portal.
+The previous plan was approved but its file changes were not committed to the codebase. Two critical pieces are still broken:
 
-### Problem 2: Email Technically Sends But Content Needs Improvement
-The edge function logs confirm the invitation email is being sent successfully (HTTP 200, Resend confirms with an email ID). However:
-- The email may be going to spam because it links to the client signup page instead of a proper admin onboarding route
-- The email design, while functional, can be made more professional and trustworthy
-- There is no "Admin Portal" branding distinction in the email body — it looks the same as a client invite
-
-### Problem 3: No Dedicated Admin Registration Page
-There is currently no `/admin/register` or equivalent route. Invited admins should land on a simplified registration page that:
-- Does NOT ask for NRC (not required for admin staff)
-- Shows "Admin Portal" branding clearly
-- Redirects to `/admin/login` after completion, not the client portal
-
----
-
-## What Will Be Fixed
-
-### 1. Create `/admin/register` Page
-A new dedicated admin registration page at `src/admin/pages/AdminRegister.tsx` that:
-- Pre-fills email from the URL query param (same as current signup)
-- Collects only: Full Name, Phone, Password (no NRC — not required for admin staff)
-- After successful signup, signs the user out, marks the invitation accepted, and redirects to `/admin/login`
-- Shows clear "Admin Portal Invitation" branding
-
-### 2. Update Invitation Email — Beautiful New Template
-Redesign `supabase/functions/send-invitation/index.ts` with a premium email template:
-- AHIS logo area with green gradient header
-- Crescent/shield icon for Halal/Islamic branding feel
-- Role badge highlighting the specific role being assigned (e.g. "Certification Officer")
-- Inviter name displayed prominently
-- Expiry countdown callout (7 days)
-- CTA button pointing to the new `/admin/register?email=...&invited=true` route
-- Secondary link for existing users to go directly to `/admin/login`
-- Clean footer with legal disclaimer and support contact
-
-### 3. Update the Invitation Link URL
-Change the `href` in the email from:
+**Issue 1 — Wrong link in invitation email**
+In `supabase/functions/send-invitation/index.ts` (line 111), the "Accept Invitation" button links to:
 ```
 /auth/signup?email=...&invited=true
 ```
-to:
-```
-/admin/register?email=...&invited=true&role=...
-```
-This ensures invited admins land on the correct admin-specific registration page.
+This sends invited admins to the **client portal** signup, which requires an NRC number (Zambian national ID) and redirects to the client portal upon completion — not the admin portal.
 
-### 4. Wire Up the New Route in App.tsx
-Add `/admin/register` to the router so the new page is reachable.
+**Issue 2 — AdminRegister page does not exist**
+`src/admin/pages/AdminRegister.tsx` was never created. There is no `/admin/register` route in `App.tsx`. Even if the email link was corrected, there would be no page for invited admins to land on.
+
+**Issue 3 — Email template is plain and not fully branded**
+The current email uses a simple green header but lacks the role badge, inviter attribution callout, expiry warning, and secondary "already have an account" admin login link that were planned.
 
 ---
 
-## Technical Details
+## What Will Be Built
 
-| File | Change |
-|------|--------|
-| `supabase/functions/send-invitation/index.ts` | New beautiful email template + correct invitation link URL |
-| `src/admin/pages/AdminRegister.tsx` | New admin-specific registration page (no NRC field) |
-| `src/App.tsx` | Add `/admin/register` route |
+### 1. Create `src/admin/pages/AdminRegister.tsx`
+A dedicated admin-only registration page that:
+- Reads `?email=...` from the URL query string and pre-fills the email field (read-only, cannot be changed)
+- Collects only: **Full Name**, **Phone**, **Password** (+ Confirm Password with strength meter)
+- Has a password strength indicator and generate-password button (matching the client SignUp UX)
+- On submit: calls `supabase.auth.signUp()`, updates profile, marks `admin_invitations` as `accepted`, signs the user out immediately, and redirects to `/admin/login` with a toast message
+- Shows clear "Admin Portal" branding with the AHIS logo and a shield icon
+- Has a link back to `/admin/login` for users who already have accounts
 
-### New Email Design Highlights
-- Deep green gradient header with AHIS wordmark
-- Role assignment badge (e.g. "Certification Officer — Administrative Access")
-- Inviter attribution: "Invited by John Doe"
-- 7-day expiry warning callout in amber
-- Prominent green CTA button: "Create Your Admin Account"
-- "Already have an account? Sign in to Admin Portal" secondary link
-- Professional footer with copyright and support email
+### 2. Add `/admin/register` route in `src/App.tsx`
+Add `<Route path="register" element={<AdminRegister />} />` inside the existing `/admin` route group, alongside the existing `login` route.
 
-### Admin Register Page Flow
+### 3. Update Email Template in `supabase/functions/send-invitation/index.ts`
+Fix the CTA button URL from `/auth/signup` → `/admin/register` and upgrade the email design:
+- Deep green gradient header with "Africa Halal Integrity System — Admin Portal"
+- Role badge callout box: "You have been invited as **{role_name}**"
+- Inviter credit line: "Invited by **{inviter_name}**"
+- 7-day expiry amber warning box
+- Large green "Create Your Admin Account" CTA button → `/admin/register?email=...&invited=true&role=...`
+- Secondary text: "Already have an admin account? Sign in here" → `/admin/login`
+- Professional footer with copyright
+
+### 4. Deploy the Updated Edge Function
+After saving the edge function file, deploy it so the next invitation email sent uses the new template and correct URL.
+
+---
+
+## Files Changed
+
+| File | What Changes |
+|------|-------------|
+| `src/admin/pages/AdminRegister.tsx` | **New file** — admin-only registration page |
+| `src/App.tsx` | Add `register` route inside the `/admin` route group |
+| `supabase/functions/send-invitation/index.ts` | Fix CTA URL + upgrade email template |
+
+No database migration needed — the `admin_invitations` table already has all required columns.
+
+---
+
+## Admin Register Page Flow
+
 ```text
-Invited admin clicks email link
-        ↓
-/admin/register?email=xxx@yyy.com&invited=true
-        ↓
-Fills: Full Name, Phone, Password (no NRC)
-        ↓
-supabase.auth.signUp() called
-        ↓
-Profile updated, invitation marked "accepted"
-        ↓
-User signed out (must confirm email)
-        ↓
-Redirected to /admin/login with success toast
+Invited admin receives email
+         ↓
+Clicks "Create Your Admin Account" button
+         ↓
+Lands on /admin/register?email=xxx@yyy.com&invited=true
+         ↓
+Email pre-filled (read-only), enters: Full Name, Phone, Password
+         ↓
+Submits → supabase.auth.signUp() with emailRedirectTo: /admin/login
+         ↓
+Profile updated with full_name + phone
+         ↓
+admin_invitations record updated → status: 'accepted'
+         ↓
+supabase.auth.signOut() called immediately
+         ↓
+Redirected to /admin/login with toast:
+"Account Created — Check Your Email"
+"Please verify your email address, then sign in to the Admin Portal."
 ```
-
-No database migration is required — this is purely a frontend page addition and edge function update.
