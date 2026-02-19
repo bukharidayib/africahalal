@@ -1,125 +1,177 @@
 
-# Fix: Dynamic RBAC Roles Blocked by Hardcoded RLS Policies
+# Fix: Align Workflow Stages with Your 7 Application Statuses and Make Permissions Work End-to-End
 
-## Root Cause (Confirmed by Full Investigation)
+## What You Have vs. What You Need
 
-The system has a fundamental architectural mismatch between two layers:
+### The Problem in Plain Language
 
-**Layer 1 — The Permission System (dynamic, correct)**
-- Custom roles are stored in `admin_roles` table (e.g. `cido`, `super_admin`)
-- Permissions are stored in `permissions` table with codes like `applications.view`
-- `role_permissions` links roles to their permissions
-- `get_user_permissions()` fetches a user's permission codes dynamically
-- The frontend sidebar correctly uses permission flags (`canViewApplications`)
-- `afrosaas@gmail.com` has the `cido` role which has `applications.view` permission ✅
+Your system has a **mismatch** in three places:
 
-**Layer 2 — The Database RLS Policies (hardcoded, broken)**
-- The `certification_applications` SELECT policy only allows:
-  ```sql
-  has_role(auth.uid(), 'super_admin') OR has_role(auth.uid(), 'certification_officer') OR assigned_officer_id = auth.uid()
-  ```
-- `has_role()` checks against a hardcoded `admin_role` ENUM which only has: `super_admin`, `certification_officer`, `finance_officer`, `it_system_auditor`
-- `cido` is NOT in this enum — it's a custom dynamic role
-- So even though the `cido` role has `applications.view` permission, the database RLS blocks all queries — returning 0 rows silently
+**1. Workflow Stages in the database (6 stages — wrong names):**
+```
+Stage 1: APPLICATION      → Application Submission
+Stage 2: DOC_REVIEW       → Documentation Review
+Stage 3: INSPECTION       → Inspection
+Stage 4: SHARIAH          → Shariah Review        ← not one of your 7 statuses
+Stage 5: CERT_ISSUE       → Certificate Issuance
+Stage 6: SURVEILLANCE     → Surveillance & Renewal ← not one of your 7 statuses
+```
 
-**This same mismatch affects ALL admin-facing tables:**
+**2. Your 7 application statuses (what you actually use):**
+```
+submitted
+under_review
+awaiting_inspection   (displayed as "Inspection Scheduled")
+inspection_complete   (displayed as "Inspection Completed")
+approved
+rejected
+suspended
+```
 
-| Table | Broken RLS Policy |
-|-------|------------------|
-| `certification_applications` | Only `super_admin` or `certification_officer` can SELECT |
-| `inspections` | Only `super_admin` or `certification_officer` can manage |
-| `non_conformance_notices` | Only `super_admin` or `certification_officer` can manage |
-| `approval_requests` | Only `super_admin` or `certification_officer` can INSERT/UPDATE |
-| `certificates` | Only `super_admin` or `certification_officer` can INSERT/UPDATE |
-| `certification_decisions` | Only `super_admin` or `certification_officer` can INSERT |
-| `inspectors` | Only `super_admin` can manage |
-| `audit_logs` | Only `it_system_auditor` or `super_admin` can SELECT |
+**3. The Workflow Stage Permissions — barely configured:**
+- `super_admin` has **zero** workflow stage assignments — meaning even super admins technically fail the strict `can_perform_workflow_action()` check
+- `cido` only has DOC_REVIEW and APPLICATION stages — incomplete
 
-## The Fix: Replace Hardcoded `has_role()` Checks with Permission-Based Checks
+These three layers need to be aligned so that:
+- A role's permissions tell WHAT they can do
+- The workflow stage assignments tell AT WHICH STAGE they can do it
+- The application status tells WHERE in the process an application is
 
-The correct approach is to replace `has_role(auth.uid(), 'certification_officer')` with `has_permission(auth.uid(), 'applications.view')`. This way:
-- The database enforces access based on **what the role is allowed to do** (permissions), not **what the role is named**
-- Any custom role (like `cido`) that has been granted the relevant permission will automatically get access
-- No more dependency on the hardcoded `admin_role` enum for access control
+---
 
-### New `is_admin_user()` check
-For broad SELECT policies (e.g. "any admin can view"), keep using `is_admin_user()` — it checks the `user_roles` table directly and works with any role name.
+## The Full Fix: 3 Parts
 
-### Updated Policy Strategy
+---
 
-| Action | Old Policy | New Policy |
-|--------|-----------|-----------|
-| SELECT applications | `has_role('super_admin') OR has_role('certification_officer')` | `is_admin_user(auth.uid())` |
-| UPDATE applications | `has_role('super_admin') OR has_role('certification_officer')` | `has_permission(auth.uid(), 'applications.update')` |
-| INSERT applications | `has_role('super_admin') OR has_role('certification_officer')` | `has_permission(auth.uid(), 'applications.create')` |
-| SELECT inspections | `is_admin_user()` ✅ | keep as-is |
-| MANAGE inspections | `has_role('super_admin') OR has_role('certification_officer')` | `has_permission(auth.uid(), 'inspections.manage')` |
-| INSERT/UPDATE certificates | `has_role('certification_officer')` | `has_permission(auth.uid(), 'certificates.issue')` |
-| SELECT audit_logs | `has_role('it_system_auditor') OR has_role('super_admin')` | `has_permission(auth.uid(), 'audit_logs.view')` |
-| MANAGE inspectors | `has_role('super_admin')` | `has_permission(auth.uid(), 'inspectors.manage')` |
+### Part 1 — Replace the 6 Workflow Stages with Your Exact 7 Statuses (Database Migration)
 
-## Also Fix: Two Missing Permission Codes in `CODE_TO_KEY`
+The workflow stages need to match your actual application lifecycle exactly. We will:
+- Delete all existing workflow stages and their permissions
+- Insert 7 new stages that perfectly match your 7 application statuses
 
-The `permissions` table has `inspectors.view` and `inspectors.manage` codes, but `src/admin/lib/permissions.ts` has no mapping for them in `CODE_TO_KEY`. This means even if the CIDO role has these inspector permissions, they never get translated to `canManageInspections` flags on the frontend.
+**New workflow stages (matching your business flow):**
 
-However, looking at the Permission interface — there is no `canManageInspectors` or `canViewInspectors` field at all. The sidebar uses `canManageInspections` (plural, for the Inspections list) as the gate for the "Inspectors" nav item, which is semantically wrong.
+| Stage Order | System Code | Display Name | Maps to Application Status |
+|-------------|-------------|--------------|---------------------------|
+| 1 | `SUBMITTED` | Submitted | `submitted` |
+| 2 | `UNDER_REVIEW` | Under Review | `under_review` |
+| 3 | `INSPECTION_SCHEDULED` | Inspection Scheduled | `awaiting_inspection` |
+| 4 | `INSPECTION_COMPLETED` | Inspection Completed | `inspection_complete` |
+| 5 | `APPROVED` | Approved | `approved` |
+| 6 | `REJECTED` | Rejected | `rejected` |
+| 7 | `SUSPENDED` | Suspended | `suspended` |
 
-**Fix needed:** Add `canViewInspectors` and `canManageInspectors` to the `Permission` interface and map the DB codes.
+**Why this is the right approach:** The workflow stage system is designed to control WHO can do WHAT at each point in the process. By naming stages after your actual statuses, the Role Editor becomes intuitive — when you open Stage 3 "Inspection Scheduled", you know exactly which applications are in that stage and what permissions are needed.
+
+---
+
+### Part 2 — Seed Correct Workflow Stage Permissions for Both Roles (Database Migration)
+
+After creating the correct stages, we need to assign permissions to roles at each stage. This is the data currently missing from `workflow_stage_permissions`.
+
+**For `super_admin` — full access at every stage:**
+
+| Stage | Permissions Assigned |
+|-------|---------------------|
+| Submitted | applications.view, applications.update, applications.manage |
+| Under Review | applications.view, applications.update, applications.approve, applications.reject, documentation.view, documentation.approve |
+| Inspection Scheduled | applications.view, inspections.view, inspections.manage, inspections.schedule |
+| Inspection Completed | applications.view, inspections.view, inspections.approve_report, applications.update |
+| Approved | applications.view, certificates.view, certificates.issue, certificates.update |
+| Rejected | applications.view, applications.update |
+| Suspended | applications.view, applications.update, certificates.update, certificates.revoke |
+
+**For `cido` — appropriate access based on their role (Certification and Inspection Delivery Officer):**
+
+| Stage | Permissions Assigned |
+|-------|---------------------|
+| Submitted | applications.view |
+| Under Review | applications.view, applications.update, documentation.view, documentation.approve |
+| Inspection Scheduled | applications.view, inspections.view, inspections.schedule, inspections.manage |
+| Inspection Completed | applications.view, inspections.view, inspections.approve_report, applications.update |
+| Approved | applications.view, certificates.view, certificates.issue |
+| Rejected | applications.view |
+| Suspended | applications.view |
+
+**Important note:** The `cido` role already has the right global permissions. The workflow stage assignments above tell the system at WHICH stage those permissions can actually be exercised.
+
+---
+
+### Part 3 — Fix the ApplicationDetail Status Update Panel (Code)
+
+Currently the Status Update dropdown in `ApplicationDetail.tsx` shows an option called `"awaiting_inspection"` mapped to label `"Inspection Scheduled"` — which is correct. However, the dropdown **does not enforce any workflow permission check** before letting any admin change any status. We need to:
+
+1. Map each application status to its corresponding new workflow stage code so the UI can check permissions
+2. Show which status transitions are allowed for the current user based on their role's workflow stage permissions
+3. Disable status options the current user's role is not permitted to set
+
+**Status → Stage mapping (for permission enforcement):**
+```
+submitted           → SUBMITTED
+under_review        → UNDER_REVIEW
+awaiting_inspection → INSPECTION_SCHEDULED
+inspection_complete → INSPECTION_COMPLETED
+approved            → APPROVED
+rejected            → REJECTED
+suspended           → SUSPENDED
+```
+
+---
+
+### Part 4 — Update the ApplicationTracker Client Component (Code)
+
+The `ApplicationTracker.tsx` shown to clients currently only shows 5 steps in the visual stepper (skipping Rejected and Suspended as separate visual states). We need to ensure it correctly reflects all 7 statuses so clients always see an accurate picture.
+
+The tracker currently has:
+```
+Submitted → Under Review → Inspection Scheduled → Inspection Completed → Approved
+```
+
+This is fine as a happy-path flow — but the status labels displayed at the bottom (next step text) need to be complete and accurate for all 7 statuses including Rejected and Suspended.
+
+---
+
+## Technical Summary of All Changes
+
+### Database Migration (SQL)
+```sql
+-- 1. Remove old workflow_stage_permissions (they reference old stage IDs)
+-- 2. Remove old workflow_stages (the 6 mismatched ones)
+-- 3. Insert 7 new workflow stages matching your application statuses
+-- 4. Insert workflow_stage_permissions for super_admin at all 7 stages
+-- 5. Insert workflow_stage_permissions for cido at all 7 stages
+```
+
+### Code Changes
+
+| File | What Changes |
+|------|-------------|
+| `src/admin/pages/ApplicationDetail.tsx` | Add permission checking per stage before allowing status transitions; map status values to stage codes |
+| `src/components/ApplicationTracker.tsx` | Minor: ensure all 7 status labels show correctly for client-facing view |
+
+---
+
+## What This Means in Practice After the Fix
+
+**When a CIDO user opens an application and tries to change status:**
+1. The system checks their role's `workflow_stage_permissions` for the **target status's stage**
+2. If they have `applications.update` at that stage → the option is available
+3. If they don't → the option is grayed out with a tooltip explaining why
+
+**When a Super Admin opens an application:**
+- All status options are available (they have permissions at every stage)
+
+**In the Role Editor → Workflow Stages tab:**
+- You will now see 7 stages matching your exact business process
+- Each stage shows checkboxes for what permissions that role can exercise there
+- This is fully manageable by any Super Admin going forward
+
+---
 
 ## Files to Change
 
-### 1. Database Migration (SQL)
-Drop the old hardcoded RLS policies and recreate them using `is_admin_user()` and `has_permission()`:
-
-**`certification_applications`:**
-- DROP "Officers view applications" → CREATE with `is_admin_user(auth.uid())`
-- DROP "Officers can update applications" → CREATE with `has_permission(auth.uid(), 'applications.update')`
-- DROP "Officers can insert applications" → CREATE with `has_permission(auth.uid(), 'applications.create')`
-
-**`inspections`:**
-- DROP "Officers can manage inspections" → CREATE with `has_permission(auth.uid(), 'inspections.manage')`
-
-**`non_conformance_notices`:**
-- DROP "Officers can manage NCNs" → CREATE with `has_permission(auth.uid(), 'enforcement.manage')`
-
-**`approval_requests`:**
-- DROP "Officers can insert approval requests" → CREATE with `has_permission(auth.uid(), 'applications.approve')`
-- DROP "Officers can update approval requests" → CREATE with `has_permission(auth.uid(), 'applications.approve')`
-
-**`certificates`:**
-- DROP "Officers can insert certificates" → CREATE with `has_permission(auth.uid(), 'certificates.issue')`
-- DROP "Officers can update certificates" → CREATE with `has_permission(auth.uid(), 'certificates.update')`
-
-**`certification_decisions`:**
-- DROP "Officers can insert decisions" → CREATE with `has_permission(auth.uid(), 'applications.approve')`
-
-**`inspectors`:**
-- DROP "Super admins can manage inspectors" → CREATE with `has_permission(auth.uid(), 'inspectors.manage')`
-
-**`audit_logs`:**
-- DROP "IT auditors and super admins can view audit logs" → CREATE with `has_permission(auth.uid(), 'audit_logs.view')`
-
-### 2. `src/admin/lib/permissions.ts`
-- Add `canViewInspectors: boolean` and `canManageInspectors: boolean` to the `Permission` interface
-- Add `'inspectors.view': 'canViewInspectors'` and `'inspectors.manage': 'canManageInspectors'` to `CODE_TO_KEY`
-- Add `false` defaults for the new fields in `emptyPermissions()`
-
-### 3. `src/admin/components/layout/AdminSidebar.tsx`
-- Change the "Inspectors" nav item permission from `'canManageInspections'` to `'canManageInspectors'`
-
-## Why This Fix Is Correct
-
-The RBAC system's contract is:
-> "A user can do X if their role has permission code X"
-
-The database should enforce this same contract. By replacing `has_role('hardcoded_name')` with `has_permission('permission_code')`, the RLS policies enforce exactly the same rules as the frontend permission flags — making the whole system consistent and future-proof. Any new custom role that is granted the right permissions will automatically get database-level access.
-
-## Summary of Changes
-
-| File | Type | Change |
-|------|------|--------|
-| New migration SQL | Database | Replace 10+ hardcoded `has_role()` RLS policies with `has_permission()` and `is_admin_user()` |
-| `src/admin/lib/permissions.ts` | Code | Add `canViewInspectors` and `canManageInspectors` to interface + CODE_TO_KEY |
-| `src/admin/components/layout/AdminSidebar.tsx` | Code | Fix Inspectors nav item to use `canManageInspectors` |
-
-No changes needed to `AdminRegister.tsx`, `accept-invitation`, or `send-invitation`.
+| File | Type | Description |
+|------|------|-------------|
+| New migration SQL | Database | Replace 6 old stages with 7 correct ones + seed all stage permissions for both roles |
+| `src/admin/pages/ApplicationDetail.tsx` | Code | Add per-status permission gating in the status update panel |
+| `src/components/ApplicationTracker.tsx` | Code | Ensure all 7 statuses render correctly in the client-facing tracker |
