@@ -1,35 +1,93 @@
 
+# Fix Admin Invitation Email & Admin Onboarding Flow
 
-# Fix: Assign All Permissions to Super Administrator Role
+## Problems Found (Deep Investigation)
 
-## The Problem
+### Problem 1: Wrong Signup Destination for Invited Admins
+The invitation email sends a link to `/auth/signup?email=...&invited=true` — this is the **client portal** signup page. It asks for NRC number (a Zambian national ID), which admin staff don't have as a requirement. After creating their account, the page redirects them to `/auth/signin` (the client portal sign-in), not `/admin/login`. Admin users never land on the right portal.
 
-The entire admin portal is currently broken for all users, including the Super Administrator. When you log in as `admin@africanhalaal.com`, you see only the Dashboard link in the sidebar, and most dashboard content is hidden. This is because:
+### Problem 2: Email Technically Sends But Content Needs Improvement
+The edge function logs confirm the invitation email is being sent successfully (HTTP 200, Resend confirms with an email ID). However:
+- The email may be going to spam because it links to the client signup page instead of a proper admin onboarding route
+- The email design, while functional, can be made more professional and trustworthy
+- There is no "Admin Portal" branding distinction in the email body — it looks the same as a client invite
 
-- The `role_permissions` table (which links roles to permissions) is **completely empty** -- it has 0 rows
-- Even though the "Super Administrator" role exists and is assigned to your account, it has no permissions attached
-- Every page and sidebar item checks permissions before showing content, so everything is hidden
+### Problem 3: No Dedicated Admin Registration Page
+There is currently no `/admin/register` or equivalent route. Invited admins should land on a simplified registration page that:
+- Does NOT ask for NRC (not required for admin staff)
+- Shows "Admin Portal" branding clearly
+- Redirects to `/admin/login` after completion, not the client portal
+
+---
 
 ## What Will Be Fixed
 
-A single SQL migration will insert all 70 permissions into the `role_permissions` table for the Super Administrator role. After this:
+### 1. Create `/admin/register` Page
+A new dedicated admin registration page at `src/admin/pages/AdminRegister.tsx` that:
+- Pre-fills email from the URL query param (same as current signup)
+- Collects only: Full Name, Phone, Password (no NRC — not required for admin staff)
+- After successful signup, signs the user out, marks the invitation accepted, and redirects to `/admin/login`
+- Shows clear "Admin Portal Invitation" branding
 
-- All sidebar menu items will appear (Applications, Certificates, Inspections, Users, Roles, etc.)
-- All dashboard stats, cards, and quick actions will be visible
-- You will be able to access Roles & Permissions to manage other roles (like CIDO)
-- You will be able to assign permissions to other roles through the Permission Matrix UI
+### 2. Update Invitation Email — Beautiful New Template
+Redesign `supabase/functions/send-invitation/index.ts` with a premium email template:
+- AHIS logo area with green gradient header
+- Crescent/shield icon for Halal/Islamic branding feel
+- Role badge highlighting the specific role being assigned (e.g. "Certification Officer")
+- Inviter name displayed prominently
+- Expiry countdown callout (7 days)
+- CTA button pointing to the new `/admin/register?email=...&invited=true` route
+- Secondary link for existing users to go directly to `/admin/login`
+- Clean footer with legal disclaimer and support contact
+
+### 3. Update the Invitation Link URL
+Change the `href` in the email from:
+```
+/auth/signup?email=...&invited=true
+```
+to:
+```
+/admin/register?email=...&invited=true&role=...
+```
+This ensures invited admins land on the correct admin-specific registration page.
+
+### 4. Wire Up the New Route in App.tsx
+Add `/admin/register` to the router so the new page is reachable.
+
+---
 
 ## Technical Details
 
-**Migration SQL:**
-- Query all permission IDs from the `permissions` table
-- Insert a row into `role_permissions` for each permission, linked to the Super Administrator role ID (`bfeb6e6a-83f1-42be-9f89-1f3a5fe967e1`)
-- Use `ON CONFLICT DO NOTHING` to make the migration safe to re-run
+| File | Change |
+|------|--------|
+| `supabase/functions/send-invitation/index.ts` | New beautiful email template + correct invitation link URL |
+| `src/admin/pages/AdminRegister.tsx` | New admin-specific registration page (no NRC field) |
+| `src/App.tsx` | Add `/admin/register` route |
 
-**No code changes required** -- the frontend already reads permissions dynamically. Once the database has the correct data, everything will work.
+### New Email Design Highlights
+- Deep green gradient header with AHIS wordmark
+- Role assignment badge (e.g. "Certification Officer — Administrative Access")
+- Inviter attribution: "Invited by John Doe"
+- 7-day expiry warning callout in amber
+- Prominent green CTA button: "Create Your Admin Account"
+- "Already have an account? Sign in to Admin Portal" secondary link
+- Professional footer with copyright and support email
 
-| Change | Details |
-|--------|---------|
-| New SQL migration | Insert all 70 permissions for Super Administrator role into `role_permissions` |
-| Files modified | 0 application code files -- this is purely a data fix |
+### Admin Register Page Flow
+```text
+Invited admin clicks email link
+        ↓
+/admin/register?email=xxx@yyy.com&invited=true
+        ↓
+Fills: Full Name, Phone, Password (no NRC)
+        ↓
+supabase.auth.signUp() called
+        ↓
+Profile updated, invitation marked "accepted"
+        ↓
+User signed out (must confirm email)
+        ↓
+Redirected to /admin/login with success toast
+```
 
+No database migration is required — this is purely a frontend page addition and edge function update.
