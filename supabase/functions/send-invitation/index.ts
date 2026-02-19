@@ -66,7 +66,10 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Missing required fields: email, role_id, invitation_id");
     }
 
-    const appUrl = "https://africahalal.lovable.app";
+    const origin = req.headers.get("origin") || req.headers.get("referer") || "";
+    const appUrl = origin.startsWith("http")
+      ? new URL(origin).origin
+      : "https://africahalal.lovable.app";
 
     const registerUrl = `${appUrl}/admin/register?email=${encodeURIComponent(email)}&invited=true&role=${encodeURIComponent(role_name || '')}`;
     const loginUrl = `${appUrl}/admin/login`;
