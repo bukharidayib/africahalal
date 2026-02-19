@@ -111,6 +111,7 @@ export default function ApplicationDetail() {
   const { toast } = useToast();
 
   const [application, setApplication] = useState<Application | null>(null);
+  const [clientProfile, setClientProfile] = useState<{ id: string; email: string; full_name: string } | null>(null);
   const [statusHistory, setStatusHistory] = useState<StatusHistory[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -200,6 +201,17 @@ export default function ApplicationDetail() {
       if (appError) throw appError;
       setApplication(appData);
       setNewStatus(appData.status);
+
+      // Fetch client profile email as fallback when organizations.contact_email is NULL
+      if (appData.organization_id) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .eq('organization_id', appData.organization_id)
+          .limit(1)
+          .single();
+        if (profileData) setClientProfile(profileData);
+      }
 
       // Check workflow permissions for this user
       checkWorkflowPermissions();
@@ -352,8 +364,9 @@ export default function ApplicationDetail() {
       }
 
       // Send status notification email
+      // Priority 1: organization contact_email, Priority 2: profile email (login email)
       try {
-        const contactEmail = application.organizations?.contact_email;
+        const contactEmail = application.organizations?.contact_email || clientProfile?.email;
         if (contactEmail) {
           await supabase.functions.invoke('send-status-notification', {
             body: {
@@ -365,6 +378,12 @@ export default function ApplicationDetail() {
               reason: statusReason || undefined,
               ...(newStatus === 'approved' && generatedCertNumber ? { certificate_number: generatedCertNumber } : {}),
             },
+          });
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Email not sent',
+            description: 'No contact email found for this organization. The client was not notified.',
           });
         }
       } catch (emailError) {
