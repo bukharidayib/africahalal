@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Calendar, FileText, Clock, CheckCircle2,
   XCircle, AlertCircle, User, MapPin, Loader2, Save, History,
-  Brain, ShieldAlert, ShieldCheck, HelpCircle
+  Brain, ShieldAlert, ShieldCheck, HelpCircle, Lock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type ApplicationStatus = Database['public']['Enums']['application_status'];
 
@@ -90,6 +91,20 @@ const statusConfig: Record<ApplicationStatus, { label: string; variant: 'default
   withdrawn: { label: 'Withdrawn', variant: 'outline' },
 };
 
+// Maps each application status to its corresponding workflow stage system_code
+const STATUS_TO_STAGE: Record<ApplicationStatus, string> = {
+  draft: 'SUBMITTED',
+  submitted: 'SUBMITTED',
+  under_review: 'UNDER_REVIEW',
+  awaiting_inspection: 'INSPECTION_SCHEDULED',
+  inspection_complete: 'INSPECTION_COMPLETED',
+  pending_decision: 'INSPECTION_COMPLETED',
+  approved: 'APPROVED',
+  rejected: 'REJECTED',
+  suspended: 'SUSPENDED',
+  withdrawn: 'REJECTED',
+};
+
 export default function ApplicationDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -107,11 +122,58 @@ export default function ApplicationDetail() {
   const [newStatus, setNewStatus] = useState<ApplicationStatus | ''>('');
   const [statusReason, setStatusReason] = useState('');
 
+  // Workflow permission: track which target statuses the current user can set
+  const [allowedStatuses, setAllowedStatuses] = useState<Set<ApplicationStatus>>(new Set());
+  const [isCheckingPermissions, setIsCheckingPermissions] = useState(false);
+
   useEffect(() => {
     if (id) {
       fetchApplicationDetails();
     }
   }, [id]);
+
+  async function checkWorkflowPermissions() {
+    setIsCheckingPermissions(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const allowed = new Set<ApplicationStatus>();
+
+      // Check permission for each target status by calling the DB function
+      await Promise.all(
+        STATUS_OPTIONS.map(async (opt) => {
+          const stageCode = STATUS_TO_STAGE[opt.value];
+          const { data } = await supabase.rpc('can_perform_workflow_action', {
+            _user_id: user.id,
+            _stage_code: stageCode,
+            _permission_code: 'applications.update',
+          });
+          if (data) allowed.add(opt.value);
+        })
+      );
+
+      // super_admin also gets approve/reject via applications.manage
+      await Promise.all(
+        STATUS_OPTIONS.map(async (opt) => {
+          if (allowed.has(opt.value)) return; // already allowed
+          const stageCode = STATUS_TO_STAGE[opt.value];
+          const { data } = await supabase.rpc('can_perform_workflow_action', {
+            _user_id: user.id,
+            _stage_code: stageCode,
+            _permission_code: 'applications.manage',
+          });
+          if (data) allowed.add(opt.value);
+        })
+      );
+
+      setAllowedStatuses(allowed);
+    } catch (e) {
+      console.error('Permission check error:', e);
+    } finally {
+      setIsCheckingPermissions(false);
+    }
+  }
 
   async function fetchApplicationDetails() {
     setIsLoading(true);
@@ -138,6 +200,9 @@ export default function ApplicationDetail() {
       if (appError) throw appError;
       setApplication(appData);
       setNewStatus(appData.status);
+
+      // Check workflow permissions for this user
+      checkWorkflowPermissions();
 
       // Fetch status history
       const { data: historyData, error: historyError } = await supabase
@@ -495,7 +560,7 @@ export default function ApplicationDetail() {
               <CardHeader>
                 <CardTitle className="text-lg">Update Application Status</CardTitle>
                 <CardDescription>
-                  Change the status of this application. A record will be kept in the history.
+                  Change the status of this application. Your role determines which transitions are permitted.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -509,22 +574,55 @@ export default function ApplicationDetail() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="new-status">New Status</Label>
-                    <Select
-                      value={newStatus}
-                      onValueChange={(val) => setNewStatus(val as ApplicationStatus)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select new status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="new-status">
+                      New Status
+                      {isCheckingPermissions && (
+                        <span className="ml-2 text-xs text-muted-foreground inline-flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Checking permissions...
+                        </span>
+                      )}
+                    </Label>
+                    <TooltipProvider>
+                      <Select
+                        value={newStatus}
+                        onValueChange={(val) => {
+                          if (allowedStatuses.has(val as ApplicationStatus) || allowedStatuses.size === 0) {
+                            setNewStatus(val as ApplicationStatus);
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select new status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((opt) => {
+                            const isAllowed = allowedStatuses.size === 0 || allowedStatuses.has(opt.value);
+                            return (
+                              <SelectItem
+                                key={opt.value}
+                                value={opt.value}
+                                disabled={!isAllowed}
+                                className={!isAllowed ? 'opacity-40 cursor-not-allowed' : ''}
+                              >
+                                <span className="flex items-center gap-2">
+                                  {!isAllowed && <Lock className="h-3 w-3 text-muted-foreground" />}
+                                  {opt.label}
+                                  {!isAllowed && (
+                                    <span className="text-xs text-muted-foreground ml-1">(no permission)</span>
+                                  )}
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </TooltipProvider>
+                    {allowedStatuses.size > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Your role can set {allowedStatuses.size} of {STATUS_OPTIONS.length} statuses. 
+                        Locked options require additional permissions.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -541,7 +639,12 @@ export default function ApplicationDetail() {
 
                 <Button
                   onClick={handleStatusUpdate}
-                  disabled={isSaving || !newStatus || newStatus === application.status}
+                  disabled={
+                    isSaving ||
+                    !newStatus ||
+                    newStatus === application.status ||
+                    (allowedStatuses.size > 0 && !allowedStatuses.has(newStatus as ApplicationStatus))
+                  }
                   className="gap-2"
                 >
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -550,6 +653,7 @@ export default function ApplicationDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+
 
           {/* AI Analysis Tab */}
           <TabsContent value="ai-analysis">
