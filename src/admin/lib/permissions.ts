@@ -79,6 +79,9 @@ export interface Permission {
   canViewReports: boolean;
   canDeleteReports: boolean;
   canExportReports: boolean;
+  // Inspectors
+  canViewInspectors: boolean;
+  canManageInspectors: boolean;
   // System
   canViewSettings: boolean;
   canUpdateSettings: boolean;
@@ -108,6 +111,7 @@ function emptyPermissions(): Permission {
     canCreateRoles: false, canViewRoles: false, canUpdateRoles: false, canDeleteRoles: false, canManageRoles: false,
     canViewAuditLogs: false,
     canCreateReports: false, canViewReports: false, canDeleteReports: false, canExportReports: false,
+    canViewInspectors: false, canManageInspectors: false,
     canViewSettings: false, canUpdateSettings: false, canManageSettings: false,
   };
 }
@@ -182,6 +186,8 @@ const CODE_TO_KEY: Record<string, keyof Permission> = {
   'settings.view': 'canViewSettings',
   'settings.update': 'canUpdateSettings',
   'settings.manage': 'canManageSettings',
+  'inspectors.view': 'canViewInspectors',
+  'inspectors.manage': 'canManageInspectors',
 };
 
 /** Convert an array of permission codes from the DB into the Permission object */

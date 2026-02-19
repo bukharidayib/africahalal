@@ -59,7 +59,7 @@ const navItems: NavItem[] = [
     title: 'Inspectors',
     href: '/admin/inspectors',
     icon: Users,
-    permission: 'canManageInspections',
+    permission: 'canManageInspectors',
   },
   {
     title: 'Enforcement',
