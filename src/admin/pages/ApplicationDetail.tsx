@@ -249,6 +249,7 @@ export default function ApplicationDetail() {
     if (!application || !newStatus || newStatus === application.status) return;
 
     setIsSaving(true);
+    let generatedCertNumber: string | undefined;
     try {
       const { error } = await supabase
         .from('certification_applications')
@@ -326,6 +327,7 @@ export default function ApplicationDetail() {
         expiryDate.setFullYear(issueDate.getFullYear() + 1);
 
         const certNumber = `AHI-ZAM-${issueDate.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        generatedCertNumber = certNumber;
         const qrHash = crypto.randomUUID();
 
         const { error: certError } = await supabase.from('certificates').insert({
@@ -361,6 +363,7 @@ export default function ApplicationDetail() {
               organization_name: application.organizations?.name || 'Unknown',
               contact_email: contactEmail,
               reason: statusReason || undefined,
+              ...(newStatus === 'approved' && generatedCertNumber ? { certificate_number: generatedCertNumber } : {}),
             },
           });
         }
