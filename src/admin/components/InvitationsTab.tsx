@@ -168,6 +168,7 @@ export default function InvitationsTab({ availableRoles, currentUserId }: Invita
             role_name: roleName,
             inviter_name: inviterProfile?.full_name || 'An administrator',
             invitation_id: invitation.id,
+            invitation_token: invitation.token,
           }),
         }
       );
@@ -268,6 +269,7 @@ export default function InvitationsTab({ availableRoles, currentUserId }: Invita
             role_name: roleName,
             inviter_name: inviterProfile?.full_name || 'An administrator',
             invitation_id: invitation.id,
+            invitation_token: invitation.token,
           }),
         }
       );

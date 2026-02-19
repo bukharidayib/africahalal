@@ -21,6 +21,7 @@ interface InvitationRequest {
   role_name: string;
   inviter_name: string;
   invitation_id: string;
+  invitation_token?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -59,7 +60,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Only admin users can send invitations");
     }
 
-    const { email, role_id, role_name, inviter_name, invitation_id }: InvitationRequest =
+    const { email, role_id, role_name, inviter_name, invitation_id, invitation_token }: InvitationRequest =
       await req.json();
 
     if (!email || !role_id || !invitation_id) {
@@ -71,7 +72,8 @@ const handler = async (req: Request): Promise<Response> => {
       ? new URL(origin).origin
       : "https://africahalal.lovable.app";
 
-    const registerUrl = `${appUrl}/admin/register?email=${encodeURIComponent(email)}&invited=true&role=${encodeURIComponent(role_name || '')}`;
+    const tokenParam = invitation_token ? `&token=${encodeURIComponent(invitation_token)}` : "";
+    const registerUrl = `${appUrl}/admin/register?email=${encodeURIComponent(email)}&invited=true&role=${encodeURIComponent(role_name || '')}${tokenParam}`;
     const loginUrl = `${appUrl}/admin/login`;
     const year = new Date().getFullYear();
 

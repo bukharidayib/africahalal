@@ -56,6 +56,8 @@ export default function AdminRegister() {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
+  const invitationToken = searchParams.get("token") || "";
+
   useEffect(() => {
     const invitedEmail = searchParams.get("email");
     if (invitedEmail) setEmail(invitedEmail);
@@ -106,11 +108,15 @@ export default function AdminRegister() {
           .update({ full_name: fullName, phone })
           .eq('id', authData.user.id);
 
-        // Mark invitation as accepted
-        await supabase.from('admin_invitations')
-          .update({ status: 'accepted', accepted_at: new Date().toISOString() })
-          .eq('email', email)
-          .eq('status', 'pending');
+        // Mark invitation as accepted via edge function (bypasses RLS for new users)
+        if (invitationToken) {
+          const { error: acceptError } = await supabase.functions.invoke('accept-invitation', {
+            body: { email, token: invitationToken },
+          });
+          if (acceptError) {
+            console.warn("Could not mark invitation as accepted:", acceptError.message);
+          }
+        }
 
         // Sign out immediately — user must confirm email first
         await supabase.auth.signOut();
