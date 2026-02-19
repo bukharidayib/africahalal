@@ -101,9 +101,12 @@ export function ApplicationTracker({ applications, isLoading }: ApplicationTrack
                   "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold",
                   app.status === 'approved' && "bg-green-500/10 text-green-600",
                   app.status === 'rejected' && "bg-destructive/10 text-destructive",
+                  app.status === 'suspended' && "bg-yellow-500/10 text-yellow-600",
                   !FINAL_STATUSES.includes(app.status) && "bg-primary/10 text-primary"
                 )}>
-                  {app.status?.replace(/_/g, ' ')}
+                  {app.status === 'awaiting_inspection' ? 'Inspection Scheduled'
+                    : app.status === 'inspection_complete' ? 'Inspection Completed'
+                    : app.status?.replace(/_/g, ' ')}
                 </span>
               </div>
             </CardHeader>
