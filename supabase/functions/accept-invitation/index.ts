@@ -33,7 +33,7 @@ serve(async (req: Request) => {
     // Look up the invitation matching email + token + pending status
     const { data: invitation, error: fetchError } = await supabaseAdmin
       .from("admin_invitations")
-      .select("id, status, expires_at")
+      .select("id, status, expires_at, role_id")
       .eq("email", email)
       .eq("token", token)
       .eq("status", "pending")
@@ -74,6 +74,46 @@ serve(async (req: Request) => {
     }
 
     console.log(`Invitation accepted for ${email}`);
+
+    // Look up the user's profile by email to get their user_id
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .single();
+
+    if (profileError || !profile) {
+      console.warn(`Profile not found for ${email} — role not assigned yet:`, profileError);
+      // Still return success — invitation was marked accepted
+      return new Response(
+        JSON.stringify({ success: true, warning: "Profile not found, role not assigned" }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Insert the role into user_roles using service role key (bypasses RLS)
+    const { error: roleError } = await supabaseAdmin
+      .from("user_roles")
+      .insert({
+        user_id: profile.id,
+        role_id: invitation.role_id,
+        assigned_by: null,
+      });
+
+    if (roleError) {
+      // If it's a duplicate (user already has this role), that's fine
+      if (roleError.code === "23505") {
+        console.log(`Role already assigned to ${email} — skipping`);
+      } else {
+        console.error("Failed to insert user role:", roleError);
+        return new Response(
+          JSON.stringify({ error: "Invitation accepted but failed to assign role" }),
+          { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+    } else {
+      console.log(`Role ${invitation.role_id} assigned to user ${profile.id}`);
+    }
 
     return new Response(
       JSON.stringify({ success: true }),
