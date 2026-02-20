@@ -4,7 +4,7 @@ import {
   ArrowLeft, Save, Shield, AlertTriangle, Info,
   FileText, FolderOpen, ClipboardList, DollarSign, Award,
   MessageSquare, Users, ScrollText, BarChart3, Settings,
-  UserCheck, CheckSquare, XSquare,
+  UserCheck, CheckSquare, XSquare, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -92,6 +92,7 @@ export default function RoleEditor() {
   const [stagePermissions, setStagePermissions] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [openStageId, setOpenStageId] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) loadData();
@@ -507,8 +508,8 @@ export default function RoleEditor() {
               <CardHeader>
                 <CardTitle>Workflow Stage Assignments</CardTitle>
                 <CardDescription>
-                  Choose which permissions this role can use at each stage of the certification process.
-                  Only permissions enabled in the <strong>Permissions tab</strong> will appear here.
+                  Control which permissions this role can use at each stage of the certification process.
+                  Only permissions enabled in the <strong>Permissions tab</strong> appear here.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -518,116 +519,111 @@ export default function RoleEditor() {
                     <p>No workflow stages configured.</p>
                   </div>
                 ) : (
-                  <div className="relative space-y-0">
-                    {/* Timeline line */}
-                    <div className="absolute left-5 top-6 bottom-6 w-0.5 bg-border hidden md:block" />
-
+                  <div className="space-y-2">
                     {workflowStages.map((stage, index) => {
                       const rolePerms = allPermissions.filter(p => selectedPermissions.has(p.code));
                       const stageCount = rolePerms.filter(p => stagePermissions.has(`${stage.id}:${p.id}`)).length;
                       const hasPerms = rolePerms.length > 0;
-
-                      // Group role's permissions by category for this stage
-                      const permsByCategory: Record<string, DynamicPermission[]> = {};
-                      rolePerms.forEach(p => {
-                        if (!permsByCategory[p.category]) permsByCategory[p.category] = [];
-                        permsByCategory[p.category].push(p);
-                      });
+                      const isOpen = openStageId === stage.id;
 
                       return (
-                        <div key={stage.id} className="relative flex gap-6 pb-6">
-                          {/* Timeline node */}
-                          <div className="relative z-10 shrink-0 hidden md:flex flex-col items-center">
-                            <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 ${stageCount > 0 ? 'bg-primary border-primary text-primary-foreground' : 'bg-background border-border text-muted-foreground'}`}>
-                              {index + 1}
-                            </div>
-                          </div>
-
-                          {/* Stage Card */}
-                          <div className="flex-1 border rounded-xl overflow-hidden">
-                            {/* Stage Header */}
-                            <div className={`flex items-start justify-between px-5 py-4 ${stageCount > 0 ? 'bg-primary/5' : 'bg-muted/30'}`}>
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge variant="outline" className="font-mono text-xs md:hidden">#{index + 1}</Badge>
-                                  <h4 className="font-semibold text-sm">{stage.display_name}</h4>
-                                  <Badge variant={stageCount > 0 ? 'default' : 'secondary'} className="text-[10px]">
-                                    {stageCount} permission{stageCount !== 1 ? 's' : ''} assigned
-                                  </Badge>
-                                </div>
+                        <div
+                          key={stage.id}
+                          className={`border rounded-xl overflow-hidden transition-all ${stageCount > 0 ? 'border-primary/40' : 'border-border'}`}
+                        >
+                          {/* Accordion Header — always visible, click to toggle */}
+                          <button
+                            type="button"
+                            className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${isOpen ? 'bg-muted/40' : stageCount > 0 ? 'bg-primary/5 hover:bg-primary/10' : 'bg-muted/20 hover:bg-muted/40'}`}
+                            onClick={() => setOpenStageId(isOpen ? null : stage.id)}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              {/* Stage number bubble */}
+                              <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 ${stageCount > 0 ? 'bg-primary border-primary text-primary-foreground' : 'bg-background border-border text-muted-foreground'}`}>
+                                {index + 1}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="font-semibold text-sm">{stage.display_name}</span>
                                 {stage.description && (
-                                  <p className="text-xs text-muted-foreground mt-1">{stage.description}</p>
+                                  <p className="text-xs text-muted-foreground truncate max-w-xs mt-0.5">{stage.description}</p>
                                 )}
                               </div>
-                              {hasPerms && (
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 text-xs"
-                                    onClick={() => assignAllAtStage(stage.id, rolePerms)}
-                                    disabled={stageCount === rolePerms.length}
-                                  >
-                                    <CheckSquare className="h-3 w-3 mr-1" />
-                                    Assign All
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 text-xs text-muted-foreground"
-                                    onClick={() => clearAllAtStage(stage.id, rolePerms)}
-                                    disabled={stageCount === 0}
-                                  >
-                                    <XSquare className="h-3 w-3 mr-1" />
-                                    Clear
-                                  </Button>
-                                </div>
-                              )}
                             </div>
+                            <div className="flex items-center gap-3 shrink-0 ml-4">
+                              <Badge variant={stageCount > 0 ? 'default' : 'secondary'} className="text-[11px]">
+                                {stageCount} assigned
+                              </Badge>
+                              {isOpen
+                                ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              }
+                            </div>
+                          </button>
 
-                            {/* Permissions Body */}
-                            <div className="px-5 py-4 bg-card">
+                          {/* Accordion Body — only visible when open */}
+                          {isOpen && (
+                            <div className="border-t bg-card px-5 py-4">
                               {!hasPerms ? (
-                                <div className="flex items-start gap-2 text-muted-foreground text-sm">
+                                <div className="flex items-start gap-2 text-muted-foreground text-sm py-2">
                                   <Info className="h-4 w-4 mt-0.5 shrink-0" />
-                                  <span>No permissions selected yet. Go to the <strong>Permissions</strong> tab to grant this role permissions first.</span>
+                                  <span>No permissions granted to this role yet. Go to the <strong>Permissions</strong> tab first.</span>
                                 </div>
                               ) : (
-                                <div className="space-y-4">
-                                  {Object.entries(permsByCategory).map(([category, perms]) => {
-                                    const moduleConfig = PERMISSION_MODULES[category];
-                                    return (
-                                      <div key={category}>
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <span className="text-muted-foreground">
-                                            {MODULE_ICONS[moduleConfig?.icon] || <FileText className="h-3.5 w-3.5" />}
-                                          </span>
-                                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                            {moduleConfig?.label || category}
-                                          </span>
+                                <>
+                                  {/* Assign All / Clear All */}
+                                  <div className="flex items-center gap-2 mb-4">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-xs"
+                                      onClick={() => assignAllAtStage(stage.id, rolePerms)}
+                                      disabled={stageCount === rolePerms.length}
+                                    >
+                                      <CheckSquare className="h-3 w-3 mr-1" />
+                                      Assign All
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 text-xs text-muted-foreground"
+                                      onClick={() => clearAllAtStage(stage.id, rolePerms)}
+                                      disabled={stageCount === 0}
+                                    >
+                                      <XSquare className="h-3 w-3 mr-1" />
+                                      Clear All
+                                    </Button>
+                                    <span className="text-xs text-muted-foreground ml-1">
+                                      {stageCount} of {rolePerms.length} permissions active at this stage
+                                    </span>
+                                  </div>
+
+                                  {/* Flat 2-column permission grid — no module sub-headers */}
+                                  <div className="grid gap-1.5 sm:grid-cols-2">
+                                    {rolePerms.map(perm => (
+                                      <label
+                                        key={`${stage.id}-${perm.id}`}
+                                        className="flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-muted/50 cursor-pointer border border-transparent hover:border-border transition-colors"
+                                      >
+                                        <Checkbox
+                                          id={`stage-${stage.id}-${perm.id}`}
+                                          checked={stagePermissions.has(`${stage.id}:${perm.id}`)}
+                                          onCheckedChange={() => toggleStagePermission(stage.id, perm.id!)}
+                                        />
+                                        <div className="min-w-0">
+                                          <span className="text-sm font-medium leading-tight">{perm.name}</span>
+                                          {isHighRisk(perm.code) && (
+                                            <span className="ml-1.5 inline-flex items-center gap-0.5 bg-warning-subtle text-warning-foreground text-[10px] font-medium px-1.5 py-0.5 rounded-full">
+                                              <AlertTriangle className="h-2.5 w-2.5" /> Risk
+                                            </span>
+                                          )}
                                         </div>
-                                        <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 pl-1">
-                                          {perms.map(perm => (
-                                            <label
-                                              key={`${stage.id}-${perm.id}`}
-                                              className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
-                                            >
-                                              <Checkbox
-                                                id={`stage-${stage.id}-${perm.id}`}
-                                                checked={stagePermissions.has(`${stage.id}:${perm.id}`)}
-                                                onCheckedChange={() => toggleStagePermission(stage.id, perm.id!)}
-                                              />
-                                              <span className="text-sm leading-tight">{perm.name}</span>
-                                            </label>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </>
                               )}
                             </div>
-                          </div>
+                          )}
                         </div>
                       );
                     })}
