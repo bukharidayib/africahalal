@@ -71,7 +71,7 @@ const navItems: NavItem[] = [
     title: 'Billing & Invoices',
     href: '/admin/billing',
     icon: Receipt,
-    permission: 'canViewApplications',
+    permission: 'canViewFinance',
   },
   {
     title: 'Support Center',
