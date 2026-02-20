@@ -26,13 +26,6 @@ export interface Permission {
   canManageInspections: boolean;
   canScheduleInspections: boolean;
   canApproveInspectionReport: boolean;
-  // Shariah Review
-  canCreateShariahReview: boolean;
-  canViewShariahReview: boolean;
-  canUpdateShariahReview: boolean;
-  canDeleteShariahReview: boolean;
-  canSubmitShariahReview: boolean;
-  canApproveShariahReview: boolean;
   // Finance
   canCreateFinance: boolean;
   canViewFinance: boolean;
@@ -97,8 +90,6 @@ function emptyPermissions(): Permission {
     canApproveDocumentation: false, canUploadDocumentation: false,
     canCreateInspections: false, canViewInspections: false, canUpdateInspections: false, canDeleteInspections: false,
     canManageInspections: false, canScheduleInspections: false, canApproveInspectionReport: false,
-    canCreateShariahReview: false, canViewShariahReview: false, canUpdateShariahReview: false, canDeleteShariahReview: false,
-    canSubmitShariahReview: false, canApproveShariahReview: false,
     canCreateFinance: false, canViewFinance: false, canUpdateFinance: false, canDeleteFinance: false,
     canManageFinance: false, canApproveFinance: false,
     canCreateCertificates: false, canViewCertificates: false, canUpdateCertificates: false, canDeleteCertificates: false,
@@ -139,12 +130,6 @@ const CODE_TO_KEY: Record<string, keyof Permission> = {
   'inspections.manage': 'canManageInspections',
   'inspections.schedule': 'canScheduleInspections',
   'inspections.approve_report': 'canApproveInspectionReport',
-  'shariah_review.create': 'canCreateShariahReview',
-  'shariah_review.view': 'canViewShariahReview',
-  'shariah_review.update': 'canUpdateShariahReview',
-  'shariah_review.delete': 'canDeleteShariahReview',
-  'shariah_review.submit': 'canSubmitShariahReview',
-  'shariah_review.approve': 'canApproveShariahReview',
   'finance.create': 'canCreateFinance',
   'finance.view': 'canViewFinance',
   'finance.update': 'canUpdateFinance',
@@ -227,26 +212,77 @@ export const HIGH_RISK_PERMISSIONS = [
   'users.manage',
   'users.delete',
   'settings.manage',
-  'shariah_review.approve',
   'finance.approve',
   'applications.approve',
   'applications.reject',
   'applications.delete',
 ];
 
-/** Module display config for the CRUD matrix */
-export const PERMISSION_MODULES: Record<string, { label: string; icon: string }> = {
-  'Applications': { label: 'Applications', icon: 'FileText' },
-  'Documentation': { label: 'Documentation', icon: 'FolderOpen' },
-  'Inspections': { label: 'Inspections', icon: 'ClipboardList' },
-  'Shariah Review': { label: 'Shariah Review', icon: 'BookOpen' },
-  'Finance': { label: 'Finance', icon: 'DollarSign' },
-  'Certificates': { label: 'Certificates', icon: 'Award' },
-  'Enforcement': { label: 'Enforcement', icon: 'AlertTriangle' },
-  'Support': { label: 'Support', icon: 'MessageSquare' },
-  'Users': { label: 'Users', icon: 'Users' },
-  'Roles': { label: 'Roles', icon: 'Shield' },
-  'Audit': { label: 'Audit', icon: 'ScrollText' },
-  'Reports': { label: 'Reports', icon: 'BarChart3' },
-  'System': { label: 'System', icon: 'Settings' },
+/** Module display config for the permission matrix */
+export const PERMISSION_MODULES: Record<string, { label: string; icon: string; description: string }> = {
+  'Applications': {
+    label: 'Applications',
+    icon: 'FileText',
+    description: 'Review, approve, and manage halal certification applications',
+  },
+  'Documentation': {
+    label: 'Documentation',
+    icon: 'FolderOpen',
+    description: 'Upload, view, and approve application supporting documents',
+  },
+  'Inspections': {
+    label: 'Inspections',
+    icon: 'ClipboardList',
+    description: 'Schedule, conduct, and report on facility inspections',
+  },
+  'Finance': {
+    label: 'Finance',
+    icon: 'DollarSign',
+    description: 'View and manage invoices, payments, and billing records',
+  },
+  'Certificates': {
+    label: 'Certificates',
+    icon: 'Award',
+    description: 'Issue, update, and revoke halal certificates',
+  },
+  'Enforcement': {
+    label: 'Enforcement',
+    icon: 'AlertTriangle',
+    description: 'Issue and manage Non-Conformance Notices (NCNs)',
+  },
+  'Support': {
+    label: 'Support',
+    icon: 'MessageSquare',
+    description: 'View and respond to client support tickets and chats',
+  },
+  'Users': {
+    label: 'Users',
+    icon: 'Users',
+    description: 'Create, manage, and suspend admin user accounts',
+  },
+  'Roles': {
+    label: 'Roles',
+    icon: 'Shield',
+    description: 'Create and configure roles and their permission sets',
+  },
+  'Audit': {
+    label: 'Audit',
+    icon: 'ScrollText',
+    description: 'View the system-wide audit trail and activity logs',
+  },
+  'Reports': {
+    label: 'Reports',
+    icon: 'BarChart3',
+    description: 'Generate and export certification and compliance reports',
+  },
+  'Inspectors': {
+    label: 'Inspectors',
+    icon: 'UserCheck',
+    description: 'Onboard and manage field inspectors',
+  },
+  'System': {
+    label: 'System',
+    icon: 'Settings',
+    description: 'Manage system-wide settings and configuration',
+  },
 };
