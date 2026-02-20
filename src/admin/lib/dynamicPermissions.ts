@@ -20,11 +20,11 @@ export interface AdminRoleWithPermissions {
   user_count?: number;
 }
 
-// Fetch all available permissions (now includes action_type)
+// Fetch all available permissions (includes action_type directly from DB)
 export async function fetchAllPermissions(): Promise<DynamicPermission[]> {
   const { data, error } = await supabase
     .from('permissions')
-    .select('id, code, name, category, description')
+    .select('id, code, name, category, description, action_type')
     .order('category', { ascending: true })
     .order('name', { ascending: true });
 
@@ -33,28 +33,9 @@ export async function fetchAllPermissions(): Promise<DynamicPermission[]> {
     return [];
   }
 
-  // Fetch action_type separately since it may not be in generated types yet
-  const { data: withActionType } = await supabase
-    .from('permissions')
-    .select('id, code, name, category, description')
-    .order('category', { ascending: true })
-    .order('name', { ascending: true });
-
-  // Try to get action_type via raw query
-  try {
-    const { data: rawPerms } = await supabase
-      .rpc('get_permissions_with_action_type' as any) as any;
-    if (rawPerms && Array.isArray(rawPerms)) {
-      return rawPerms;
-    }
-  } catch {
-    // Function doesn't exist, fall back
-  }
-
-  // Fallback: infer action_type from code
   return (data || []).map(p => ({
     ...p,
-    action_type: inferActionType(p.code),
+    action_type: (p as any).action_type || inferActionType(p.code),
   }));
 }
 
