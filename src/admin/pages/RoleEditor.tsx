@@ -506,10 +506,10 @@ export default function RoleEditor() {
           <TabsContent value="workflow">
             <Card>
               <CardHeader>
-                <CardTitle>Workflow Stage Assignments</CardTitle>
+                <CardTitle>Workflow Stage Access</CardTitle>
                 <CardDescription>
-                  Control which permissions this role can use at each stage of the certification process.
-                  Only permissions enabled in the <strong>Permissions tab</strong> appear here.
+                  For each stage, choose which application statuses this role can set. 
+                  This controls exactly when and where the role can act in the certification lifecycle.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -521,25 +521,78 @@ export default function RoleEditor() {
                 ) : (
                   <div className="space-y-2">
                     {workflowStages.map((stage, index) => {
-                      const rolePerms = allPermissions.filter(p => selectedPermissions.has(p.code));
-                      const stageCount = rolePerms.filter(p => stagePermissions.has(`${stage.id}:${p.id}`)).length;
-                      const hasPerms = rolePerms.length > 0;
+                      // Map each stage to the target statuses it can unlock
+                      const STAGE_TARGET_STATUSES: Record<string, { label: string; permCodes: string[]; color: string }[]> = {
+                        'SUBMITTED': [
+                          { label: 'Under Review', permCodes: ['applications.update'], color: 'bg-blue-100 text-blue-800 border-blue-200' },
+                          { label: 'Rejected', permCodes: ['applications.update', 'applications.reject'], color: 'bg-red-100 text-red-800 border-red-200' },
+                        ],
+                        'UNDER_REVIEW': [
+                          { label: 'Inspection Scheduled', permCodes: ['applications.update'], color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+                          { label: 'Rejected', permCodes: ['applications.update', 'applications.reject'], color: 'bg-red-100 text-red-800 border-red-200' },
+                        ],
+                        'INSPECTION_SCHEDULED': [
+                          { label: 'Inspection Completed', permCodes: ['applications.update'], color: 'bg-teal-100 text-teal-800 border-teal-200' },
+                          { label: 'Rejected', permCodes: ['applications.update', 'applications.reject'], color: 'bg-red-100 text-red-800 border-red-200' },
+                        ],
+                        'INSPECTION_COMPLETED': [
+                          { label: 'Approved', permCodes: ['applications.update', 'applications.approve'], color: 'bg-green-100 text-green-800 border-green-200' },
+                          { label: 'Rejected', permCodes: ['applications.update', 'applications.reject'], color: 'bg-red-100 text-red-800 border-red-200' },
+                          { label: 'Under Review', permCodes: ['applications.update'], color: 'bg-blue-100 text-blue-800 border-blue-200' },
+                        ],
+                        'APPROVED': [
+                          { label: 'Suspended', permCodes: ['applications.update'], color: 'bg-orange-100 text-orange-800 border-orange-200' },
+                        ],
+                        'REJECTED': [
+                          { label: 'Under Review', permCodes: ['applications.update'], color: 'bg-blue-100 text-blue-800 border-blue-200' },
+                        ],
+                        'SUSPENDED': [
+                          { label: 'Approved', permCodes: ['applications.update', 'applications.approve'], color: 'bg-green-100 text-green-800 border-green-200' },
+                          { label: 'Rejected', permCodes: ['applications.update', 'applications.reject'], color: 'bg-red-100 text-red-800 border-red-200' },
+                        ],
+                      };
+
+                      const targetStatuses = STAGE_TARGET_STATUSES[stage.system_code] || [];
+
+                      // A target is "active" if ALL its required perm codes are assigned at this stage
+                      function isTargetActive(target: typeof targetStatuses[0]): boolean {
+                        return target.permCodes.every(code => {
+                          const perm = allPermissions.find(p => p.code === code);
+                          return perm && stagePermissions.has(`${stage.id}:${perm.id}`);
+                        });
+                      }
+
+                      function toggleTarget(target: typeof targetStatuses[0]) {
+                        const active = isTargetActive(target);
+                        setStagePermissions(prev => {
+                          const next = new Set(prev);
+                          target.permCodes.forEach(code => {
+                            const perm = allPermissions.find(p => p.code === code);
+                            if (!perm?.id) return;
+                            const key = `${stage.id}:${perm.id}`;
+                            if (active) next.delete(key);
+                            else next.add(key);
+                          });
+                          return next;
+                        });
+                      }
+
+                      const activeCount = targetStatuses.filter(isTargetActive).length;
                       const isOpen = openStageId === stage.id;
 
                       return (
                         <div
                           key={stage.id}
-                          className={`border rounded-xl overflow-hidden transition-all ${stageCount > 0 ? 'border-primary/40' : 'border-border'}`}
+                          className={`border rounded-xl overflow-hidden transition-all ${activeCount > 0 ? 'border-primary/40' : 'border-border'}`}
                         >
-                          {/* Accordion Header — always visible, click to toggle */}
+                          {/* Accordion Header */}
                           <button
                             type="button"
-                            className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${isOpen ? 'bg-muted/40' : stageCount > 0 ? 'bg-primary/5 hover:bg-primary/10' : 'bg-muted/20 hover:bg-muted/40'}`}
+                            className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${isOpen ? 'bg-muted/40' : activeCount > 0 ? 'bg-primary/5 hover:bg-primary/10' : 'bg-muted/20 hover:bg-muted/40'}`}
                             onClick={() => setOpenStageId(isOpen ? null : stage.id)}
                           >
                             <div className="flex items-center gap-3 min-w-0">
-                              {/* Stage number bubble */}
-                              <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 ${stageCount > 0 ? 'bg-primary border-primary text-primary-foreground' : 'bg-background border-border text-muted-foreground'}`}>
+                              <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 ${activeCount > 0 ? 'bg-primary border-primary text-primary-foreground' : 'bg-background border-border text-muted-foreground'}`}>
                                 {index + 1}
                               </div>
                               <div className="min-w-0">
@@ -550,8 +603,8 @@ export default function RoleEditor() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3 shrink-0 ml-4">
-                              <Badge variant={stageCount > 0 ? 'default' : 'secondary'} className="text-[11px]">
-                                {stageCount} assigned
+                              <Badge variant={activeCount > 0 ? 'default' : 'secondary'} className="text-[11px]">
+                                {activeCount} target{activeCount !== 1 ? 's' : ''} enabled
                               </Badge>
                               {isOpen
                                 ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -560,65 +613,41 @@ export default function RoleEditor() {
                             </div>
                           </button>
 
-                          {/* Accordion Body — only visible when open */}
+                          {/* Accordion Body */}
                           {isOpen && (
-                            <div className="border-t bg-card px-5 py-4">
-                              {!hasPerms ? (
-                                <div className="flex items-start gap-2 text-muted-foreground text-sm py-2">
-                                  <Info className="h-4 w-4 mt-0.5 shrink-0" />
-                                  <span>No permissions granted to this role yet. Go to the <strong>Permissions</strong> tab first.</span>
-                                </div>
+                            <div className="border-t bg-card px-5 py-5">
+                              {targetStatuses.length === 0 ? (
+                                <p className="text-sm text-muted-foreground italic">No configurable transitions for this stage.</p>
                               ) : (
                                 <>
-                                  {/* Assign All / Clear All */}
-                                  <div className="flex items-center gap-2 mb-4">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-7 text-xs"
-                                      onClick={() => assignAllAtStage(stage.id, rolePerms)}
-                                      disabled={stageCount === rolePerms.length}
-                                    >
-                                      <CheckSquare className="h-3 w-3 mr-1" />
-                                      Assign All
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 text-xs text-muted-foreground"
-                                      onClick={() => clearAllAtStage(stage.id, rolePerms)}
-                                      disabled={stageCount === 0}
-                                    >
-                                      <XSquare className="h-3 w-3 mr-1" />
-                                      Clear All
-                                    </Button>
-                                    <span className="text-xs text-muted-foreground ml-1">
-                                      {stageCount} of {rolePerms.length} permissions active at this stage
-                                    </span>
-                                  </div>
-
-                                  {/* Flat 2-column permission grid — no module sub-headers */}
-                                  <div className="grid gap-1.5 sm:grid-cols-2">
-                                    {rolePerms.map(perm => (
-                                      <label
-                                        key={`${stage.id}-${perm.id}`}
-                                        className="flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-muted/50 cursor-pointer border border-transparent hover:border-border transition-colors"
-                                      >
-                                        <Checkbox
-                                          id={`stage-${stage.id}-${perm.id}`}
-                                          checked={stagePermissions.has(`${stage.id}:${perm.id}`)}
-                                          onCheckedChange={() => toggleStagePermission(stage.id, perm.id!)}
-                                        />
-                                        <div className="min-w-0">
-                                          <span className="text-sm font-medium leading-tight">{perm.name}</span>
-                                          {isHighRisk(perm.code) && (
-                                            <span className="ml-1.5 inline-flex items-center gap-0.5 bg-warning-subtle text-warning-foreground text-[10px] font-medium px-1.5 py-0.5 rounded-full">
-                                              <AlertTriangle className="h-2.5 w-2.5" /> Risk
-                                            </span>
-                                          )}
-                                        </div>
-                                      </label>
-                                    ))}
+                                  <p className="text-sm text-muted-foreground mb-4">
+                                    This role can move applications <strong>to</strong> the following statuses when they are in the <strong>{stage.display_name}</strong> stage:
+                                  </p>
+                                  <div className="flex flex-wrap gap-3">
+                                    {targetStatuses.map((target) => {
+                                      const active = isTargetActive(target);
+                                      return (
+                                        <button
+                                          key={target.label}
+                                          type="button"
+                                          onClick={() => toggleTarget(target)}
+                                          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all select-none ${
+                                            active
+                                              ? `${target.color} border-current shadow-sm`
+                                              : 'bg-muted/30 text-muted-foreground border-border hover:bg-muted/60'
+                                          }`}
+                                        >
+                                          <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${active ? 'border-current bg-current' : 'border-muted-foreground'}`}>
+                                            {active && (
+                                              <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                              </svg>
+                                            )}
+                                          </span>
+                                          {target.label}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 </>
                               )}

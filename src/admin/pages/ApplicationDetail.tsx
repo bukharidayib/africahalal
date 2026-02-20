@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Calendar, FileText, Clock, CheckCircle2,
   XCircle, AlertCircle, User, MapPin, Loader2, Save, History,
-  Brain, ShieldAlert, ShieldCheck, HelpCircle, Lock
+  Brain, ShieldAlert, ShieldCheck, HelpCircle, Lock, ExternalLink,
+  Send, MessageSquare, Mail
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,7 @@ interface Document {
   document_type: string;
   uploaded_at: string;
   file_size: number | null;
+  file_path: string;
 }
 
 const STATUS_OPTIONS: { value: ApplicationStatus; label: string }[] = [
@@ -122,6 +124,16 @@ export default function ApplicationDetail() {
 
   const [newStatus, setNewStatus] = useState<ApplicationStatus | ''>('');
   const [statusReason, setStatusReason] = useState('');
+
+  // Send Message state
+  const [messageType, setMessageType] = useState('missing_documents');
+  const [messageBody, setMessageBody] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  // AI Ingredient Alert state
+  const [showIngredientAlert, setShowIngredientAlert] = useState(false);
+  const [ingredientAlertMessage, setIngredientAlertMessage] = useState('');
+  const [isSendingAlert, setIsSendingAlert] = useState(false);
 
   // Workflow permission: track which target statuses the current user can set
   const [allowedStatuses, setAllowedStatuses] = useState<Set<ApplicationStatus>>(new Set());
@@ -230,12 +242,12 @@ export default function ApplicationDetail() {
       // Fetch documents
       const { data: docsData, error: docsError } = await supabase
         .from('application_documents')
-        .select('id, file_name, document_type, uploaded_at, file_size')
+        .select('id, file_name, document_type, uploaded_at, file_size, file_path')
         .eq('application_id', id)
         .order('uploaded_at', { ascending: false });
 
       if (!docsError) {
-        setDocuments(docsData || []);
+        setDocuments((docsData || []) as Document[]);
       }
 
       // Fetch products with ingredients
@@ -422,6 +434,13 @@ export default function ApplicationDetail() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setAiResults(data);
+      setShowIngredientAlert(false);
+      // Pre-fill alert message when issues detected
+      if ((data.haram_count || 0) > 0 || (data.unknown_count || 0) > 0) {
+        setIngredientAlertMessage(
+          `Dear ${application?.organizations?.name || 'Applicant'},\n\nOur AI-powered ingredient analysis has detected one or more non-halal or unverified ingredients in your submitted products. Please review the flagged ingredients listed below.\n\nAction Required:\n• Replace any haram ingredients with certified halal alternatives\n• Provide updated Technical Specification Sheets (TSS) for affected products\n• Resubmit your documentation through the client portal\n\nPlease address these issues promptly to avoid delays in your certification process.`
+        );
+      }
       toast({ title: 'Analysis Complete', description: data.summary || 'Ingredient analysis finished.' });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Analysis Failed', description: e.message });
@@ -429,6 +448,80 @@ export default function ApplicationDetail() {
       setIsAnalyzing(false);
     }
   };
+
+  async function handleSendMessage() {
+    if (!application || !messageBody.trim()) return;
+    setIsSendingMessage(true);
+    try {
+      const contactEmail = application.organizations?.contact_email || clientProfile?.email;
+      if (!contactEmail) {
+        toast({ variant: 'destructive', title: 'No Email Found', description: 'No contact email found for this organization.' });
+        return;
+      }
+      const { error } = await supabase.functions.invoke('send-application-message', {
+        body: {
+          application_id: application.id,
+          application_number: application.application_number,
+          organization_name: application.organizations?.name || 'Applicant',
+          contact_email: contactEmail,
+          message_type: messageType,
+          message: messageBody,
+        },
+      });
+      if (error) throw error;
+      toast({ title: 'Message Sent', description: 'The applicant has been notified by email.' });
+      setMessageBody('');
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Failed to Send', description: e.message });
+    } finally {
+      setIsSendingMessage(false);
+    }
+  }
+
+  async function handleSendIngredientAlert() {
+    if (!application || !ingredientAlertMessage.trim()) return;
+    setIsSendingAlert(true);
+    try {
+      const contactEmail = application.organizations?.contact_email || clientProfile?.email;
+      if (!contactEmail) {
+        toast({ variant: 'destructive', title: 'No Email Found', description: 'No contact email found for this organization.' });
+        return;
+      }
+      const flaggedIngredients = (aiResults?.results || []).filter(
+        (r: any) => r.classification === 'haram' || r.classification === 'unknown'
+      );
+      const { error } = await supabase.functions.invoke('send-application-message', {
+        body: {
+          application_id: application.id,
+          application_number: application.application_number,
+          organization_name: application.organizations?.name || 'Applicant',
+          contact_email: contactEmail,
+          message_type: 'ingredient_issue',
+          message: ingredientAlertMessage,
+          flagged_ingredients: flaggedIngredients,
+        },
+      });
+      if (error) throw error;
+      toast({ title: 'Alert Sent', description: 'The applicant has been notified of the ingredient issues.' });
+      setShowIngredientAlert(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Failed to Send', description: e.message });
+    } finally {
+      setIsSendingAlert(false);
+    }
+  }
+
+  async function handleOpenDocument(doc: Document & { file_path?: string }) {
+    try {
+      const { data, error } = await supabase.storage
+        .from('application-documents')
+        .createSignedUrl((doc as any).file_path || doc.id, 60);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank');
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Cannot Open File', description: e.message });
+    }
+  }
 
   if (isLoading) {
     return (
@@ -481,6 +574,7 @@ export default function ApplicationDetail() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="status">Status Update</TabsTrigger>
+            <TabsTrigger value="send-message" className="gap-1"><MessageSquare className="h-4 w-4" />Send Message</TabsTrigger>
             <TabsTrigger value="ai-analysis" className="gap-1"><Brain className="h-4 w-4" />AI Analysis</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -676,6 +770,66 @@ export default function ApplicationDetail() {
             </Card>
           </TabsContent>
 
+          {/* Send Message Tab */}
+          <TabsContent value="send-message">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Send Message to Applicant
+                </CardTitle>
+                <CardDescription>
+                  Send a direct email to the application owner. The email will be CC'd to admin and operations teams.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="p-3 rounded-lg border bg-muted/30 text-sm">
+                  <p className="text-muted-foreground">
+                    <strong>Recipient:</strong>{' '}
+                    {application.organizations?.contact_email || clientProfile?.email || (
+                      <span className="text-destructive">No email on file</span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="msg-type">Message Type</Label>
+                  <Select value={messageType} onValueChange={setMessageType}>
+                    <SelectTrigger id="msg-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="missing_documents">Missing Documents</SelectItem>
+                      <SelectItem value="additional_info">Additional Information Required</SelectItem>
+                      <SelectItem value="ingredient_issue">Ingredient Clarification Needed</SelectItem>
+                      <SelectItem value="general">General Update</SelectItem>
+                      <SelectItem value="custom">Custom Message</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="msg-body">Message</Label>
+                  <Textarea
+                    id="msg-body"
+                    rows={6}
+                    placeholder="Write your message to the applicant here..."
+                    value={messageBody}
+                    onChange={(e) => setMessageBody(e.target.value)}
+                  />
+                </div>
+
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={isSendingMessage || !messageBody.trim()}
+                  className="gap-2"
+                >
+                  {isSendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {isSendingMessage ? 'Sending...' : 'Send to Applicant'}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* AI Analysis Tab */}
           <TabsContent value="ai-analysis">
@@ -716,6 +870,56 @@ export default function ApplicationDetail() {
                     </div>
 
                     <p className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">{aiResults.summary}</p>
+
+                    {/* Ingredient Issue Alert Banner */}
+                    {((aiResults.haram_count || 0) > 0 || (aiResults.unknown_count || 0) > 0) && (
+                      <div className="border border-destructive/40 rounded-lg overflow-hidden">
+                        <div className="flex items-center justify-between bg-destructive/10 px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <ShieldAlert className="h-4 w-4 text-destructive" />
+                            <span className="font-semibold text-sm text-destructive">
+                              {(aiResults.haram_count || 0) + (aiResults.unknown_count || 0)} ingredient(s) require applicant action
+                            </span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="gap-1.5"
+                            onClick={() => setShowIngredientAlert(!showIngredientAlert)}
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            Notify Applicant
+                          </Button>
+                        </div>
+
+                        {showIngredientAlert && (
+                          <div className="p-4 space-y-3 bg-card border-t border-destructive/20">
+                            <Label className="text-sm font-medium">Notification Message (editable)</Label>
+                            <Textarea
+                              rows={6}
+                              value={ingredientAlertMessage}
+                              onChange={(e) => setIngredientAlertMessage(e.target.value)}
+                              className="text-sm"
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={isSendingAlert || !ingredientAlertMessage.trim()}
+                                onClick={handleSendIngredientAlert}
+                                className="gap-1.5"
+                              >
+                                {isSendingAlert ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                                {isSendingAlert ? 'Sending...' : 'Send Notification'}
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setShowIngredientAlert(false)}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="border rounded-lg overflow-hidden">
                       <table className="w-full text-sm">
@@ -833,11 +1037,22 @@ export default function ApplicationDetail() {
                             <p className="text-xs text-muted-foreground">{doc.document_type}</p>
                           </div>
                         </div>
-                        <div className="text-right text-xs text-muted-foreground">
-                          <p>{format(new Date(doc.uploaded_at), 'dd MMM yyyy')}</p>
-                          {doc.file_size && (
-                            <p>{(doc.file_size / 1024).toFixed(1)} KB</p>
-                          )}
+                        <div className="flex items-center gap-4">
+                          <div className="text-right text-xs text-muted-foreground">
+                            <p>{format(new Date(doc.uploaded_at), 'dd MMM yyyy')}</p>
+                            {doc.file_size && (
+                              <p>{(doc.file_size / 1024).toFixed(1)} KB</p>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 shrink-0"
+                            onClick={() => handleOpenDocument(doc)}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            Open
+                          </Button>
                         </div>
                       </div>
                     ))}

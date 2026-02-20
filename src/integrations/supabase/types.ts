@@ -144,6 +144,41 @@ export type Database = {
           },
         ]
       }
+      application_messages: {
+        Row: {
+          application_id: string
+          id: string
+          message: string
+          message_type: string
+          sent_at: string
+          sent_by: string
+        }
+        Insert: {
+          application_id: string
+          id?: string
+          message: string
+          message_type: string
+          sent_at?: string
+          sent_by: string
+        }
+        Update: {
+          application_id?: string
+          id?: string
+          message?: string
+          message_type?: string
+          sent_at?: string
+          sent_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_messages_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "certification_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       application_products: {
         Row: {
           application_id: string
