@@ -1439,6 +1439,59 @@ export type Database = {
           },
         ]
       }
+      supervisor_collected_ingredients: {
+        Row: {
+          admin_decision: string | null
+          ai_classification: string | null
+          ai_reasoning: string | null
+          ai_risk_level: string | null
+          collection_id: string
+          created_at: string
+          id: string
+          ingredient_name: string
+          notes: string | null
+          percentage: number | null
+          source: string | null
+          supplier_name: string | null
+        }
+        Insert: {
+          admin_decision?: string | null
+          ai_classification?: string | null
+          ai_reasoning?: string | null
+          ai_risk_level?: string | null
+          collection_id: string
+          created_at?: string
+          id?: string
+          ingredient_name: string
+          notes?: string | null
+          percentage?: number | null
+          source?: string | null
+          supplier_name?: string | null
+        }
+        Update: {
+          admin_decision?: string | null
+          ai_classification?: string | null
+          ai_reasoning?: string | null
+          ai_risk_level?: string | null
+          collection_id?: string
+          created_at?: string
+          id?: string
+          ingredient_name?: string
+          notes?: string | null
+          percentage?: number | null
+          source?: string | null
+          supplier_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supervisor_collected_ingredients_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_ingredient_collections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supervisor_compliance_scores: {
         Row: {
           category_scores: Json
@@ -1533,6 +1586,60 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "supervisor_incidents_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supervisor_ingredient_collections: {
+        Row: {
+          brand: string | null
+          collection_date: string
+          created_at: string
+          id: string
+          notes: string | null
+          organization_id: string
+          product_name: string
+          site_id: string
+          status: string
+          supervisor_id: string
+        }
+        Insert: {
+          brand?: string | null
+          collection_date?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          product_name: string
+          site_id: string
+          status?: string
+          supervisor_id: string
+        }
+        Update: {
+          brand?: string | null
+          collection_date?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          product_name?: string
+          site_id?: string
+          status?: string
+          supervisor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supervisor_ingredient_collections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supervisor_ingredient_collections_site_id_fkey"
             columns: ["site_id"]
             isOneToOne: false
             referencedRelation: "supervisor_sites"

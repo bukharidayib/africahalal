@@ -105,9 +105,9 @@ export default function SupervisorIncidentForm() {
           <CardContent className="pt-6 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Site *</Label>
-                <Select value={selectedSite} onValueChange={setSelectedSite}>
-                  <SelectTrigger><SelectValue placeholder="Select site" /></SelectTrigger>
+                <Label>Company *</Label>
+                <Select value={selectedSite} onValueChange={setSelectedSite} disabled={sites.length <= 1}>
+                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
                   <SelectContent>
                     {sites.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>)}
                   </SelectContent>

@@ -139,9 +139,9 @@ export default function SupervisorObservations() {
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="space-y-2">
-                <Label>Site *</Label>
-                <Select value={newSite} onValueChange={setNewSite}>
-                  <SelectTrigger><SelectValue placeholder="Select site" /></SelectTrigger>
+                <Label>Company *</Label>
+                <Select value={newSite} onValueChange={setNewSite} disabled={sites.length <= 1}>
+                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
                   <SelectContent>
                     {sites.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>)}
                   </SelectContent>

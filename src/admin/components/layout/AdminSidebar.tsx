@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Key,
   Receipt,
+  FlaskConical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAdminAuthContext } from '../../contexts/AdminAuthContext';
@@ -78,6 +79,12 @@ const navItems: NavItem[] = [
     href: '/admin/support',
     icon: MessageSquare,
     permission: 'canViewSupport',
+  },
+  {
+    title: 'Ingredient Tracker',
+    href: '/admin/ingredients',
+    icon: FlaskConical,
+    permission: 'canViewApplications',
   },
   {
     title: 'Audit Logs',

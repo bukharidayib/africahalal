@@ -69,6 +69,7 @@ import AdminSupportChatSession from "./admin/pages/AdminSupportChatSession";
 import RolesPermissions from "./admin/pages/RolesPermissions";
 import RoleEditor from "./admin/pages/RoleEditor";
 import AdminBilling from "./admin/pages/AdminBilling";
+import IngredientTracker from "./admin/pages/IngredientTracker";
 
 // Supervisor Portal
 import { SupervisorProtectedRoute } from "./components/auth/SupervisorProtectedRoute";
@@ -84,6 +85,8 @@ import SupervisorNCRDetail from "./pages/supervisor/SupervisorNCRDetail";
 import SupervisorIncidents from "./pages/supervisor/SupervisorIncidents";
 import SupervisorIncidentForm from "./pages/supervisor/SupervisorIncidentForm";
 import SupervisorObservations from "./pages/supervisor/SupervisorObservations";
+import SupervisorIngredients from "./pages/supervisor/SupervisorIngredients";
+import SupervisorIngredientForm from "./pages/supervisor/SupervisorIngredientForm";
 import SupervisorTickets from "./pages/supervisor/SupervisorTickets";
 import SupervisorTicketNew from "./pages/supervisor/SupervisorTicketNew";
 import SupervisorTicketDetail from "./pages/supervisor/SupervisorTicketDetail";
@@ -172,6 +175,7 @@ const App = () => (
               <Route path="roles" element={<RolesPermissions />} />
               <Route path="roles/:id" element={<RoleEditor />} />
               <Route path="billing" element={<AdminBilling />} />
+              <Route path="ingredients" element={<IngredientTracker />} />
             </Route>
 
             {/* Supervisor Auth Routes (public) */}
@@ -190,6 +194,8 @@ const App = () => (
             <Route path="/supervisor/incidents" element={<SupervisorProtectedRoute><SupervisorIncidents /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/incidents/new" element={<SupervisorProtectedRoute><SupervisorIncidentForm /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/observations" element={<SupervisorProtectedRoute><SupervisorObservations /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/ingredients" element={<SupervisorProtectedRoute><SupervisorIngredients /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/ingredients/new" element={<SupervisorProtectedRoute><SupervisorIngredientForm /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/support/tickets" element={<SupervisorProtectedRoute><SupervisorTickets /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/support/tickets/new" element={<SupervisorProtectedRoute><SupervisorTicketNew /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/support/tickets/:id" element={<SupervisorProtectedRoute><SupervisorTicketDetail /></SupervisorProtectedRoute>} />
