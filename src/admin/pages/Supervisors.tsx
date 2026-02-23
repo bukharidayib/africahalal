@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { AdminLayout } from "../components/layout/AdminLayout";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -16,20 +16,43 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, UserPlus, Trash2, Building2, FileText, AlertTriangle, AlertOctagon, Activity } from "lucide-react";
+import {
+  Loader2, UserPlus, Trash2, Building2, FileText, AlertTriangle,
+  AlertOctagon, Activity, Send, Clock, CheckCircle, XCircle,
+  RotateCcw, RefreshCw, Mail, MapPin,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, isPast } from "date-fns";
 
 interface Supervisor {
   id: string;
   email: string;
   full_name: string;
   organization?: { id: string; name: string } | null;
+  sites: { id: string; site_name: string; site_address: string | null; is_active: boolean }[];
 }
 
 interface Organization {
   id: string;
   name: string;
+}
+
+interface SupervisorInvitation {
+  id: string;
+  email: string;
+  full_name: string | null;
+  organization_id: string | null;
+  site_name: string | null;
+  site_address: string | null;
+  invited_by: string;
+  token: string;
+  status: string;
+  expires_at: string;
+  accepted_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  org_name?: string;
+  inviter_name?: string;
 }
 
 const riskColors: Record<string, string> = {
@@ -42,15 +65,28 @@ export default function Supervisors() {
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("supervisors");
+
+  // Create Supervisor dialog
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createEmail, setCreateEmail] = useState("");
+  const [createName, setCreateName] = useState("");
+  const [createOrgId, setCreateOrgId] = useState("");
+  const [createSiteName, setCreateSiteName] = useState("");
+  const [createSiteAddress, setCreateSiteAddress] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Assign Site dialog
   const [isSiteDialogOpen, setIsSiteDialogOpen] = useState(false);
-  const [selectedSupervisor, setSelectedSupervisor] = useState("");
-  const [selectedOrg, setSelectedOrg] = useState("");
   const [siteName, setSiteName] = useState("");
   const [siteAddress, setSiteAddress] = useState("");
   const [siteSupId, setSiteSupId] = useState("");
   const [siteOrgId, setSiteOrgId] = useState("");
-  const [activeTab, setActiveTab] = useState("assignments");
+
+  // Invitations
+  const [invitations, setInvitations] = useState<SupervisorInvitation[]>([]);
+  const [invitationsLoading, setInvitationsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   // Tab data
   const [reports, setReports] = useState<any[]>([]);
@@ -62,38 +98,102 @@ export default function Supervisors() {
 
   const { toast } = useToast();
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchSupervisors(); }, []);
 
   useEffect(() => {
-    if (activeTab !== "assignments") loadTabData(activeTab);
+    if (activeTab === "invitations") fetchInvitations();
+    else if (activeTab !== "supervisors") loadTabData(activeTab);
   }, [activeTab]);
 
-  const fetchData = async () => {
+  const fetchSupervisors = async () => {
     setIsLoading(true);
     try {
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email');
+      // Only get actual supervisors (those with organization_supervisors records)
       const { data: assignments } = await (supabase.from('organization_supervisors' as any).select('supervisor_id, organization_id') as any);
-      const { data: orgs } = await supabase.from('organizations').select('id, name').order('name');
+      if (!assignments || assignments.length === 0) {
+        setSupervisors([]);
+        const { data: orgs } = await supabase.from('organizations').select('id, name').order('name');
+        setOrganizations((orgs as any[]) || []);
+        setIsLoading(false);
+        return;
+      }
+
+      const supervisorIds = [...new Set((assignments as any[]).map((a: any) => a.supervisor_id))];
+      const orgIds = [...new Set((assignments as any[]).map((a: any) => a.organization_id))];
+
+      const [profilesRes, orgsRes, sitesRes] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, email').in('id', supervisorIds),
+        supabase.from('organizations').select('id, name').order('name'),
+        supabase.from('supervisor_sites' as any).select('*').in('supervisor_id', supervisorIds) as any,
+      ]);
+
+      const profileMap = new Map(((profilesRes.data as any[]) || []).map((p: any) => [p.id, p]));
+      const orgMap = new Map(((orgsRes.data as any[]) || []).map((o: any) => [o.id, o]));
+      const sitesMap = new Map<string, any[]>();
+      ((sitesRes.data as any[]) || []).forEach((s: any) => {
+        if (!sitesMap.has(s.supervisor_id)) sitesMap.set(s.supervisor_id, []);
+        sitesMap.get(s.supervisor_id)!.push(s);
+      });
 
       const assignmentMap = new Map<string, string>();
-      ((assignments as any[]) || []).forEach((a: any) => assignmentMap.set(a.supervisor_id, a.organization_id));
+      (assignments as any[]).forEach((a: any) => assignmentMap.set(a.supervisor_id, a.organization_id));
 
-      const orgMap = new Map<string, Organization>();
-      ((orgs as any[]) || []).forEach((o: any) => orgMap.set(o.id, o));
-
-      const formatted = ((profiles as any[]) || []).map((p: any) => {
-        const orgId = assignmentMap.get(p.id);
-        return { id: p.id, email: p.email, full_name: p.full_name || p.email, organization: orgId ? orgMap.get(orgId) || null : null };
+      const formatted: Supervisor[] = supervisorIds.map(id => {
+        const profile = profileMap.get(id);
+        const orgId = assignmentMap.get(id);
+        return {
+          id,
+          email: profile?.email || 'Unknown',
+          full_name: profile?.full_name || profile?.email || 'Unknown',
+          organization: orgId ? orgMap.get(orgId) || null : null,
+          sites: sitesMap.get(id) || [],
+        };
       });
 
       setSupervisors(formatted);
-      setOrganizations((orgs as any[]) || []);
+      setOrganizations((orgsRes.data as any[]) || []);
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message });
     } finally {
       setIsLoading(false);
     }
   };
+
+  const fetchInvitations = useCallback(async () => {
+    setInvitationsLoading(true);
+    try {
+      const { data, error } = await (supabase
+        .from('supervisor_invitations' as any)
+        .select('*')
+        .order('created_at', { ascending: false }) as any);
+
+      if (error) throw error;
+
+      const orgIds = [...new Set(((data as any[]) || []).filter((i: any) => i.organization_id).map((i: any) => i.organization_id))];
+      const inviterIds = [...new Set(((data as any[]) || []).map((i: any) => i.invited_by))];
+
+      const [orgsRes, profilesRes] = await Promise.all([
+        orgIds.length > 0 ? supabase.from('organizations').select('id, name').in('id', orgIds) : Promise.resolve({ data: [] }),
+        inviterIds.length > 0 ? supabase.from('profiles').select('id, full_name').in('id', inviterIds) : Promise.resolve({ data: [] }),
+      ]);
+
+      const orgMap = new Map(((orgsRes.data as any[]) || []).map((o: any) => [o.id, o.name]));
+      const profileMap = new Map(((profilesRes.data as any[]) || []).map((p: any) => [p.id, p.full_name]));
+
+      const enriched = ((data as any[]) || []).map((inv: any) => ({
+        ...inv,
+        org_name: inv.organization_id ? orgMap.get(inv.organization_id) : null,
+        inviter_name: profileMap.get(inv.invited_by) || 'Admin',
+        status: inv.status === 'pending' && isPast(new Date(inv.expires_at)) ? 'expired' : inv.status,
+      }));
+
+      setInvitations(enriched);
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    } finally {
+      setInvitationsLoading(false);
+    }
+  }, [toast]);
 
   const loadTabData = async (tab: string) => {
     setTabLoading(true);
@@ -121,30 +221,103 @@ export default function Supervisors() {
     }
   };
 
-  const handleAssign = async () => {
-    if (!selectedSupervisor || !selectedOrg) return;
+  const handleCreateSupervisor = async () => {
+    const email = createEmail.trim().toLowerCase();
+    if (!email || !createOrgId) {
+      toast({ variant: "destructive", title: "Required", description: "Email and organization are required." });
+      return;
+    }
+
+    // Check duplicate pending invitation
+    const existing = invitations.find(i => i.email === email && i.status === 'pending');
+    if (existing) {
+      toast({ variant: "destructive", title: "Duplicate", description: "A pending invitation already exists for this email." });
+      return;
+    }
+
+    setIsCreating(true);
     try {
-      const existing = supervisors.find(s => s.id === selectedSupervisor);
-      if (existing?.organization) {
-        await (supabase.from('organization_supervisors' as any).delete().eq('supervisor_id', selectedSupervisor) as any);
-      }
-      const { error } = await (supabase.from('organization_supervisors' as any).insert({ supervisor_id: selectedSupervisor, organization_id: selectedOrg } as any) as any);
-      if (error) throw error;
-      toast({ title: "Success", description: "Supervisor assigned successfully" });
-      setIsAssignOpen(false);
-      fetchData();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      // Get inviter name
+      const { data: inviterProfile } = await supabase.from('profiles').select('full_name').eq('id', session.user.id).single();
+
+      // Create invitation record
+      const { data: invitation, error: insertError } = await (supabase
+        .from('supervisor_invitations' as any)
+        .insert({
+          email,
+          full_name: createName || null,
+          organization_id: createOrgId,
+          site_name: createSiteName || null,
+          site_address: createSiteAddress || null,
+          invited_by: session.user.id,
+        } as any)
+        .select()
+        .single() as any);
+
+      if (insertError) throw insertError;
+
+      // Get org name
+      const org = organizations.find(o => o.id === createOrgId);
+
+      // Send invitation email
+      const response = await fetch(
+        `https://xdixdqyzjfdqummwpuzg.supabase.co/functions/v1/send-supervisor-invitation`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            email,
+            full_name: createName || '',
+            organization_name: org?.name || '',
+            site_name: createSiteName || '',
+            invitation_id: invitation.id,
+            invitation_token: invitation.token,
+            inviter_name: inviterProfile?.full_name || 'Administrator',
+          }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to send invitation');
+
+      // Audit log
+      await supabase.rpc('log_audit', {
+        _action: 'supervisor_invitation_sent',
+        _resource_type: 'supervisor_invitations',
+        _resource_id: invitation.id,
+        _metadata: { email, organization_id: createOrgId, site_name: createSiteName },
+      });
+
+      toast({ title: "Invitation Sent", description: `Supervisor invitation sent to ${email}` });
+      setIsCreateOpen(false);
+      setCreateEmail("");
+      setCreateName("");
+      setCreateOrgId("");
+      setCreateSiteName("");
+      setCreateSiteAddress("");
+      fetchInvitations();
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message });
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleRemoveAssignment = async (supervisorId: string) => {
-    if (!confirm("Remove this assignment?")) return;
+    if (!confirm("Remove this supervisor's assignment? They will lose access to the Supervisor Portal.")) return;
     try {
+      // Remove sites first
+      await (supabase.from('supervisor_sites' as any).delete().eq('supervisor_id', supervisorId) as any);
       const { error } = await (supabase.from('organization_supervisors' as any).delete().eq('supervisor_id', supervisorId) as any);
       if (error) throw error;
       toast({ title: "Assignment removed" });
-      fetchData();
+      fetchSupervisors();
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message });
     }
@@ -166,6 +339,84 @@ export default function Supervisors() {
       setIsSiteDialogOpen(false);
       setSiteName("");
       setSiteAddress("");
+      fetchSupervisors();
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    }
+  };
+
+  const handleCancelInvitation = async (inv: SupervisorInvitation) => {
+    if (!confirm(`Cancel the invitation for ${inv.email}?`)) return;
+    try {
+      const { error } = await (supabase
+        .from('supervisor_invitations' as any)
+        .update({ status: 'cancelled', cancelled_at: new Date().toISOString() } as any)
+        .eq('id', inv.id) as any);
+      if (error) throw error;
+      toast({ title: "Invitation cancelled" });
+      fetchInvitations();
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    }
+  };
+
+  const handleResendInvitation = async (inv: SupervisorInvitation) => {
+    setIsSending(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      // Reset invitation
+      await (supabase
+        .from('supervisor_invitations' as any)
+        .update({
+          status: 'pending',
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          cancelled_at: null,
+        } as any)
+        .eq('id', inv.id) as any);
+
+      const { data: inviterProfile } = await supabase.from('profiles').select('full_name').eq('id', session.user.id).single();
+
+      const response = await fetch(
+        `https://xdixdqyzjfdqummwpuzg.supabase.co/functions/v1/send-supervisor-invitation`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            email: inv.email,
+            full_name: inv.full_name || '',
+            organization_name: inv.org_name || '',
+            site_name: inv.site_name || '',
+            invitation_id: inv.id,
+            invitation_token: inv.token,
+            inviter_name: inviterProfile?.full_name || 'Administrator',
+          }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to resend');
+
+      toast({ title: "Invitation resent", description: `New invitation sent to ${inv.email}` });
+      fetchInvitations();
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleDeleteInvitation = async (inv: SupervisorInvitation) => {
+    if (!confirm(`Permanently delete the invitation for ${inv.email}?`)) return;
+    try {
+      const { error } = await (supabase.from('supervisor_invitations' as any).delete().eq('id', inv.id) as any);
+      if (error) throw error;
+      toast({ title: "Invitation deleted" });
+      fetchInvitations();
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message });
     }
@@ -185,27 +436,45 @@ export default function Supervisors() {
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending': return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+      case 'accepted': return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"><CheckCircle className="h-3 w-3 mr-1" />Accepted</Badge>;
+      case 'cancelled': return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"><XCircle className="h-3 w-3 mr-1" />Cancelled</Badge>;
+      case 'expired': return <Badge variant="secondary"><AlertTriangle className="h-3 w-3 mr-1" />Expired</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const invStats = {
+    pending: invitations.filter(i => i.status === 'pending').length,
+    accepted: invitations.filter(i => i.status === 'accepted').length,
+    cancelled: invitations.filter(i => i.status === 'cancelled').length,
+    expired: invitations.filter(i => i.status === 'expired').length,
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Supervisors</h2>
-            <p className="text-muted-foreground">Manage supervisors, sites, reports, and compliance tracking.</p>
+            <p className="text-muted-foreground">Manage field supervisors, site assignments, and compliance tracking.</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setIsSiteDialogOpen(true)}>
-              <Building2 className="mr-2 h-4 w-4" /> Assign Site
+              <MapPin className="mr-2 h-4 w-4" /> Assign Site
             </Button>
-            <Button onClick={() => setIsAssignOpen(true)}>
-              <UserPlus className="mr-2 h-4 w-4" /> Assign Supervisor
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" /> Create Supervisor
             </Button>
           </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
-            <TabsTrigger value="assignments">Assignments</TabsTrigger>
+            <TabsTrigger value="supervisors">Supervisors</TabsTrigger>
+            <TabsTrigger value="invitations"><Mail className="mr-1 h-3 w-3" />Invitations</TabsTrigger>
             <TabsTrigger value="reports"><FileText className="mr-1 h-3 w-3" />Reports</TabsTrigger>
             <TabsTrigger value="compliance">Compliance</TabsTrigger>
             <TabsTrigger value="incidents"><AlertTriangle className="mr-1 h-3 w-3" />Incidents</TabsTrigger>
@@ -213,22 +482,25 @@ export default function Supervisors() {
             <TabsTrigger value="activity"><Activity className="mr-1 h-3 w-3" />Activity</TabsTrigger>
           </TabsList>
 
-          {/* ASSIGNMENTS TAB */}
-          <TabsContent value="assignments">
+          {/* SUPERVISORS TAB */}
+          <TabsContent value="supervisors">
             <div className="border rounded-md">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Assigned Company</TableHead>
+                    <TableHead>Sites</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={3} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell></TableRow>
                   ) : supervisors.length === 0 ? (
-                    <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No supervisors found.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      No supervisors found. Use "Create Supervisor" to invite one.
+                    </TableCell></TableRow>
                   ) : (
                     supervisors.map((s) => (
                       <TableRow key={s.id}>
@@ -245,18 +517,125 @@ export default function Supervisors() {
                             <span className="text-muted-foreground italic text-sm">Unassigned</span>
                           )}
                         </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {s.sites.length === 0 ? (
+                              <span className="text-xs text-muted-foreground italic">No sites</span>
+                            ) : s.sites.map(site => (
+                              <Badge key={site.id} variant="secondary" className="text-xs gap-1">
+                                <MapPin className="h-2.5 w-2.5" />{site.site_name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
-                          {s.organization && (
-                            <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleRemoveAssignment(s.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleRemoveAssignment(s.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
                   )}
                 </TableBody>
               </Table>
+            </div>
+          </TabsContent>
+
+          {/* INVITATIONS TAB */}
+          <TabsContent value="invitations">
+            <div className="space-y-6">
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: 'Pending', count: invStats.pending, icon: Clock, bg: 'bg-amber-100 dark:bg-amber-900/30', iconColor: 'text-amber-600' },
+                  { label: 'Accepted', count: invStats.accepted, icon: CheckCircle, bg: 'bg-green-100 dark:bg-green-900/30', iconColor: 'text-green-600' },
+                  { label: 'Cancelled', count: invStats.cancelled, icon: XCircle, bg: 'bg-red-100 dark:bg-red-900/30', iconColor: 'text-red-600' },
+                  { label: 'Expired', count: invStats.expired, icon: AlertTriangle, bg: 'bg-muted', iconColor: 'text-muted-foreground' },
+                ].map(({ label, count, icon: Icon, bg, iconColor }) => (
+                  <Card key={label}>
+                    <CardContent className="pt-4 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-10 w-10 rounded-lg ${bg} flex items-center justify-center`}>
+                          <Icon className={`h-5 w-5 ${iconColor}`} />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">{count}</p>
+                          <p className="text-xs text-muted-foreground">{label}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={fetchInvitations}>
+                  <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+                </Button>
+              </div>
+
+              {/* Invitations Table */}
+              <Card>
+                <CardContent className="pt-6">
+                  {invitationsLoading ? (
+                    <div className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
+                  ) : invitations.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <h3 className="font-medium mb-1">No invitations yet</h3>
+                      <p className="text-sm">Use "Create Supervisor" to send the first invitation.</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Organization</TableHead>
+                          <TableHead>Site</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Invited By</TableHead>
+                          <TableHead>Sent</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invitations.map(inv => (
+                          <TableRow key={inv.id}>
+                            <TableCell className="font-medium">{inv.email}</TableCell>
+                            <TableCell>{inv.full_name || '—'}</TableCell>
+                            <TableCell>{inv.org_name || '—'}</TableCell>
+                            <TableCell>{inv.site_name || '—'}</TableCell>
+                            <TableCell>{getStatusBadge(inv.status)}</TableCell>
+                            <TableCell className="text-sm">{inv.inviter_name}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{format(new Date(inv.created_at), 'dd MMM yyyy')}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                {(inv.status === 'pending' || inv.status === 'expired' || inv.status === 'cancelled') && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleResendInvitation(inv)} disabled={isSending} title="Resend">
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {inv.status === 'pending' && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleCancelInvitation(inv)} title="Cancel">
+                                    <XCircle className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {(inv.status === 'cancelled' || inv.status === 'expired' || inv.status === 'accepted') && (
+                                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeleteInvitation(inv)} title="Delete">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
@@ -422,32 +801,44 @@ export default function Supervisors() {
           </TabsContent>
         </Tabs>
 
-        {/* Assign Supervisor Dialog */}
-        <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
-          <DialogContent>
+        {/* Create Supervisor Dialog */}
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Assign Supervisor</DialogTitle>
-              <DialogDescription>Select a user and a company to assign them to.</DialogDescription>
+              <DialogTitle>Create Supervisor</DialogTitle>
+              <DialogDescription>Send a branded invitation email to onboard a new field supervisor.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Supervisor (User)</Label>
-                <Select value={selectedSupervisor} onValueChange={setSelectedSupervisor}>
-                  <SelectTrigger><SelectValue placeholder="Select user" /></SelectTrigger>
-                  <SelectContent>{supervisors.map(s => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}</SelectContent>
-                </Select>
+                <Label>Email Address *</Label>
+                <Input type="email" value={createEmail} onChange={(e) => setCreateEmail(e.target.value)} placeholder="supervisor@email.com" />
               </div>
               <div className="space-y-2">
-                <Label>Company</Label>
-                <Select value={selectedOrg} onValueChange={setSelectedOrg}>
-                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                <Label>Full Name</Label>
+                <Input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="John Mwanza" />
+              </div>
+              <div className="space-y-2">
+                <Label>Organization *</Label>
+                <Select value={createOrgId} onValueChange={setCreateOrgId}>
+                  <SelectTrigger><SelectValue placeholder="Select organization" /></SelectTrigger>
                   <SelectContent>{organizations.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Site Name (optional)</Label>
+                <Input value={createSiteName} onChange={(e) => setCreateSiteName(e.target.value)} placeholder="e.g. Main Production Facility" />
+              </div>
+              <div className="space-y-2">
+                <Label>Site Address (optional)</Label>
+                <Input value={createSiteAddress} onChange={(e) => setCreateSiteAddress(e.target.value)} placeholder="Physical address" />
+              </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAssignOpen(false)}>Cancel</Button>
-              <Button onClick={handleAssign}>Assign</Button>
+              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+              <Button onClick={handleCreateSupervisor} disabled={isCreating || !createEmail || !createOrgId}>
+                {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                Send Invitation
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -457,14 +848,14 @@ export default function Supervisors() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Assign Site to Supervisor</DialogTitle>
-              <DialogDescription>Create a site assignment for a supervisor.</DialogDescription>
+              <DialogDescription>Create a new site assignment for an existing supervisor.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Supervisor</Label>
                 <Select value={siteSupId} onValueChange={setSiteSupId}>
                   <SelectTrigger><SelectValue placeholder="Select supervisor" /></SelectTrigger>
-                  <SelectContent>{supervisors.filter(s => s.organization).map(s => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}</SelectContent>
+                  <SelectContent>{supervisors.map(s => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
