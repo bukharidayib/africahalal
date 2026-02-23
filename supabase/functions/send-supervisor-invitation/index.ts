@@ -55,6 +55,14 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Missing required fields: email, invitation_id, invitation_token");
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return new Response(JSON.stringify({ error: "Invalid email address format" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const origin = req.headers.get("origin") || req.headers.get("referer") || "";
     const appUrl = origin.startsWith("http")
       ? new URL(origin).origin
