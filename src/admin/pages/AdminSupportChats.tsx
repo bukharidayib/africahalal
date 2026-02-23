@@ -21,6 +21,7 @@ interface ChatSession {
   };
   message_count?: number;
   last_message?: string;
+  userRole?: string;
 }
 
 export default function AdminSupportChats() {
@@ -63,6 +64,25 @@ export default function AdminSupportChats() {
 
         const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
+        // Determine user roles
+        const { data: supervisorRecords } = await supabase
+          .from('organization_supervisors')
+          .select('supervisor_id')
+          .in('supervisor_id', userIds);
+        const supervisorIds = new Set(supervisorRecords?.map(s => s.supervisor_id) || []);
+
+        const { data: adminRoleRecords } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .in('user_id', userIds);
+        const adminIds = new Set(adminRoleRecords?.map(r => r.user_id) || []);
+
+        const getUserRole = (userId: string) => {
+          if (adminIds.has(userId)) return 'Admin';
+          if (supervisorIds.has(userId)) return 'Supervisor';
+          return 'Client';
+        };
+
         // Fetch message counts and last message for each chat
         const chatsWithDetails = await Promise.all(
           chats.map(async (chat) => {
@@ -83,6 +103,7 @@ export default function AdminSupportChats() {
               profile: profileMap.get(chat.user_id),
               message_count: count || 0,
               last_message: lastMsg?.[0]?.message,
+              userRole: getUserRole(chat.user_id),
             };
           })
         );
@@ -116,6 +137,9 @@ export default function AdminSupportChats() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="font-medium">{chat.profile?.full_name || 'Unknown User'}</p>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  {chat.userRole}
+                </Badge>
                 <Badge variant={isActive ? 'default' : 'secondary'}>
                   {isActive ? 'Active' : 'Ended'}
                 </Badge>

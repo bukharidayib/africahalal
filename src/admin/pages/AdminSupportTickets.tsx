@@ -37,6 +37,7 @@ interface Ticket {
     full_name: string;
     email: string;
   };
+  userRole?: string;
 }
 
 export default function AdminSupportTickets() {
@@ -68,9 +69,29 @@ export default function AdminSupportTickets() {
 
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
+      // Determine user roles
+      const { data: supervisorRecords } = await supabase
+        .from('organization_supervisors')
+        .select('supervisor_id')
+        .in('supervisor_id', userIds);
+      const supervisorIds = new Set(supervisorRecords?.map(s => s.supervisor_id) || []);
+
+      const { data: adminRoleRecords } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('user_id', userIds);
+      const adminIds = new Set(adminRoleRecords?.map(r => r.user_id) || []);
+
+      const getUserRole = (userId: string) => {
+        if (adminIds.has(userId)) return 'Admin';
+        if (supervisorIds.has(userId)) return 'Supervisor';
+        return 'Client';
+      };
+
       const ticketsWithProfiles = (ticketsData || []).map(ticket => ({
         ...ticket,
         profile: profileMap.get(ticket.user_id),
+        userRole: getUserRole(ticket.user_id),
       }));
 
       setTickets(ticketsWithProfiles);
@@ -227,7 +248,12 @@ export default function AdminSupportTickets() {
                             <User className="h-4 w-4 text-primary" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium">{ticket.profile?.full_name || 'Unknown'}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-medium">{ticket.profile?.full_name || 'Unknown'}</p>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                {ticket.userRole}
+                              </Badge>
+                            </div>
                             <p className="text-xs text-muted-foreground">{ticket.profile?.email}</p>
                           </div>
                         </div>
