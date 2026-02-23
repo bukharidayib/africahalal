@@ -39,7 +39,7 @@ export default function SupervisorObservations() {
     const { data: obsData } = await (supabase.from("supervisor_observations" as any).select("*").eq("created_by", session.user.id).order("created_at", { ascending: false }) as any);
     setObservations((obsData as any[]) || []);
 
-    const { data: siteData } = await (supabase.from("supervisor_sites" as any).select("*").eq("supervisor_id", session.user.id).eq("is_active", true) as any);
+    const { data: siteData } = await (supabase.from("supervisor_sites" as any).select("*, organizations(name)").eq("supervisor_id", session.user.id).eq("is_active", true) as any);
     const siteList = (siteData as any[]) || [];
     setSites(siteList);
     if (siteList.length === 1) setNewSite(siteList[0].id);
@@ -143,7 +143,7 @@ export default function SupervisorObservations() {
                 <Select value={newSite} onValueChange={setNewSite}>
                   <SelectTrigger><SelectValue placeholder="Select site" /></SelectTrigger>
                   <SelectContent>
-                    {sites.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.site_name}</SelectItem>)}
+                    {sites.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
