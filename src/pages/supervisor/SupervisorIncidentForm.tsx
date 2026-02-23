@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { SupervisorLayout } from "@/components/layout/SupervisorLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -106,12 +107,16 @@ export default function SupervisorIncidentForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Company *</Label>
-                <Select value={selectedSite} onValueChange={setSelectedSite} disabled={sites.length <= 1}>
-                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                  <SelectContent>
-                    {sites.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                {sites.length <= 1 ? (
+                  <Input value={sites[0]?.organizations?.name || sites[0]?.site_name || "No company assigned"} disabled className="bg-muted" />
+                ) : (
+                  <Select value={selectedSite} onValueChange={setSelectedSite}>
+                    <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                    <SelectContent>
+                      {sites.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Incident Type *</Label>
