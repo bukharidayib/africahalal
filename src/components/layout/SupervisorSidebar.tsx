@@ -10,6 +10,7 @@ import {
   LogOut,
   ChevronRight,
   ShieldCheck,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Incidents", href: "/supervisor/incidents", icon: AlertTriangle },
   { name: "NCR Management", href: "/supervisor/ncrs", icon: AlertOctagon },
   { name: "Observations", href: "/supervisor/observations", icon: BookOpen },
+  { name: "Ingredients", href: "/supervisor/ingredients", icon: FlaskConical },
   { name: "Support Tickets", href: "/supervisor/support/tickets", icon: TicketCheck },
   { name: "Live Chat", href: "/supervisor/support/chat", icon: MessageSquare },
 ];

@@ -143,11 +143,11 @@ export default function SupervisorDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Assigned Site</CardTitle>
+              <CardTitle className="text-sm font-medium">Assigned Company</CardTitle>
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <p className="text-lg font-bold">{site?.site_name || orgName || "Not assigned"}</p>
+              <p className="text-lg font-bold">{orgName || site?.site_name || "Not assigned"}</p>
               {site?.site_address && <p className="text-xs text-muted-foreground">{site.site_address}</p>}
             </CardContent>
           </Card>
