@@ -834,14 +834,6 @@ export default function Supervisors() {
                   <SelectContent>{organizations.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Site Name (optional)</Label>
-                <Input value={createSiteName} onChange={(e) => setCreateSiteName(e.target.value)} placeholder="e.g. Main Production Facility" />
-              </div>
-              <div className="space-y-2">
-                <Label>Site Address (optional)</Label>
-                <Input value={createSiteAddress} onChange={(e) => setCreateSiteAddress(e.target.value)} placeholder="Physical address" />
-              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
