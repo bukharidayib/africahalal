@@ -88,6 +88,7 @@ import SupervisorTickets from "./pages/supervisor/SupervisorTickets";
 import SupervisorTicketNew from "./pages/supervisor/SupervisorTicketNew";
 import SupervisorTicketDetail from "./pages/supervisor/SupervisorTicketDetail";
 import SupervisorChat from "./pages/supervisor/SupervisorChat";
+import SupervisorRegister from "./pages/supervisor/SupervisorRegister";
 
 const queryClient = new QueryClient();
 
@@ -175,6 +176,7 @@ const App = () => (
 
             {/* Supervisor Auth Routes (public) */}
             <Route path="/supervisor/signin" element={<SupervisorSignIn />} />
+            <Route path="/supervisor/register" element={<SupervisorRegister />} />
             <Route path="/supervisor/forgot-password" element={<SupervisorForgotPassword />} />
             <Route path="/supervisor/reset-password" element={<SupervisorResetPassword />} />
 
