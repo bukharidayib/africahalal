@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -140,12 +141,16 @@ export default function SupervisorObservations() {
             <div className="space-y-4 py-2">
               <div className="space-y-2">
                 <Label>Company *</Label>
-                <Select value={newSite} onValueChange={setNewSite} disabled={sites.length <= 1}>
-                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                  <SelectContent>
-                    {sites.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                {sites.length <= 1 ? (
+                  <Input value={sites[0]?.organizations?.name || sites[0]?.site_name || "No company assigned"} disabled className="bg-muted" />
+                ) : (
+                  <Select value={newSite} onValueChange={setNewSite}>
+                    <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                    <SelectContent>
+                      {sites.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Tag *</Label>

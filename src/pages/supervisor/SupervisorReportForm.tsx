@@ -222,14 +222,18 @@ export default function SupervisorReportForm() {
               </div>
               <div className="space-y-2">
                 <Label>Company</Label>
-                <Select value={selectedSite} onValueChange={setSelectedSite} disabled={sites.length <= 1}>
-                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                  <SelectContent>
-                    {sites.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {sites.length <= 1 ? (
+                  <Input value={sites[0]?.organizations?.name || sites[0]?.site_name || "No company assigned"} disabled className="bg-muted" />
+                ) : (
+                  <Select value={selectedSite} onValueChange={setSelectedSite}>
+                    <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                    <SelectContent>
+                      {sites.map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Report Date</Label>

@@ -151,14 +151,18 @@ export default function SupervisorIngredientForm() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Company *</Label>
-                <Select value={selectedSite} onValueChange={setSelectedSite} disabled={sites.length <= 1}>
-                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                  <SelectContent>
-                    {sites.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {sites.length <= 1 ? (
+                  <Input value={sites[0]?.organizations?.name || sites[0]?.site_name || "No company assigned"} disabled className="bg-muted" />
+                ) : (
+                  <Select value={selectedSite} onValueChange={setSelectedSite}>
+                    <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                    <SelectContent>
+                      {sites.map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Product Name *</Label>
