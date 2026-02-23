@@ -64,10 +64,10 @@ export default function SupervisorReportForm() {
     async function loadSites() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      const { data } = await (supabase.from("supervisor_sites" as any).select("*, organizations(name)").eq("supervisor_id", session.user.id).eq("is_active", true) as any);
+      const { data } = await (supabase.from("organization_supervisors" as any).select("*, organizations(name, id)").eq("supervisor_id", session.user.id) as any);
       const siteList = (data as any[]) || [];
       setSites(siteList);
-      if (siteList.length === 1) setSelectedSite(siteList[0].id);
+      if (siteList.length === 1) setSelectedSite(siteList[0].organization_id);
       setIsLoading(false);
     }
     loadSites();
@@ -223,13 +223,13 @@ export default function SupervisorReportForm() {
               <div className="space-y-2">
                 <Label>Company</Label>
                 {sites.length <= 1 ? (
-                  <Input value={sites[0]?.organizations?.name || sites[0]?.site_name || "No company assigned"} disabled className="bg-muted" />
+                  <Input value={sites[0]?.organizations?.name || "No company assigned"} disabled className="bg-muted" />
                 ) : (
                   <Select value={selectedSite} onValueChange={setSelectedSite}>
                     <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
                     <SelectContent>
                       {sites.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>{s.organizations?.name || s.site_name}</SelectItem>
+                        <SelectItem key={s.id} value={s.organization_id}>{s.organizations?.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
