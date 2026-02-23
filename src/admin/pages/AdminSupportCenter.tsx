@@ -27,6 +27,7 @@ interface ChatSession {
     email: string;
   };
   last_message?: string;
+  userRole?: string;
 }
 
 export default function AdminSupportCenter() {
@@ -116,6 +117,25 @@ export default function AdminSupportCenter() {
 
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
+      // Determine user roles
+      const { data: supervisorRecords } = await supabase
+        .from('organization_supervisors')
+        .select('supervisor_id')
+        .in('supervisor_id', userIds);
+      const supervisorIds = new Set(supervisorRecords?.map(s => s.supervisor_id) || []);
+
+      const { data: adminRoleRecords } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('user_id', userIds);
+      const adminIds = new Set(adminRoleRecords?.map(r => r.user_id) || []);
+
+      const getUserRole = (userId: string) => {
+        if (adminIds.has(userId)) return 'Admin';
+        if (supervisorIds.has(userId)) return 'Supervisor';
+        return 'Client';
+      };
+
       // Fetch last message for each chat
       const chatsWithDetails = await Promise.all(
         chats.map(async (chat) => {
@@ -130,6 +150,7 @@ export default function AdminSupportCenter() {
             ...chat,
             profile: profileMap.get(chat.user_id),
             last_message: messages?.[0]?.message,
+            userRole: getUserRole(chat.user_id),
           };
         })
       );
@@ -255,7 +276,12 @@ export default function AdminSupportCenter() {
                           <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white" />
                         </div>
                         <div>
-                          <p className="font-medium">{chat.profile?.full_name || 'Unknown User'}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-medium">{chat.profile?.full_name || 'Unknown User'}</p>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              {chat.userRole}
+                            </Badge>
+                          </div>
                           <p className="text-xs text-muted-foreground truncate max-w-[200px]">
                             {chat.last_message || 'No messages yet'}
                           </p>
