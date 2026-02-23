@@ -221,10 +221,16 @@ export default function Supervisors() {
     }
   };
 
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
   const handleCreateSupervisor = async () => {
     const email = createEmail.trim().toLowerCase();
     if (!email || !createOrgId) {
       toast({ variant: "destructive", title: "Required", description: "Email and organization are required." });
+      return;
+    }
+    if (!isValidEmail(email)) {
+      toast({ variant: "destructive", title: "Invalid Email", description: "Please enter a valid email address (e.g. name@example.com)." });
       return;
     }
 
@@ -361,6 +367,10 @@ export default function Supervisors() {
   };
 
   const handleResendInvitation = async (inv: SupervisorInvitation) => {
+    if (!isValidEmail(inv.email)) {
+      toast({ variant: "destructive", title: "Invalid Email", description: `The email "${inv.email}" is invalid. Please delete this invitation and create a new one with a correct email.` });
+      return;
+    }
     setIsSending(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
