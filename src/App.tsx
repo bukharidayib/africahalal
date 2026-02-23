@@ -72,7 +72,18 @@ import AdminBilling from "./admin/pages/AdminBilling";
 
 // Supervisor Portal
 import { SupervisorProtectedRoute } from "./components/auth/SupervisorProtectedRoute";
+import SupervisorSignIn from "./pages/supervisor/SupervisorSignIn";
+import SupervisorForgotPassword from "./pages/supervisor/SupervisorForgotPassword";
+import SupervisorResetPassword from "./pages/supervisor/SupervisorResetPassword";
 import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
+import SupervisorReports from "./pages/supervisor/SupervisorReports";
+import SupervisorReportForm from "./pages/supervisor/SupervisorReportForm";
+import SupervisorReportDetail from "./pages/supervisor/SupervisorReportDetail";
+import SupervisorNCRs from "./pages/supervisor/SupervisorNCRs";
+import SupervisorNCRDetail from "./pages/supervisor/SupervisorNCRDetail";
+import SupervisorIncidents from "./pages/supervisor/SupervisorIncidents";
+import SupervisorIncidentForm from "./pages/supervisor/SupervisorIncidentForm";
+import SupervisorObservations from "./pages/supervisor/SupervisorObservations";
 import SupervisorTickets from "./pages/supervisor/SupervisorTickets";
 import SupervisorTicketNew from "./pages/supervisor/SupervisorTicketNew";
 import SupervisorTicketDetail from "./pages/supervisor/SupervisorTicketDetail";
@@ -135,7 +146,7 @@ const App = () => (
             <Route path="/client/billing/invoices" element={<ProtectedRoute><BillingInvoices /></ProtectedRoute>} />
             <Route path="/client/billing/invoices/:id" element={<ProtectedRoute><BillingInvoiceDetail /></ProtectedRoute>} />
 
-            {/* Admin Portal Routes - Layout route pattern ensures provider wraps all children */}
+            {/* Admin Portal Routes */}
             <Route path="/admin" element={<AdminProviderWrapper />}>
               <Route path="login" element={<AdminLogin />} />
               <Route path="register" element={<AdminRegister />} />
@@ -162,8 +173,21 @@ const App = () => (
               <Route path="billing" element={<AdminBilling />} />
             </Route>
 
-            {/* Supervisor Portal Routes */}
+            {/* Supervisor Auth Routes (public) */}
+            <Route path="/supervisor/signin" element={<SupervisorSignIn />} />
+            <Route path="/supervisor/forgot-password" element={<SupervisorForgotPassword />} />
+            <Route path="/supervisor/reset-password" element={<SupervisorResetPassword />} />
+
+            {/* Supervisor Portal Protected Routes */}
             <Route path="/supervisor/dashboard" element={<SupervisorProtectedRoute><SupervisorDashboard /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/reports" element={<SupervisorProtectedRoute><SupervisorReports /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/reports/new" element={<SupervisorProtectedRoute><SupervisorReportForm /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/reports/:id" element={<SupervisorProtectedRoute><SupervisorReportDetail /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/ncrs" element={<SupervisorProtectedRoute><SupervisorNCRs /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/ncrs/:id" element={<SupervisorProtectedRoute><SupervisorNCRDetail /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/incidents" element={<SupervisorProtectedRoute><SupervisorIncidents /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/incidents/new" element={<SupervisorProtectedRoute><SupervisorIncidentForm /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/observations" element={<SupervisorProtectedRoute><SupervisorObservations /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/support/tickets" element={<SupervisorProtectedRoute><SupervisorTickets /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/support/tickets/new" element={<SupervisorProtectedRoute><SupervisorTicketNew /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/support/tickets/:id" element={<SupervisorProtectedRoute><SupervisorTicketDetail /></SupervisorProtectedRoute>} />

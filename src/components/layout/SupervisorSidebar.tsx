@@ -1,9 +1,12 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
-  HeadphonesIcon,
-  MessageSquare,
+  FileText,
+  AlertOctagon,
+  AlertTriangle,
+  BookOpen,
   TicketCheck,
+  MessageSquare,
   LogOut,
   ChevronRight,
   ShieldCheck,
@@ -15,6 +18,10 @@ import { useState } from "react";
 
 const navigation = [
   { name: "Dashboard", href: "/supervisor/dashboard", icon: LayoutDashboard },
+  { name: "Reports", href: "/supervisor/reports", icon: FileText },
+  { name: "Incidents", href: "/supervisor/incidents", icon: AlertTriangle },
+  { name: "NCR Management", href: "/supervisor/ncrs", icon: AlertOctagon },
+  { name: "Observations", href: "/supervisor/observations", icon: BookOpen },
   { name: "Support Tickets", href: "/supervisor/support/tickets", icon: TicketCheck },
   { name: "Live Chat", href: "/supervisor/support/chat", icon: MessageSquare },
 ];
@@ -33,7 +40,7 @@ export function SupervisorSidebar() {
         toast({ title: "Logout failed", description: error.message, variant: "destructive" });
       } else {
         toast({ title: "Logged out", description: "You have been signed out successfully." });
-        navigate("/auth/signin");
+        navigate("/supervisor/signin");
       }
     } catch {
       toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
@@ -54,7 +61,8 @@ export function SupervisorSidebar() {
 
       <nav className="flex-1 space-y-1 px-3 py-6">
         {navigation.map((item) => {
-          const isActive = location.pathname.startsWith(item.href);
+          const isActive = location.pathname === item.href || 
+            (item.href !== "/supervisor/dashboard" && location.pathname.startsWith(item.href));
           return (
             <Link
               key={item.name}

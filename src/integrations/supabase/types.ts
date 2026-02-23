@@ -1362,6 +1362,402 @@ export type Database = {
           },
         ]
       }
+      supervisor_activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          metadata: Json
+          resource_id: string | null
+          resource_type: string | null
+          supervisor_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          resource_id?: string | null
+          resource_type?: string | null
+          supervisor_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          resource_id?: string | null
+          resource_type?: string | null
+          supervisor_id?: string
+        }
+        Relationships: []
+      }
+      supervisor_checklist_items: {
+        Row: {
+          category: string
+          created_at: string
+          evidence_urls: string[] | null
+          id: string
+          item_description: string
+          observation_notes: string | null
+          observation_time: string | null
+          report_id: string
+          response: string | null
+          sort_order: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          evidence_urls?: string[] | null
+          id?: string
+          item_description: string
+          observation_notes?: string | null
+          observation_time?: string | null
+          report_id: string
+          response?: string | null
+          sort_order?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          evidence_urls?: string[] | null
+          id?: string
+          item_description?: string
+          observation_notes?: string | null
+          observation_time?: string | null
+          report_id?: string
+          response?: string | null
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supervisor_checklist_items_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supervisor_compliance_scores: {
+        Row: {
+          category_scores: Json
+          created_at: string
+          id: string
+          overall_score: number
+          report_id: string
+          risk_level: string
+          score_date: string
+          site_id: string
+        }
+        Insert: {
+          category_scores?: Json
+          created_at?: string
+          id?: string
+          overall_score: number
+          report_id: string
+          risk_level: string
+          score_date: string
+          site_id: string
+        }
+        Update: {
+          category_scores?: Json
+          created_at?: string
+          id?: string
+          overall_score?: number
+          report_id?: string
+          risk_level?: string
+          score_date?: string
+          site_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supervisor_compliance_scores_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supervisor_compliance_scores_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supervisor_incidents: {
+        Row: {
+          created_at: string
+          description: string
+          evidence_urls: string[] | null
+          id: string
+          immediate_action_taken: string | null
+          incident_number: string
+          incident_type: string
+          reported_at: string
+          reported_by: string
+          severity: string
+          site_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          evidence_urls?: string[] | null
+          id?: string
+          immediate_action_taken?: string | null
+          incident_number: string
+          incident_type: string
+          reported_at?: string
+          reported_by: string
+          severity?: string
+          site_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          evidence_urls?: string[] | null
+          id?: string
+          immediate_action_taken?: string | null
+          incident_number?: string
+          incident_type?: string
+          reported_at?: string
+          reported_by?: string
+          severity?: string
+          site_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supervisor_incidents_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supervisor_ncrs: {
+        Row: {
+          category: string
+          checklist_item_id: string | null
+          corrective_action: string | null
+          created_at: string
+          description: string
+          due_date: string | null
+          id: string
+          ncr_number: string
+          raised_at: string
+          raised_by: string
+          report_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          site_id: string
+          status: string
+        }
+        Insert: {
+          category: string
+          checklist_item_id?: string | null
+          corrective_action?: string | null
+          created_at?: string
+          description: string
+          due_date?: string | null
+          id?: string
+          ncr_number: string
+          raised_at?: string
+          raised_by: string
+          report_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          site_id: string
+          status?: string
+        }
+        Update: {
+          category?: string
+          checklist_item_id?: string | null
+          corrective_action?: string | null
+          created_at?: string
+          description?: string
+          due_date?: string | null
+          id?: string
+          ncr_number?: string
+          raised_at?: string
+          raised_by?: string
+          report_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          site_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supervisor_ncrs_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_checklist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supervisor_ncrs_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supervisor_ncrs_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supervisor_observations: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          observation: string
+          recommendation: string | null
+          report_id: string | null
+          site_id: string
+          tag: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          observation: string
+          recommendation?: string | null
+          report_id?: string | null
+          site_id: string
+          tag: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          observation?: string
+          recommendation?: string | null
+          report_id?: string | null
+          site_id?: string
+          tag?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supervisor_observations_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supervisor_observations_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supervisor_reports: {
+        Row: {
+          compliance_score: number | null
+          created_at: string
+          id: string
+          notes: string | null
+          report_date: string
+          report_type: string
+          risk_level: string | null
+          site_id: string
+          status: string
+          submitted_at: string | null
+          supervisor_id: string
+        }
+        Insert: {
+          compliance_score?: number | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          report_date?: string
+          report_type: string
+          risk_level?: string | null
+          site_id: string
+          status?: string
+          submitted_at?: string | null
+          supervisor_id: string
+        }
+        Update: {
+          compliance_score?: number | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          report_date?: string
+          report_type?: string
+          risk_level?: string | null
+          site_id?: string
+          status?: string
+          submitted_at?: string | null
+          supervisor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supervisor_reports_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "supervisor_sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supervisor_sites: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          id: string
+          is_active: boolean
+          organization_id: string
+          site_address: string | null
+          site_name: string
+          supervisor_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          is_active?: boolean
+          organization_id: string
+          site_address?: string | null
+          site_name: string
+          supervisor_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          is_active?: boolean
+          organization_id?: string
+          site_address?: string | null
+          site_name?: string
+          supervisor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supervisor_sites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_tickets: {
         Row: {
           category: string
@@ -1579,6 +1975,8 @@ export type Database = {
       generate_certificate_number: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       generate_ncn_number: { Args: never; Returns: string }
+      generate_ncr_supervisor_number: { Args: never; Returns: string }
+      generate_supervisor_incident_number: { Args: never; Returns: string }
       generate_ticket_number: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: string[] }
       get_user_role: { Args: { _user_id: string }; Returns: string }
@@ -1604,6 +2002,17 @@ export type Database = {
         }
         Returns: string
       }
+      log_supervisor_activity: {
+        Args: {
+          _action: string
+          _metadata?: Json
+          _resource_id?: string
+          _resource_type?: string
+          _supervisor_id: string
+        }
+        Returns: string
+      }
+      submit_supervisor_report: { Args: { _report_id: string }; Returns: Json }
       validate_dual_approval: {
         Args: { _application_id: string; _approver_id: string }
         Returns: boolean

@@ -57,7 +57,7 @@ export function SupervisorProtectedRoute({ children }: SupervisorProtectedRouteP
   }
 
   if (!isAuthorized) {
-    return <Navigate to="/auth/signin" state={{ from: location }} replace />;
+    return <Navigate to="/supervisor/signin" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
