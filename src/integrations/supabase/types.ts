@@ -743,9 +743,143 @@ export type Database = {
         }
         Relationships: []
       }
+      inspection_checklist_items: {
+        Row: {
+          category: string
+          created_at: string | null
+          evidence_urls: string[] | null
+          id: string
+          inspection_id: string
+          item_description: string
+          notes: string | null
+          response: string | null
+          sort_order: number | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          evidence_urls?: string[] | null
+          id?: string
+          inspection_id: string
+          item_description: string
+          notes?: string | null
+          response?: string | null
+          sort_order?: number | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          evidence_urls?: string[] | null
+          id?: string
+          inspection_id?: string
+          item_description?: string
+          notes?: string | null
+          response?: string | null
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_checklist_items_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspection_evidence: {
+        Row: {
+          caption: string | null
+          checklist_item_id: string | null
+          created_at: string | null
+          file_type: string | null
+          file_url: string
+          id: string
+          inspection_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          caption?: string | null
+          checklist_item_id?: string | null
+          created_at?: string | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          inspection_id: string
+          uploaded_by: string
+        }
+        Update: {
+          caption?: string | null
+          checklist_item_id?: string | null
+          created_at?: string | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          inspection_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_evidence_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "inspection_checklist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_evidence_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspection_notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          inspection_id: string | null
+          is_read: boolean | null
+          message: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          inspection_id?: string | null
+          is_read?: boolean | null
+          message?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          inspection_id?: string | null
+          is_read?: boolean | null
+          message?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_notifications_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inspection_reports: {
         Row: {
           attestation_timestamp: string | null
+          compliance_score: number | null
           created_at: string
           findings: Json
           id: string
@@ -753,10 +887,15 @@ export type Database = {
           inspector_attestation: boolean
           overall_assessment: string | null
           recommendations: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
           submitted_at: string | null
         }
         Insert: {
           attestation_timestamp?: string | null
+          compliance_score?: number | null
           created_at?: string
           findings?: Json
           id?: string
@@ -764,10 +903,15 @@ export type Database = {
           inspector_attestation?: boolean
           overall_assessment?: string | null
           recommendations?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
           submitted_at?: string | null
         }
         Update: {
           attestation_timestamp?: string | null
+          compliance_score?: number | null
           created_at?: string
           findings?: Json
           id?: string
@@ -775,6 +919,10 @@ export type Database = {
           inspector_attestation?: boolean
           overall_assessment?: string | null
           recommendations?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
           submitted_at?: string | null
         }
         Relationships: [
@@ -796,9 +944,12 @@ export type Database = {
           created_at: string
           id: string
           inspector_id: string
+          notes: string | null
           scheduled_date: string
           scheduled_time: string | null
+          started_at: string | null
           status: Database["public"]["Enums"]["inspection_status"]
+          supervisor_id: string | null
         }
         Insert: {
           application_id: string
@@ -808,9 +959,12 @@ export type Database = {
           created_at?: string
           id?: string
           inspector_id: string
+          notes?: string | null
           scheduled_date: string
           scheduled_time?: string | null
+          started_at?: string | null
           status?: Database["public"]["Enums"]["inspection_status"]
+          supervisor_id?: string | null
         }
         Update: {
           application_id?: string
@@ -820,9 +974,12 @@ export type Database = {
           created_at?: string
           id?: string
           inspector_id?: string
+          notes?: string | null
           scheduled_date?: string
           scheduled_time?: string | null
+          started_at?: string | null
           status?: Database["public"]["Enums"]["inspection_status"]
+          supervisor_id?: string | null
         }
         Relationships: [
           {
