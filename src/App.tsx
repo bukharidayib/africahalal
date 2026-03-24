@@ -92,6 +92,21 @@ import SupervisorTicketNew from "./pages/supervisor/SupervisorTicketNew";
 import SupervisorTicketDetail from "./pages/supervisor/SupervisorTicketDetail";
 import SupervisorChat from "./pages/supervisor/SupervisorChat";
 import SupervisorRegister from "./pages/supervisor/SupervisorRegister";
+import SupervisorInspections from "./pages/supervisor/SupervisorInspections";
+import SupervisorInspectionView from "./pages/supervisor/SupervisorInspectionView";
+
+// Inspector Portal
+import { InspectorProtectedRoute } from "./components/auth/InspectorProtectedRoute";
+import InspectorSignIn from "./pages/inspector/InspectorSignIn";
+import InspectorForgotPassword from "./pages/inspector/InspectorForgotPassword";
+import InspectorResetPassword from "./pages/inspector/InspectorResetPassword";
+import InspectorDashboard from "./pages/inspector/InspectorDashboard";
+import InspectorInspections from "./pages/inspector/InspectorInspections";
+import InspectorInspectionDetail from "./pages/inspector/InspectorInspectionDetail";
+import InspectorNotifications from "./pages/inspector/InspectorNotifications";
+
+// Admin Inspection Detail
+import AdminInspectionDetail from "./admin/pages/InspectionDetail";
 
 const queryClient = new QueryClient();
 
@@ -159,6 +174,7 @@ const App = () => (
               <Route path="applications/:id" element={<ApplicationDetail />} />
               <Route path="certificates" element={<Certificates />} />
               <Route path="inspections" element={<Inspections />} />
+              <Route path="inspections/:id" element={<AdminInspectionDetail />} />
               <Route path="approvals" element={<PendingApprovals />} />
               <Route path="audit-logs" element={<AuditLogs />} />
               <Route path="users" element={<UserManagement />} />
@@ -178,6 +194,17 @@ const App = () => (
               <Route path="ingredients" element={<IngredientTracker />} />
             </Route>
 
+            {/* Inspector Auth Routes (public) */}
+            <Route path="/inspector/signin" element={<InspectorSignIn />} />
+            <Route path="/inspector/forgot-password" element={<InspectorForgotPassword />} />
+            <Route path="/inspector/reset-password" element={<InspectorResetPassword />} />
+
+            {/* Inspector Portal Protected Routes */}
+            <Route path="/inspector/dashboard" element={<InspectorProtectedRoute><InspectorDashboard /></InspectorProtectedRoute>} />
+            <Route path="/inspector/inspections" element={<InspectorProtectedRoute><InspectorInspections /></InspectorProtectedRoute>} />
+            <Route path="/inspector/inspections/:id" element={<InspectorProtectedRoute><InspectorInspectionDetail /></InspectorProtectedRoute>} />
+            <Route path="/inspector/notifications" element={<InspectorProtectedRoute><InspectorNotifications /></InspectorProtectedRoute>} />
+
             {/* Supervisor Auth Routes (public) */}
             <Route path="/supervisor/signin" element={<SupervisorSignIn />} />
             <Route path="/supervisor/register" element={<SupervisorRegister />} />
@@ -186,6 +213,8 @@ const App = () => (
 
             {/* Supervisor Portal Protected Routes */}
             <Route path="/supervisor/dashboard" element={<SupervisorProtectedRoute><SupervisorDashboard /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/inspections" element={<SupervisorProtectedRoute><SupervisorInspections /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/inspections/:id" element={<SupervisorProtectedRoute><SupervisorInspectionView /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/reports" element={<SupervisorProtectedRoute><SupervisorReports /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/reports/new" element={<SupervisorProtectedRoute><SupervisorReportForm /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/reports/:id" element={<SupervisorProtectedRoute><SupervisorReportDetail /></SupervisorProtectedRoute>} />

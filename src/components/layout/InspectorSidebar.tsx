@@ -1,17 +1,14 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
+  ClipboardList,
   FileText,
-  AlertOctagon,
-  AlertTriangle,
-  BookOpen,
+  Bell,
   TicketCheck,
   MessageSquare,
   LogOut,
   ChevronRight,
-  ShieldCheck,
-  FlaskConical,
-  ClipboardList,
+  Search as SearchIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,18 +16,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
 const navigation = [
-  { name: "Dashboard", href: "/supervisor/dashboard", icon: LayoutDashboard },
-  { name: "Inspections", href: "/supervisor/inspections", icon: ClipboardList },
-  { name: "Reports", href: "/supervisor/reports", icon: FileText },
-  { name: "Incidents", href: "/supervisor/incidents", icon: AlertTriangle },
-  { name: "NCR Management", href: "/supervisor/ncrs", icon: AlertOctagon },
-  { name: "Observations", href: "/supervisor/observations", icon: BookOpen },
-  { name: "Ingredients", href: "/supervisor/ingredients", icon: FlaskConical },
-  { name: "Support Tickets", href: "/supervisor/support/tickets", icon: TicketCheck },
-  { name: "Live Chat", href: "/supervisor/support/chat", icon: MessageSquare },
+  { name: "Dashboard", href: "/inspector/dashboard", icon: LayoutDashboard },
+  { name: "My Inspections", href: "/inspector/inspections", icon: ClipboardList },
+  { name: "Notifications", href: "/inspector/notifications", icon: Bell },
+  { name: "Support Tickets", href: "/inspector/support/tickets", icon: TicketCheck },
+  { name: "Live Chat", href: "/inspector/support/chat", icon: MessageSquare },
 ];
 
-export function SupervisorSidebar() {
+export function InspectorSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -44,7 +37,7 @@ export function SupervisorSidebar() {
         toast({ title: "Logout failed", description: error.message, variant: "destructive" });
       } else {
         toast({ title: "Logged out", description: "You have been signed out successfully." });
-        navigate("/supervisor/signin");
+        navigate("/inspector/signin");
       }
     } catch {
       toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
@@ -56,9 +49,9 @@ export function SupervisorSidebar() {
   return (
     <div className="flex h-full w-64 flex-col bg-sidebar-background border-r border-sidebar-border">
       <div className="flex h-16 items-center px-6 gap-3 border-b border-sidebar-border">
-        <ShieldCheck className="h-8 w-8 text-secondary" />
+        <SearchIcon className="h-8 w-8 text-primary" />
         <div className="flex flex-col">
-          <span className="text-sm font-bold text-sidebar-foreground">Supervisor Portal</span>
+          <span className="text-sm font-bold text-sidebar-foreground">Inspector Portal</span>
           <span className="text-[10px] text-muted-foreground uppercase tracking-tighter">African Halal Inst.</span>
         </div>
       </div>
@@ -66,7 +59,7 @@ export function SupervisorSidebar() {
       <nav className="flex-1 space-y-1 px-3 py-6">
         {navigation.map((item) => {
           const isActive = location.pathname === item.href || 
-            (item.href !== "/supervisor/dashboard" && location.pathname.startsWith(item.href));
+            (item.href !== "/inspector/dashboard" && location.pathname.startsWith(item.href));
           return (
             <Link
               key={item.name}
@@ -74,13 +67,13 @@ export function SupervisorSidebar() {
               className={cn(
                 "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
                 isActive
-                  ? "bg-secondary text-secondary-foreground"
+                  ? "bg-primary text-primary-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
               )}
             >
               <item.icon className={cn(
                 "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
-                isActive ? "text-secondary-foreground" : "text-muted-foreground group-hover:text-sidebar-foreground"
+                isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-sidebar-foreground"
               )} />
               {item.name}
               {isActive && <ChevronRight className="ml-auto h-4 w-4" />}

@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.accept-supervisor-invitation]
 verify_jwt = false
+
+[functions.send-inspection-notification]
+verify_jwt = false
+
+[functions.generate-inspection-report-pdf]
+verify_jwt = false
