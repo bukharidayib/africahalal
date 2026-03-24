@@ -119,7 +119,7 @@ export default function InspectorInspections() {
                 <p className="text-sm">Inspections assigned to you will appear here.</p>
               </div>
             ) : (
-              <Table>
+              <div className="overflow-x-auto"><Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Organization</TableHead>
@@ -167,7 +167,7 @@ export default function InspectorInspections() {
                     );
                   })}
                 </TableBody>
-              </Table>
+              </Table></div>
             )}
           </CardContent>
         </Card>

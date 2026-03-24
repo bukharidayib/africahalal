@@ -1,15 +1,24 @@
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { SupervisorSidebar } from "./SupervisorSidebar";
-import { Bell, Search, User } from "lucide-react";
+import { Bell, Search, User, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useLocation } from "react-router-dom";
 
 interface SupervisorLayoutProps {
   children: ReactNode;
 }
 
 export function SupervisorLayout({ children }: SupervisorLayoutProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
       <div className="hidden md:flex flex-shrink-0">
@@ -17,8 +26,18 @@ export function SupervisorLayout({ children }: SupervisorLayoutProps) {
       </div>
 
       <div className="flex flex-col flex-1 overflow-hidden">
-        <header className="h-16 border-b bg-background/80 backdrop-blur-md flex items-center justify-between px-6 flex-shrink-0 sticky top-0 z-30">
-          <div className="flex items-center gap-4 flex-1">
+        <header className="h-16 border-b bg-background/80 backdrop-blur-md flex items-center justify-between px-3 md:px-6 flex-shrink-0 sticky top-0 z-30">
+          <div className="flex items-center gap-2 md:gap-4 flex-1">
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-64">
+                <SupervisorSidebar />
+              </SheetContent>
+            </Sheet>
             <div className="relative w-full max-w-md hidden sm:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/80" />
               <Input
@@ -32,9 +51,9 @@ export function SupervisorLayout({ children }: SupervisorLayoutProps) {
             <Button variant="ghost" size="icon" className="text-muted-foreground/80 hover:text-primary relative">
               <Bell className="h-5 w-5" />
             </Button>
-            <div className="h-8 w-px bg-border mx-2" />
-            <div className="flex items-center gap-3 pl-2">
-              <div className="flex flex-col items-end hidden sm:flex">
+            <div className="h-8 w-px bg-border mx-1 md:mx-2 hidden sm:block" />
+            <div className="flex items-center gap-3 pl-2 hidden sm:flex">
+              <div className="flex flex-col items-end">
                 <span className="text-sm font-semibold leading-none">Supervisor</span>
                 <span className="text-[10px] text-muted-foreground mt-1">On-site</span>
               </div>
@@ -45,7 +64,7 @@ export function SupervisorLayout({ children }: SupervisorLayoutProps) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar bg-muted/50">
+        <main className="flex-1 overflow-y-auto p-3 md:p-8 custom-scrollbar bg-muted/50">
           <div className="max-w-7xl mx-auto h-full">
             {children}
           </div>
