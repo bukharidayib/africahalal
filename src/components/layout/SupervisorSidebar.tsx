@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ShieldCheck,
   FlaskConical,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,7 @@ import { useState } from "react";
 
 const navigation = [
   { name: "Dashboard", href: "/supervisor/dashboard", icon: LayoutDashboard },
+  { name: "Inspections", href: "/supervisor/inspections", icon: ClipboardList },
   { name: "Reports", href: "/supervisor/reports", icon: FileText },
   { name: "Incidents", href: "/supervisor/incidents", icon: AlertTriangle },
   { name: "NCR Management", href: "/supervisor/ncrs", icon: AlertOctagon },

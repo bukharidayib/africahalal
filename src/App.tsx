@@ -92,6 +92,21 @@ import SupervisorTicketNew from "./pages/supervisor/SupervisorTicketNew";
 import SupervisorTicketDetail from "./pages/supervisor/SupervisorTicketDetail";
 import SupervisorChat from "./pages/supervisor/SupervisorChat";
 import SupervisorRegister from "./pages/supervisor/SupervisorRegister";
+import SupervisorInspections from "./pages/supervisor/SupervisorInspections";
+import SupervisorInspectionView from "./pages/supervisor/SupervisorInspectionView";
+
+// Inspector Portal
+import { InspectorProtectedRoute } from "./components/auth/InspectorProtectedRoute";
+import InspectorSignIn from "./pages/inspector/InspectorSignIn";
+import InspectorForgotPassword from "./pages/inspector/InspectorForgotPassword";
+import InspectorResetPassword from "./pages/inspector/InspectorResetPassword";
+import InspectorDashboard from "./pages/inspector/InspectorDashboard";
+import InspectorInspections from "./pages/inspector/InspectorInspections";
+import InspectorInspectionDetail from "./pages/inspector/InspectorInspectionDetail";
+import InspectorNotifications from "./pages/inspector/InspectorNotifications";
+
+// Admin Inspection Detail
+import AdminInspectionDetail from "./admin/pages/InspectionDetail";
 
 const queryClient = new QueryClient();
 
