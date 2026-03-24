@@ -87,7 +87,7 @@ export default function SupervisorReports() {
             </CardContent>
           </Card>
         ) : (
-          <div className="border rounded-md">
+          <div className="border rounded-md overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

@@ -71,7 +71,7 @@ export default function SupervisorInspections() {
                 <p className="text-sm">Inspections assigned to your site will appear here.</p>
               </div>
             ) : (
-              <Table>
+              <div className="overflow-x-auto"><Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Organization</TableHead>
@@ -110,7 +110,7 @@ export default function SupervisorInspections() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </Table></div>
             )}
           </CardContent>
         </Card>

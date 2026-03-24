@@ -97,7 +97,7 @@ export default function SupervisorObservations() {
           </Button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1">
           {["all", "operational", "training", "infrastructure", "documentation"].map(tag => (
             <Button key={tag} variant={tagFilter === tag ? "default" : "outline"} size="sm" onClick={() => setTagFilter(tag)}>
               {tag === "all" ? "All" : tag.charAt(0).toUpperCase() + tag.slice(1)}

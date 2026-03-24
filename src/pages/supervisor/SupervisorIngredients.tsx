@@ -62,7 +62,7 @@ export default function SupervisorIngredients() {
             </CardContent>
           </Card>
         ) : (
-          <Card>
+          <Card className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
