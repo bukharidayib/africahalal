@@ -209,7 +209,11 @@ const App = () => (
             <Route path="/inspector/inspections/:id" element={<InspectorProtectedRoute><InspectorInspectionDetail /></InspectorProtectedRoute>} />
             <Route path="/inspector/notifications" element={<InspectorProtectedRoute><InspectorNotifications /></InspectorProtectedRoute>} />
 
-            {/* Supervisor Auth Routes (public) */}
+            <Route path="/inspector/support/tickets" element={<InspectorProtectedRoute><InspectorSupportTickets /></InspectorProtectedRoute>} />
+            <Route path="/inspector/support/tickets/new" element={<InspectorProtectedRoute><InspectorSupportTicketNew /></InspectorProtectedRoute>} />
+            <Route path="/inspector/support/tickets/:id" element={<InspectorProtectedRoute><InspectorSupportTicketDetail /></InspectorProtectedRoute>} />
+            <Route path="/inspector/support/chat" element={<InspectorProtectedRoute><InspectorSupportChat /></InspectorProtectedRoute>} />
+
             <Route path="/supervisor/signin" element={<SupervisorSignIn />} />
             <Route path="/supervisor/register" element={<SupervisorRegister />} />
             <Route path="/supervisor/forgot-password" element={<SupervisorForgotPassword />} />
