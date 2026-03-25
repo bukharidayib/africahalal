@@ -104,6 +104,10 @@ import InspectorDashboard from "./pages/inspector/InspectorDashboard";
 import InspectorInspections from "./pages/inspector/InspectorInspections";
 import InspectorInspectionDetail from "./pages/inspector/InspectorInspectionDetail";
 import InspectorNotifications from "./pages/inspector/InspectorNotifications";
+import InspectorSupportTickets from "./pages/inspector/InspectorSupportTickets";
+import InspectorSupportTicketNew from "./pages/inspector/InspectorSupportTicketNew";
+import InspectorSupportTicketDetail from "./pages/inspector/InspectorSupportTicketDetail";
+import InspectorSupportChat from "./pages/inspector/InspectorSupportChat";
 
 // Admin Inspection Detail
 import AdminInspectionDetail from "./admin/pages/InspectionDetail";
