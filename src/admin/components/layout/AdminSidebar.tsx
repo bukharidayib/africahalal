@@ -162,6 +162,7 @@ const navItems: NavItem[] = [
 export function AdminSidebar() {
   const location = useLocation();
   const { permissions } = useAdminAuthContext();
+  const hasSupportNotifications = useSupportNotifications();
 
   const filteredNavItems = navItems.filter(item => {
     if (!item.permission) return true;
@@ -180,24 +181,33 @@ export function AdminSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex flex-col gap-1 p-4">
+      <nav className="flex flex-col gap-1 p-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 8rem)' }}>
         {filteredNavItems.map((item) => {
           const isActive = location.pathname === item.href ||
             (item.href !== '/admin/dashboard' && location.pathname.startsWith(item.href));
+          const showBadge = item.href === '/admin/support' && hasSupportNotifications;
 
           return (
             <NavLink
               key={item.href}
               to={item.href}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative',
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                   : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
               )}
             >
-              <item.icon className="h-4 w-4" />
+              <span className="relative">
+                <item.icon className="h-4 w-4" />
+                {showBadge && (
+                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive border-2 border-sidebar animate-pulse" />
+                )}
+              </span>
               {item.title}
+              {showBadge && (
+                <span className="ml-auto h-2 w-2 rounded-full bg-destructive" />
+              )}
             </NavLink>
           );
         })}
