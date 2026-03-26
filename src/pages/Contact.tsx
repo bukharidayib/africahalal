@@ -183,7 +183,7 @@ export default function Contact() {
                           type="tel"
                           value={formData.phone}
                           onChange={handleChange}
-                          placeholder="+260972044414"
+                          placeholder="Phone number"
                         />
                       </div>
                       <div>
