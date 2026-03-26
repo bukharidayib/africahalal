@@ -1,51 +1,108 @@
 
 
-# Make Supervisor & Inspector Portals Fully Mobile Responsive
+# Migrate All Portal Authentication from Supabase Auth to Clerk
 
-## Problem
-Both portals hide the sidebar on mobile (`hidden md:flex`) but provide **no mobile navigation** -- users on phones have no way to navigate between pages. Additionally, tables and forms need horizontal scroll wrappers on small screens.
+## Overview
 
-## Changes
+Replace Supabase Auth with Clerk across all 4 portals (Client, Admin, Inspector, Supervisor). Clerk handles sign-in/sign-up UI and session management. Supabase remains the database -- Clerk JWTs are passed to the Supabase client so RLS policies (`auth.uid()`) continue to work seamlessly.
 
-### 1. Add Mobile Hamburger Menu to Both Layouts
+## Architecture
 
-**Files:** `InspectorLayout.tsx`, `SupervisorLayout.tsx`
+```text
+┌──────────────┐      ┌──────────┐      ┌──────────────┐
+│  React App   │──────│  Clerk   │──────│  Clerk JWT   │
+│ <SignIn/>    │ auth │ Session  │ jwt  │  Template    │
+│ <SignUp/>    │      │          │      │ (Supabase)   │
+└──────┬───────┘      └──────────┘      └──────┬───────┘
+       │                                        │
+       │  supabase client with Clerk JWT        │
+       └────────────────────────────────────────┘
+                        │
+                  ┌─────▼─────┐
+                  │ Supabase  │  auth.uid() = Clerk user ID
+                  │ Database  │  RLS works unchanged
+                  └───────────┘
+```
 
-- Import `Sheet`, `SheetContent`, `SheetTrigger` from `@/components/ui/sheet` and `Menu` icon from lucide
-- Add a hamburger `Menu` button in the header (visible only on mobile via `md:hidden`)
-- Wrap the respective sidebar component inside the Sheet overlay
-- Sheet closes on navigation (use state + `useLocation` to auto-close on route change)
-- Reduce header padding on mobile (`px-3 md:px-6`)
+## Prerequisites (User Actions Required)
 
-### 2. Make Tables Horizontally Scrollable
+1. **Clerk Dashboard**: Create a JWT Template named `supabase` with:
+   - Signing algorithm: HS256
+   - Signing key: Your Supabase JWT secret (found in Supabase Settings > API > JWT Secret)
+   - Claims: `{ "sub": "{{user.id}}", "role": "authenticated", "iss": "supabase", "aud": "authenticated" }`
 
-**Files:** All pages with `<Table>` in both portals (~8 files):
-- `InspectorInspections.tsx`, `InspectorInspectionDetail.tsx`, `InspectorNotifications.tsx`
-- `SupervisorInspections.tsx`, `SupervisorReports.tsx`, `SupervisorIncidents.tsx`, `SupervisorNCRs.tsx`, `SupervisorObservations.tsx`, `SupervisorIngredients.tsx`, `SupervisorTickets.tsx`
+2. **Provide keys**: Clerk publishable key (stored as `VITE_CLERK_PUBLISHABLE_KEY` in code) and secret key (stored as Supabase edge function secret `CLERK_SECRET_KEY`)
 
-Wrap each `<Table>` in `<div className="overflow-x-auto">` so it scrolls horizontally on small screens instead of breaking layout.
+## Implementation Steps
 
-### 3. Responsive Grid Adjustments for Dashboard Stats
+### Step 1: Install Clerk + Configure Provider
+- Install `@clerk/clerk-react`
+- Add `VITE_CLERK_PUBLISHABLE_KEY` to `.env`
+- Wrap `App.tsx` in `<ClerkProvider>`
+- Create `src/integrations/clerk/supabaseClient.ts` -- a hook that gets a Clerk token via `useAuth().getToken({ template: 'supabase' })` and creates a Supabase client with that token in the Authorization header
 
-**Files:** `InspectorDashboard.tsx`, `SupervisorDashboard.tsx`
+### Step 2: Replace All Auth Pages with Clerk Components
+- **Client**: Replace `SignIn.tsx`, `SignUp.tsx`, `ForgotPassword.tsx`, `ResetPassword.tsx` with Clerk `<SignIn>` / `<SignUp>` components (routed via `routing="path"`)
+- **Inspector**: Replace `InspectorSignIn.tsx`, `InspectorForgotPassword.tsx`, `InspectorResetPassword.tsx`
+- **Supervisor**: Replace `SupervisorSignIn.tsx`, `SupervisorRegister.tsx`, `SupervisorForgotPassword.tsx`, `SupervisorResetPassword.tsx`
+- **Admin**: Replace `AdminLogin.tsx`, `AdminRegister.tsx`
 
-- Change stat card grids from `grid-cols-2 md:grid-cols-4` to `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` for better stacking on very small screens.
+Each portal gets its own sign-in page that wraps Clerk's `<SignIn>` with portal-specific branding and redirect URLs.
 
-### 4. Form Layout Adjustments
+### Step 3: Replace Protected Routes
+- **`ProtectedRoute.tsx`**: Replace `supabase.auth.getSession()` with Clerk's `useAuth()` -- check `isSignedIn`
+- **`InspectorProtectedRoute.tsx`**: Use `useAuth()` for session, then query `inspectors` table with Clerk-authenticated Supabase client
+- **`SupervisorProtectedRoute.tsx`**: Same pattern, query `organization_supervisors`
+- **`AdminLayout.tsx`**: Same pattern, query `user_roles`
 
-**Files:** `SupervisorReportForm.tsx`, `SupervisorIncidentForm.tsx`, `SupervisorIngredientForm.tsx`, `InspectorInspectionDetail.tsx`
+### Step 4: Rewrite `useAdminAuth` Hook
+- Replace all `supabase.auth.*` calls with Clerk's `useUser()`, `useAuth()`, `useClerk()`
+- `signIn` becomes `clerk.signIn.create()` (or just redirect to Clerk sign-in page)
+- `signOut` becomes `clerk.signOut()`
+- Keep role/permission fetching from Supabase (unchanged)
 
-- Ensure form grids use `grid-cols-1 md:grid-cols-2` pattern
-- Reduce main content padding on mobile (`p-3 md:p-6`)
+### Step 5: Replace `supabase.auth.*` Across All 52 Files
+Every file that calls `supabase.auth.getSession()` or `supabase.auth.getUser()` changes to:
+- Use Clerk's `useAuth()` to get `userId`
+- Use the Clerk-authenticated Supabase client for database queries
+- Pattern: create a `useSupabaseClient()` hook that returns a Supabase client with the Clerk JWT injected
 
-## Summary
+### Step 6: Update Edge Functions
+- Add `CLERK_SECRET_KEY` as a Supabase secret
+- Edge functions that validate JWTs switch from Supabase auth to verifying Clerk JWTs (or rely on the Supabase client's built-in JWT verification since we're using a compatible JWT template)
 
-| Area | Files Modified |
-|------|---------------|
-| Layouts (mobile nav) | 2 (`InspectorLayout.tsx`, `SupervisorLayout.tsx`) |
-| Tables (scroll wrapper) | ~10 page files |
-| Dashboard grids | 2 dashboard files |
-| Form layouts | ~4 form files |
+### Step 7: Update Profile Trigger
+- The `handle_new_user` trigger on `auth.users` won't fire for Clerk users
+- Create a Clerk webhook (via edge function) that listens for `user.created` and inserts into `profiles` table
+- Or: create profile on first sign-in from the client side
 
-The core fix is adding the Sheet-based mobile sidebar to both layouts. The table/form tweaks ensure content doesn't overflow on narrow screens.
+### Step 8: Database Cleanup
+- No schema changes needed -- RLS policies using `auth.uid()` will receive the Clerk user ID via the JWT template
+- Existing data linked to old Supabase Auth user IDs will be orphaned (acceptable per "fresh start" decision)
+
+## Files Modified
+
+| Area | Files | Change |
+|------|-------|--------|
+| Config | `package.json`, `.env` | Add `@clerk/clerk-react`, `VITE_CLERK_PUBLISHABLE_KEY` |
+| Provider | `App.tsx`, `main.tsx` | Wrap in `<ClerkProvider>` |
+| New utility | `src/integrations/clerk/supabaseClient.ts` | Clerk-authenticated Supabase client hook |
+| Client auth (4 files) | `SignIn`, `SignUp`, `ForgotPassword`, `ResetPassword` | Replace with Clerk components |
+| Inspector auth (3 files) | `InspectorSignIn`, `ForgotPassword`, `ResetPassword` | Replace with Clerk components |
+| Supervisor auth (4 files) | `SupervisorSignIn`, `Register`, `ForgotPassword`, `ResetPassword` | Replace with Clerk components |
+| Admin auth (2 files) | `AdminLogin`, `AdminRegister` | Replace with Clerk components |
+| Protected routes (3 files) | `ProtectedRoute`, `InspectorProtectedRoute`, `SupervisorProtectedRoute` | Use Clerk `useAuth()` |
+| Admin auth hook | `useAdminAuth.ts` | Rewrite for Clerk |
+| Admin context | `AdminAuthContext.tsx` | Update types |
+| Admin layout | `AdminLayout.tsx` | Use Clerk auth |
+| All data pages (~40 files) | Every file with `supabase.auth` | Use Clerk-authenticated Supabase client |
+| Edge functions | All that validate auth | Use Clerk JWT verification |
+| New edge function | `clerk-webhook/index.ts` | Handle `user.created` for profile creation |
+
+## What the User Needs to Do
+
+1. Set up Clerk project and provide publishable key + secret key
+2. Configure Supabase JWT Template in Clerk dashboard
+3. Re-create users in Clerk (or import them)
+4. Link Inspector/Supervisor records to new Clerk user IDs
 
