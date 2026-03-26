@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   FileText,
@@ -18,6 +19,40 @@ import {
 import { cn } from '@/lib/utils';
 import { useAdminAuthContext } from '../../contexts/AdminAuthContext';
 import { Permission } from '../../lib/permissions';
+import { supabase } from '@/integrations/supabase/client';
+
+function useSupportNotifications() {
+  const [hasUnresolved, setHasUnresolved] = useState(false);
+
+  useEffect(() => {
+    const check = async () => {
+      const [ticketsRes, chatsRes] = await Promise.all([
+        supabase
+          .from('support_tickets')
+          .select('id', { count: 'exact', head: true })
+          .in('status', ['open', 'in_progress']),
+        supabase
+          .from('chat_sessions')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'active'),
+      ]);
+      const total = (ticketsRes.count || 0) + (chatsRes.count || 0);
+      setHasUnresolved(total > 0);
+    };
+
+    check();
+
+    const ticketChannel = supabase
+      .channel('admin-support-badge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, check)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_sessions' }, check)
+      .subscribe();
+
+    return () => { supabase.removeChannel(ticketChannel); };
+  }, []);
+
+  return hasUnresolved;
+}
 
 interface NavItem {
   title: string;
