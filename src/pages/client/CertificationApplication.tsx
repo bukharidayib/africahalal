@@ -76,6 +76,7 @@ export default function CertificationApplication() {
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
     const [showPaymentPrompt, setShowPaymentPrompt] = useState(false);
     const [submittedInvoice, setSubmittedInvoice] = useState<{ id: string; number: string; amount: number } | null>(null);
+    const [showMoMoPayment, setShowMoMoPayment] = useState(false);
     const [ingredientModalOpen, setIngredientModalOpen] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const [businesses, setBusinesses] = useState<{ id: string; entity_name: string; pacra_number: string }[]>([]);
