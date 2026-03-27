@@ -8,12 +8,13 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
   DollarSign, Clock, AlertTriangle, CheckCircle2, FileText,
-  ArrowRight, Loader2, Receipt
+  ArrowRight, Loader2, Receipt, Smartphone
 } from "lucide-react";
 import { format } from "date-fns";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
+import { MoMoPaymentDialog } from "@/components/billing/MoMoPaymentDialog";
 
 interface BillingStats {
   totalPaid: number;
@@ -38,6 +39,7 @@ export default function BillingDashboard() {
   const [stats, setStats] = useState<BillingStats>({ totalPaid: 0, totalPending: 0, totalOverdue: 0, invoiceCount: 0 });
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -197,7 +199,12 @@ export default function BillingDashboard() {
                       <TableCell className="font-semibold">ZMW {Number(inv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>{format(new Date(inv.due_date), 'dd MMM yyyy')}</TableCell>
                       <TableCell>{statusBadge(inv.status)}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-right space-x-1">
+                        {(inv.status === 'pending' || inv.status === 'overdue') && (
+                          <Button variant="default" size="sm" onClick={() => setPayingInvoice(inv)}>
+                            <Smartphone className="h-3 w-3 mr-1" /> Pay
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" asChild>
                           <Link to={`/client/billing/invoices/${inv.id}`}>View</Link>
                         </Button>
@@ -217,6 +224,21 @@ export default function BillingDashboard() {
             All certification authority, decision-making, approval, and enforcement powers remain exclusively within AHI's internal systems.
           </p>
         </div>
+
+        {payingInvoice && (
+          <MoMoPaymentDialog
+            open={!!payingInvoice}
+            onOpenChange={(open) => !open && setPayingInvoice(null)}
+            invoiceId={payingInvoice.id}
+            invoiceNumber={payingInvoice.invoice_number}
+            amount={payingInvoice.amount}
+            currency={payingInvoice.currency}
+            onPaymentComplete={() => {
+              setPayingInvoice(null);
+              fetchBillingData();
+            }}
+          />
+        )}
       </div>
     </ClientLayout>
   );
