@@ -1,33 +1,89 @@
 
 
-# Fix Admin Portal 404 — Two Issues
+# Inspection Email Notifications + Client Inspections View + Payment After Submission
 
-## Problem 1: Vercel 404 on Admin Routes
-Vercel doesn't know this is a single-page app (SPA). When you visit `/admin/login` directly, Vercel looks for a file at that path and returns 404. You need a `vercel.json` config to redirect all routes to `index.html`.
+## Three Features
 
-**Fix:** Create `vercel.json` in the project root:
-```json
-{
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
+### 1. Email Notifications on Inspection Scheduling
+
+**Current state**: `handleScheduleInspection()` in `src/admin/pages/Inspections.tsx` inserts the inspection and updates application status, but does NOT send emails. The `send-inspection-notification` edge function exists and already sends emails via Resend -- it just needs to be called.
+
+**Changes**:
+
+**File: `src/admin/pages/Inspections.tsx`** (lines ~231-253)
+- After successful inspection insert, call `supabase.functions.invoke('send-inspection-notification')` with:
+  - `type: "inspection_scheduled"`
+  - `title: "Inspection Scheduled"`
+  - `message`: include date, time, organization name
+  - `user_ids`: array containing the inspector's `user_id` AND the client org owner's user ID
+- To get the client user ID: query `profiles` where `organization_id` matches the application's `organization_id`
+- To get the inspector's user ID: query `inspectors` table using `scheduleForm.inspector_id`
+
+### 2. Client Portal — Scheduled Inspections Page
+
+**Current state**: The "Inspections" sidebar link points to `/client/inspections` which loads `ComplianceCenter.tsx` — this shows compliance/CAR data, NOT scheduled inspections.
+
+**Changes**:
+
+**New file: `src/pages/client/ClientInspections.tsx`**
+- Query `inspections` table joined with `certification_applications` (filtered by the client's `organization_id`)
+- Show a table/card list of scheduled inspections with: date, time, status, application number
+- Include status badges (scheduled, in_progress, completed)
+- Empty state: "No inspections scheduled yet"
+
+**File: `src/App.tsx`**
+- Add new route `/client/inspections/scheduled` pointing to `ClientInspections`
+- Keep existing `/client/inspections` for ComplianceCenter
+
+**File: `src/components/layout/ClientSidebar.tsx`**
+- Update "Inspections" nav item or add sub-item for "Scheduled Inspections"
+
+**Database**: Add RLS policy for clients to SELECT from `inspections` via their organization's applications (if not already covered). Check: the existing RLS on `inspections` only allows admin and inspector access — need to add a client SELECT policy.
+
+**Migration**:
+```sql
+CREATE POLICY "Clients can view own inspections"
+ON public.inspections
+FOR SELECT
+TO authenticated
+USING (
+  application_id IN (
+    SELECT ca.id FROM certification_applications ca
+    JOIN profiles p ON p.organization_id = ca.organization_id
+    WHERE p.id = auth.uid()
+  )
+);
 ```
 
-## Problem 2: Admin Pages in Lovable Preview
-The admin routes exist in `App.tsx` (lines 173-199) and should work in the preview. To access them, navigate to `/admin/login` in the preview URL bar. The admin portal uses its own authentication system — you need to sign in with an admin account (a user who has a role in the `user_roles` table).
+### 3. Payment Prompt After Application Submission + Channel Selection
 
-If you're seeing a blank page or redirect loop in the preview, it's because:
-- No Supabase session exists (you're logged into the client portal, not admin)
-- Or the logged-in user has no admin role assigned in `user_roles`
+**Current state**: After submission, client is redirected to `/client/applications`. An invoice is created but there's no prompt to pay. The MoMo payment dialog exists but uses a hardcoded `channel` from env var.
 
-## Changes
+**Changes**:
 
-| File | Change |
-|------|--------|
-| `vercel.json` (new) | Add SPA rewrite rule for Vercel deployment |
+**File: `src/pages/client/CertificationApplication.tsx`**
+- After successful submission (line ~639), instead of immediately navigating, show a success dialog with:
+  - "Application submitted successfully"
+  - "Pay your certification fee now" button → opens `MoMoPaymentDialog`
+  - "Pay later" link → navigates to `/client/applications`
+- Pass the newly created invoice ID to the payment dialog
 
-## After Implementation
-1. Redeploy on Vercel — all routes will resolve correctly
-2. In the Lovable preview, navigate to `/admin/login` and sign in with admin credentials
+**File: `src/components/billing/MoMoPaymentDialog.tsx`**
+- Add a "Payment Provider" select field with options: Airtel, MTN, Zamtel
+- Pass selected channel to the edge function
+
+**File: `supabase/functions/process-momo-payment/index.ts`**
+- Accept `channel` parameter from request body (instead of env var)
+- Use the client-selected channel ("airtel", "mtn", "zamtel") in the ZynlePay payload
+- Fallback to "momo" if not provided
+
+## Implementation Order
+
+1. Database migration — add client inspection RLS policy
+2. Update `process-momo-payment` edge function — accept `channel` param
+3. Update `MoMoPaymentDialog` — add provider selector (Airtel/MTN/Zamtel)
+4. Update `Inspections.tsx` — send email after scheduling
+5. Create `ClientInspections.tsx` — client inspection view
+6. Update `App.tsx` + `ClientSidebar.tsx` — route and nav
+7. Update `CertificationApplication.tsx` — payment prompt after submission
 
