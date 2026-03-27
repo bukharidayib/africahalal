@@ -29,6 +29,7 @@ import ClientDashboard from "./pages/client/ClientDashboard";
 import CertificationApplication from "./pages/client/CertificationApplication";
 import DocumentVault from "./pages/client/DocumentVault";
 import ComplianceCenter from "./pages/client/ComplianceCenter";
+import ClientInspections from "./pages/client/ClientInspections";
 import CertificateVault from "./pages/client/CertificateVault";
 import VerifyPublic from "./pages/VerifyPublic";
 import MyApplications from "./pages/client/MyApplications";
@@ -157,7 +158,8 @@ const App = () => (
             <Route path="/client/applications" element={<ProtectedRoute><MyApplications /></ProtectedRoute>} />
             <Route path="/client/applications/:id" element={<ProtectedRoute><ClientApplicationDetail /></ProtectedRoute>} />
             <Route path="/client/documents" element={<ProtectedRoute><DocumentVault /></ProtectedRoute>} />
-            <Route path="/client/inspections" element={<ProtectedRoute><ComplianceCenter /></ProtectedRoute>} />
+            <Route path="/client/inspections" element={<ProtectedRoute><ClientInspections /></ProtectedRoute>} />
+            <Route path="/client/compliance" element={<ProtectedRoute><ComplianceCenter /></ProtectedRoute>} />
             <Route path="/client/certificates" element={<ProtectedRoute><CertificateVault /></ProtectedRoute>} />
             <Route path="/client/support" element={<ProtectedRoute><SupportCenter /></ProtectedRoute>} />
             <Route path="/client/support/tickets" element={<ProtectedRoute><SupportTickets /></ProtectedRoute>} />

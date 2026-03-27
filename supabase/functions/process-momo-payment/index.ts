@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { invoice_id, phone_number } = await req.json();
+    const { invoice_id, phone_number, channel: clientChannel } = await req.json();
 
     // Validate phone number (Zambian format: 09xx or 07xx, 10 digits)
     const phoneRegex = /^0[79]\d{8}$/;
@@ -88,7 +88,10 @@ Deno.serve(async (req) => {
     const merchantId = Deno.env.get("ZYNLEPAY_MERCHANT_ID")!;
     const apiId = Deno.env.get("ZYNLEPAY_API_ID")!;
     const apiKey = Deno.env.get("ZYNLEPAY_API_KEY")!;
-    const channel = Deno.env.get("ZYNLEPAY_CHANNEL") || "momo";
+    const allowedChannels = ["airtel", "mtn", "zamtel", "momo"];
+    const channel = (clientChannel && allowedChannels.includes(clientChannel.toLowerCase()))
+      ? clientChannel.toLowerCase()
+      : (Deno.env.get("ZYNLEPAY_CHANNEL") || "momo");
 
     const referenceNo = `${invoice.invoice_number}-${Date.now()}`;
 

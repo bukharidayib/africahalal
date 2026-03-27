@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dialog";
 import { ProductIngredientModal, Ingredient } from "@/components/client/ProductIngredientModal";
 import { MandatoryDocuments } from "@/components/client/MandatoryDocuments";
+import { MoMoPaymentDialog } from "@/components/billing/MoMoPaymentDialog";
 
 const steps = [
     { id: 1, name: "Establishment Details", icon: Building2 },
@@ -73,6 +74,9 @@ export default function CertificationApplication() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+    const [showPaymentPrompt, setShowPaymentPrompt] = useState(false);
+    const [submittedInvoice, setSubmittedInvoice] = useState<{ id: string; number: string; amount: number } | null>(null);
+    const [showMoMoPayment, setShowMoMoPayment] = useState(false);
     const [ingredientModalOpen, setIngredientModalOpen] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const [businesses, setBusinesses] = useState<{ id: string; entity_name: string; pacra_number: string }[]>([]);
@@ -594,14 +598,17 @@ export default function CertificationApplication() {
             });
 
             // Create invoice for application fee
+            let createdInvoiceId = "";
+            let createdInvoiceNumber = "";
             try {
                 const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number');
                 const validityLabel = formData.validity_period === '6_months' ? '6 Months' : '1 Year';
                 const dueDate = new Date();
                 dueDate.setDate(dueDate.getDate() + 30);
+                createdInvoiceNumber = invoiceNumber || `AHIS-INV-${Date.now()}`;
 
-                await supabase.from('invoices').insert({
-                    invoice_number: invoiceNumber || `AHIS-INV-${Date.now()}`,
+                const { data: invoiceData } = await supabase.from('invoices').insert({
+                    invoice_number: createdInvoiceNumber,
                     organization_id: organization_id,
                     application_id: appId,
                     fee_type: 'application_fee',
@@ -610,7 +617,9 @@ export default function CertificationApplication() {
                     currency: 'ZMW',
                     due_date: dueDate.toISOString().split('T')[0],
                     status: 'pending',
-                });
+                }).select('id').single();
+
+                if (invoiceData) createdInvoiceId = invoiceData.id;
             } catch (invoiceErr) {
                 console.error('Failed to create invoice:', invoiceErr);
             }
@@ -640,7 +649,14 @@ export default function CertificationApplication() {
                 title: "Application Submitted Successfully",
                 description: `Application ${applicationNumber} has been sent for review.`,
             });
-            navigate("/client/applications");
+
+            // Show payment prompt if invoice was created
+            if (createdInvoiceId) {
+                setSubmittedInvoice({ id: createdInvoiceId, number: createdInvoiceNumber, amount: formData.application_fee });
+                setShowPaymentPrompt(true);
+            } else {
+                navigate("/client/applications");
+            }
         } catch (error: any) {
             console.error('Submission error:', error);
             toast({
@@ -1200,6 +1216,49 @@ export default function CertificationApplication() {
                 ingredients={selectedProduct?.ingredients || []}
                 onSave={handleSaveIngredients}
             />
+
+            {/* Payment Prompt After Submission */}
+            <Dialog open={showPaymentPrompt} onOpenChange={(open) => { if (!open) navigate("/client/applications"); setShowPaymentPrompt(open); }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="font-serif">Application Submitted!</DialogTitle>
+                        <DialogDescription>
+                            Your application has been submitted successfully. You can pay the certification fee now or later from the Billing section.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="rounded-lg bg-muted/50 p-4 text-sm space-y-2">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Invoice</span>
+                            <span className="font-mono text-xs">{submittedInvoice?.number}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Amount</span>
+                            <span className="font-semibold">ZMW {submittedInvoice?.amount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                    </div>
+                    <DialogFooter className="flex-col gap-2 sm:flex-col">
+                        <Button onClick={() => { setShowPaymentPrompt(false); setShowMoMoPayment(true); }} className="w-full">
+                            Pay Now
+                        </Button>
+                        <Button variant="outline" onClick={() => { setShowPaymentPrompt(false); navigate("/client/applications"); }} className="w-full">
+                            Pay Later
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* MoMo Payment Dialog */}
+            {submittedInvoice && (
+                <MoMoPaymentDialog
+                    open={showMoMoPayment}
+                    onOpenChange={(open) => { setShowMoMoPayment(open); if (!open) navigate("/client/applications"); }}
+                    invoiceId={submittedInvoice.id}
+                    invoiceNumber={submittedInvoice.number}
+                    amount={submittedInvoice.amount}
+                    currency="ZMW"
+                    onPaymentComplete={() => { navigate("/client/applications"); }}
+                />
+            )}
         </ClientLayout>
     );
 }

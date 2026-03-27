@@ -249,6 +249,49 @@ export default function Inspections() {
         },
       });
 
+      // Send email notifications to inspector and client
+      try {
+        // Get inspector's user_id
+        const { data: inspector } = await supabase
+          .from('inspectors')
+          .select('user_id')
+          .eq('id', scheduleForm.inspector_id)
+          .single();
+
+        // Get application's organization_id and org name
+        const { data: app } = await supabase
+          .from('certification_applications')
+          .select('organization_id, organizations(name)')
+          .eq('id', scheduleForm.application_id)
+          .single();
+
+        // Get client user IDs from profiles linked to that org
+        const { data: clientProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('organization_id', app?.organization_id);
+
+        const userIds: string[] = [];
+        if (inspector?.user_id) userIds.push(inspector.user_id);
+        if (clientProfiles) userIds.push(...clientProfiles.map((p: any) => p.id));
+
+        const orgName = (app as any)?.organizations?.name || 'your organization';
+        const dateStr = format(scheduleForm.scheduled_date, 'PPP');
+        const timeStr = scheduleForm.scheduled_time || 'TBD';
+
+        await supabase.functions.invoke('send-inspection-notification', {
+          body: {
+            inspection_id: scheduleForm.application_id,
+            type: 'inspection_scheduled',
+            title: 'Inspection Scheduled',
+            message: `An inspection has been scheduled for ${orgName} on ${dateStr} at ${timeStr}. Please prepare accordingly.`,
+            user_ids: userIds,
+          },
+        });
+      } catch (notifErr) {
+        console.error('Failed to send inspection notifications:', notifErr);
+      }
+
       toast.success('Inspection scheduled successfully');
       setIsScheduleOpen(false);
       fetchInspections();

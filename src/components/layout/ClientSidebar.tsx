@@ -25,6 +25,7 @@ const navigation = [
     { name: "My Applications", href: "/client/applications", icon: FolderOpen },
     { name: "My Documents", href: "/client/documents", icon: Files },
     { name: "Inspections", href: "/client/inspections", icon: ClipboardCheck },
+    { name: "Compliance Center", href: "/client/compliance", icon: ShieldCheck },
     { name: "Certificate Vault", href: "/client/certificates", icon: Award },
     { name: "Billing & Payments", href: "/client/billing", icon: Receipt },
     { name: "Support Center", href: "/client/support", icon: HeadphonesIcon },
