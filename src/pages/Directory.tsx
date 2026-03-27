@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { SEOHead } from "@/components/seo/SEOHead";
+import { StructuredData, createBreadcrumbSchema } from "@/components/seo/StructuredData";
 import {
   Search,
   MapPin,
@@ -93,7 +95,16 @@ export default function Directory() {
 
   return (
     <Layout>
-      {/* Hero */}
+      <SEOHead
+        title="Halal Certified Business Directory — Zambia | African Halal Institute"
+        description="Browse AHI-certified Halal businesses in Zambia. Verified restaurants, suppliers, manufacturers, and hotels with active Halal certificates."
+        canonical="https://africanhalaal.com/directory"
+        keywords="halal directory zambia, halal certified businesses zambia, halal restaurants lusaka, halal suppliers zambia"
+      />
+      <StructuredData data={createBreadcrumbSchema([
+        { name: "Home", url: "https://africanhalaal.com" },
+        { name: "Directory", url: "https://africanhalaal.com/directory" },
+      ])} />
       <HeroSection
         subtitle="Certified Directory"
         title="Global Certified Registry"
