@@ -177,7 +177,8 @@ export default function BillingDashboard() {
             ) : recentInvoices.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Receipt className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                <p className="text-sm">No invoices found.</p>
+                <p className="text-sm font-medium">No invoices yet</p>
+                <p className="text-xs mt-1">Invoices are generated when you submit a certification application.</p>
               </div>
             ) : (
               <Table>
