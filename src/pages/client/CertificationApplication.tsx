@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dialog";
 import { ProductIngredientModal, Ingredient } from "@/components/client/ProductIngredientModal";
 import { MandatoryDocuments } from "@/components/client/MandatoryDocuments";
+import { MoMoPaymentDialog } from "@/components/billing/MoMoPaymentDialog";
 
 const steps = [
     { id: 1, name: "Establishment Details", icon: Building2 },
