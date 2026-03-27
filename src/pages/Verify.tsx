@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { SEOHead } from "@/components/seo/SEOHead";
+import { StructuredData } from "@/components/seo/StructuredData";
 import { useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -150,7 +152,22 @@ export default function Verify() {
 
   return (
     <Layout>
-      {/* Hero */}
+      <SEOHead
+        title="Verify Halal Certificate — Check Certificate Authenticity | AHI Zambia"
+        description="Instantly verify the authenticity of any Halal certificate issued by the African Halal Institute. Enter the certificate ID or scan the QR code."
+        canonical="https://africanhalaal.com/verify"
+        keywords="verify halal certificate, check halal certificate zambia, halal certificate verification, halal status check"
+      />
+      <StructuredData data={{
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        name: "AHI Certificate Verification",
+        url: "https://africanhalaal.com/verify",
+        applicationCategory: "BusinessApplication",
+        operatingSystem: "Web",
+        description: "Verify Halal certificate authenticity issued by the African Halal Institute in Zambia.",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "ZMW" },
+      }} />
       <HeroSection
         subtitle="Certificate Verification"
         title="Verify Halal Certificate Authenticity"

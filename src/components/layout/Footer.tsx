@@ -17,8 +17,16 @@ const footerLinks = {
   resources: [
     { name: "Directory", path: "/directory" },
     { name: "Verify Certificate", path: "/verify" },
+    { name: "Blog", path: "/blog" },
     { name: "FAQs", path: "/#faq" },
     { name: "Contact", path: "/contact" },
+  ],
+  certification: [
+    { name: "Halal Certification Zambia", path: "/halal-certification-zambia" },
+    { name: "Halal Certification Lusaka", path: "/halal-certification-lusaka" },
+    { name: "Verify Halal Certificate", path: "/verify-halal-certificate" },
+    { name: "Halal Restaurants Lusaka", path: "/directory/halal-restaurants-lusaka" },
+    { name: "Halal Suppliers Zambia", path: "/directory/halal-suppliers-zambia" },
   ],
 };
 
@@ -26,9 +34,9 @@ export function Footer() {
   return (
     <footer className="bg-primary text-primary-foreground">
       <div className="container section-padding">
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-5">
           {/* Brand Column */}
-          <div className="space-y-4">
+          <div className="space-y-4 lg:col-span-1">
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="African Halal Institute" className="h-12 w-auto brightness-0 invert" />
               <div>
@@ -41,16 +49,16 @@ export function Footer() {
               Integrity, compliance, and leadership in every certification.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="hover:text-secondary transition-colors">
+              <a href="#" className="hover:text-secondary transition-colors" aria-label="Facebook">
                 <Facebook className="h-5 w-5" />
               </a>
-              <a href="#" className="hover:text-secondary transition-colors">
+              <a href="#" className="hover:text-secondary transition-colors" aria-label="Twitter">
                 <Twitter className="h-5 w-5" />
               </a>
-              <a href="#" className="hover:text-secondary transition-colors">
+              <a href="#" className="hover:text-secondary transition-colors" aria-label="LinkedIn">
                 <Linkedin className="h-5 w-5" />
               </a>
-              <a href="#" className="hover:text-secondary transition-colors">
+              <a href="#" className="hover:text-secondary transition-colors" aria-label="Instagram">
                 <Instagram className="h-5 w-5" />
               </a>
             </div>
@@ -62,10 +70,7 @@ export function Footer() {
             <ul className="space-y-2">
               {footerLinks.about.map((link) => (
                 <li key={link.path}>
-                  <Link
-                    to={link.path}
-                    className="text-sm text-primary-foreground/80 hover:text-secondary transition-colors"
-                  >
+                  <Link to={link.path} className="text-sm text-primary-foreground/80 hover:text-secondary transition-colors">
                     {link.name}
                   </Link>
                 </li>
@@ -73,16 +78,27 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Services Links */}
+          {/* Resources Links */}
           <div>
-            <h4 className="font-semibold text-secondary mb-4">Services</h4>
+            <h4 className="font-semibold text-secondary mb-4">Resources</h4>
             <ul className="space-y-2">
-              {footerLinks.services.map((link) => (
+              {footerLinks.resources.map((link) => (
                 <li key={link.name}>
-                  <Link
-                    to={link.path}
-                    className="text-sm text-primary-foreground/80 hover:text-secondary transition-colors"
-                  >
+                  <Link to={link.path} className="text-sm text-primary-foreground/80 hover:text-secondary transition-colors">
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Certification Links (SEO) */}
+          <div>
+            <h4 className="font-semibold text-secondary mb-4">Certification</h4>
+            <ul className="space-y-2">
+              {footerLinks.certification.map((link) => (
+                <li key={link.name}>
+                  <Link to={link.path} className="text-sm text-primary-foreground/80 hover:text-secondary transition-colors">
                     {link.name}
                   </Link>
                 </li>

@@ -16,6 +16,12 @@ import Verify from "./pages/Verify";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import BlogDetail from "./pages/BlogDetail";
+import BlogIndex from "./pages/BlogIndex";
+import HalalCertificationZambia from "./pages/HalalCertificationZambia";
+import HalalCertificationLusaka from "./pages/HalalCertificationLusaka";
+import CityLanding from "./pages/CityLanding";
+import VerifyHalalCertificate from "./pages/VerifyHalalCertificate";
+import DirectoryCategory from "./pages/DirectoryCategory";
 
 // Client Auth
 import SignIn from "./pages/auth/SignIn";
@@ -142,7 +148,13 @@ const App = () => (
             <Route path="/directory" element={<Directory />} />
             <Route path="/verify" element={<Verify />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/blog" element={<BlogIndex />} />
             <Route path="/blog/:slug" element={<BlogDetail />} />
+            <Route path="/halal-certification-zambia" element={<HalalCertificationZambia />} />
+            <Route path="/halal-certification-lusaka" element={<HalalCertificationLusaka />} />
+            <Route path="/halal-certification/:city" element={<CityLanding />} />
+            <Route path="/verify-halal-certificate" element={<VerifyHalalCertificate />} />
+            <Route path="/directory/:category" element={<DirectoryCategory />} />
 
             {/* Client Auth Routes */}
             <Route path="/auth/signin" element={<SignIn />} />
