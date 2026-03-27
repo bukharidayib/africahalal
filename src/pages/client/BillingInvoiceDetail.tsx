@@ -6,9 +6,10 @@ import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowLeft, Receipt, Clock, Download } from "lucide-react";
+import { Loader2, ArrowLeft, Receipt, Clock, Download, Smartphone } from "lucide-react";
 import { format } from "date-fns";
 import { Separator } from "@/components/ui/separator";
+import { MoMoPaymentDialog } from "@/components/billing/MoMoPaymentDialog";
 
 interface InvoiceDetail {
   id: string;
@@ -38,6 +39,7 @@ export default function BillingInvoiceDetail() {
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [activity, setActivity] = useState<ActivityLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -227,6 +229,16 @@ export default function BillingInvoiceDetail() {
                   <span className="text-muted-foreground">Currency</span>
                   <span className="font-medium">{invoice.currency}</span>
                 </div>
+
+                {(invoice.status === "pending" || invoice.status === "overdue") && (
+                  <Button
+                    className="w-full mt-3"
+                    onClick={() => setPaymentOpen(true)}
+                  >
+                    <Smartphone className="h-4 w-4 mr-2" />
+                    Pay Now with Mobile Money
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
@@ -267,6 +279,18 @@ export default function BillingInvoiceDetail() {
             All certification decisions remain exclusively within AHI's internal systems.
           </p>
         </div>
+
+        {invoice && (
+          <MoMoPaymentDialog
+            open={paymentOpen}
+            onOpenChange={setPaymentOpen}
+            invoiceId={invoice.id}
+            invoiceNumber={invoice.invoice_number}
+            amount={invoice.amount}
+            currency={invoice.currency}
+            onPaymentComplete={() => fetchInvoice()}
+          />
+        )}
       </div>
     </ClientLayout>
   );
