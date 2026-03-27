@@ -1215,6 +1215,49 @@ export default function CertificationApplication() {
                 ingredients={selectedProduct?.ingredients || []}
                 onSave={handleSaveIngredients}
             />
+
+            {/* Payment Prompt After Submission */}
+            <Dialog open={showPaymentPrompt} onOpenChange={(open) => { if (!open) navigate("/client/applications"); setShowPaymentPrompt(open); }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="font-serif">Application Submitted!</DialogTitle>
+                        <DialogDescription>
+                            Your application has been submitted successfully. You can pay the certification fee now or later from the Billing section.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="rounded-lg bg-muted/50 p-4 text-sm space-y-2">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Invoice</span>
+                            <span className="font-mono text-xs">{submittedInvoice?.number}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Amount</span>
+                            <span className="font-semibold">ZMW {submittedInvoice?.amount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                    </div>
+                    <DialogFooter className="flex-col gap-2 sm:flex-col">
+                        <Button onClick={() => { setShowPaymentPrompt(false); setShowMoMoPayment(true); }} className="w-full">
+                            Pay Now
+                        </Button>
+                        <Button variant="outline" onClick={() => { setShowPaymentPrompt(false); navigate("/client/applications"); }} className="w-full">
+                            Pay Later
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* MoMo Payment Dialog */}
+            {submittedInvoice && (
+                <MoMoPaymentDialog
+                    open={showMoMoPayment}
+                    onOpenChange={(open) => { setShowMoMoPayment(open); if (!open) navigate("/client/applications"); }}
+                    invoiceId={submittedInvoice.id}
+                    invoiceNumber={submittedInvoice.number}
+                    amount={submittedInvoice.amount}
+                    currency="ZMW"
+                    onPaymentComplete={() => { navigate("/client/applications"); }}
+                />
+            )}
         </ClientLayout>
     );
 }
