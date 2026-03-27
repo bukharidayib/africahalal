@@ -74,6 +74,8 @@ export default function CertificationApplication() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+    const [showPaymentPrompt, setShowPaymentPrompt] = useState(false);
+    const [submittedInvoice, setSubmittedInvoice] = useState<{ id: string; number: string; amount: number } | null>(null);
     const [ingredientModalOpen, setIngredientModalOpen] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const [businesses, setBusinesses] = useState<{ id: string; entity_name: string; pacra_number: string }[]>([]);
@@ -595,14 +597,17 @@ export default function CertificationApplication() {
             });
 
             // Create invoice for application fee
+            let createdInvoiceId = "";
+            let createdInvoiceNumber = "";
             try {
                 const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number');
                 const validityLabel = formData.validity_period === '6_months' ? '6 Months' : '1 Year';
                 const dueDate = new Date();
                 dueDate.setDate(dueDate.getDate() + 30);
+                createdInvoiceNumber = invoiceNumber || `AHIS-INV-${Date.now()}`;
 
-                await supabase.from('invoices').insert({
-                    invoice_number: invoiceNumber || `AHIS-INV-${Date.now()}`,
+                const { data: invoiceData } = await supabase.from('invoices').insert({
+                    invoice_number: createdInvoiceNumber,
                     organization_id: organization_id,
                     application_id: appId,
                     fee_type: 'application_fee',
@@ -611,7 +616,9 @@ export default function CertificationApplication() {
                     currency: 'ZMW',
                     due_date: dueDate.toISOString().split('T')[0],
                     status: 'pending',
-                });
+                }).select('id').single();
+
+                if (invoiceData) createdInvoiceId = invoiceData.id;
             } catch (invoiceErr) {
                 console.error('Failed to create invoice:', invoiceErr);
             }
@@ -641,7 +648,14 @@ export default function CertificationApplication() {
                 title: "Application Submitted Successfully",
                 description: `Application ${applicationNumber} has been sent for review.`,
             });
-            navigate("/client/applications");
+
+            // Show payment prompt if invoice was created
+            if (createdInvoiceId) {
+                setSubmittedInvoice({ id: createdInvoiceId, number: createdInvoiceNumber, amount: formData.application_fee });
+                setShowPaymentPrompt(true);
+            } else {
+                navigate("/client/applications");
+            }
         } catch (error: any) {
             console.error('Submission error:', error);
             toast({
