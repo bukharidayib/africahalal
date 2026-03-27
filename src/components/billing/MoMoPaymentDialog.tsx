@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Phone, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +20,12 @@ interface MoMoPaymentDialogProps {
 
 type PaymentState = "idle" | "processing" | "pending" | "success" | "error";
 
+const PROVIDERS = [
+  { value: "airtel", label: "Airtel Money" },
+  { value: "mtn", label: "MTN Mobile Money" },
+  { value: "zamtel", label: "Zamtel Kwacha" },
+];
+
 export function MoMoPaymentDialog({
   open,
   onOpenChange,
@@ -29,6 +36,7 @@ export function MoMoPaymentDialog({
   onPaymentComplete,
 }: MoMoPaymentDialogProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [channel, setChannel] = useState("");
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [message, setMessage] = useState("");
   const [reference, setReference] = useState("");
@@ -37,16 +45,17 @@ export function MoMoPaymentDialog({
 
   const phoneRegex = /^0[79]\d{8}$/;
   const isPhoneValid = phoneRegex.test(phoneNumber);
+  const isFormValid = isPhoneValid && channel !== "";
 
   const handlePayment = async () => {
-    if (!isPhoneValid) return;
+    if (!isFormValid) return;
 
     setPaymentState("processing");
     setMessage("");
 
     try {
       const { data, error } = await supabase.functions.invoke("process-momo-payment", {
-        body: { invoice_id: invoiceId, phone_number: phoneNumber },
+        body: { invoice_id: invoiceId, phone_number: phoneNumber, channel },
       });
 
       if (error) throw error;
@@ -96,6 +105,7 @@ export function MoMoPaymentDialog({
     if (paymentState !== "processing") {
       setPaymentState("idle");
       setPhoneNumber("");
+      setChannel("");
       setMessage("");
       setReference("");
       setTransactionId(null);
@@ -115,6 +125,20 @@ export function MoMoPaymentDialog({
 
         {paymentState === "idle" && (
           <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="provider">Payment Provider</Label>
+              <Select value={channel} onValueChange={setChannel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVIDERS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="phone">Mobile Money Number</Label>
               <div className="relative">
@@ -160,9 +184,7 @@ export function MoMoPaymentDialog({
             </div>
             <p className="font-medium">Check Your Phone</p>
             <p className="text-sm text-muted-foreground">{message}</p>
-            {reference && (
-              <p className="text-xs text-muted-foreground font-mono">Ref: {reference}</p>
-            )}
+            {reference && <p className="text-xs text-muted-foreground font-mono">Ref: {reference}</p>}
           </div>
         )}
 
@@ -173,9 +195,7 @@ export function MoMoPaymentDialog({
             </div>
             <p className="font-medium">Payment Successful!</p>
             <p className="text-sm text-muted-foreground">{message}</p>
-            {reference && (
-              <p className="text-xs text-muted-foreground font-mono">Ref: {reference}</p>
-            )}
+            {reference && <p className="text-xs text-muted-foreground font-mono">Ref: {reference}</p>}
           </div>
         )}
 
@@ -191,7 +211,7 @@ export function MoMoPaymentDialog({
 
         <DialogFooter>
           {paymentState === "idle" && (
-            <Button onClick={handlePayment} disabled={!isPhoneValid} className="w-full">
+            <Button onClick={handlePayment} disabled={!isFormValid} className="w-full">
               Pay {currency} {Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </Button>
           )}
