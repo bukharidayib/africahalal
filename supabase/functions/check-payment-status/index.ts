@@ -6,6 +6,20 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function extractResponseCode(result: any): string {
+  if (!result) return "";
+  if (typeof result.response === "string" || typeof result.response === "number") {
+    return String(result.response);
+  }
+  if (typeof result.response === "object" && result.response !== null) {
+    if (result.response.code !== undefined) return String(result.response.code);
+    if (result.response.response_code !== undefined) return String(result.response.response_code);
+  }
+  if (result.code !== undefined) return String(result.code);
+  if (result.response_code !== undefined) return String(result.response_code);
+  return "";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -52,7 +66,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // If already completed or failed, return current status
     if (transaction.status !== "pending") {
       return new Response(
         JSON.stringify({ status: transaction.status, message: `Transaction is ${transaction.status}` }),
@@ -60,7 +73,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Poll ZynlePay for status update
     const merchantId = Deno.env.get("ZYNLEPAY_MERCHANT_ID")!;
     const apiId = Deno.env.get("ZYNLEPAY_API_ID")!;
     const apiKey = Deno.env.get("ZYNLEPAY_API_KEY")!;
@@ -84,9 +96,11 @@ Deno.serve(async (req) => {
     );
 
     const zynleResult = await zynleResponse.json();
-    console.log("ZynlePay status response:", JSON.stringify(zynleResult));
+    console.log("ZynlePay status raw response:", JSON.stringify(zynleResult));
 
-    const responseCode = String(zynleResult?.response || zynleResult?.code || "");
+    const responseCode = extractResponseCode(zynleResult);
+    console.log("Extracted status response code:", responseCode);
+
     let newStatus = "pending";
     let message = "Payment is still being processed.";
 
