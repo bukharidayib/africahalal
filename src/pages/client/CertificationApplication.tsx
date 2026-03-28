@@ -1111,19 +1111,136 @@ export default function CertificationApplication() {
                             </div>
                         )}
 
-                        {/* Navigation Buttons */}
-                        <div className="flex items-center justify-between mt-12 pt-8 border-t">
-                            <Button
-                                variant="ghost"
-                                onClick={handleBack}
-                                disabled={currentStep === 1 || isLoading}
-                                className="h-11 font-bold group"
-                            >
-                                <ChevronLeft className="mr-2 h-5 w-5 group-hover:-translate-x-1 transition-transform" />
-                                Previous Step
-                            </Button>
+                        {/* Step 6: Payment */}
+                        {currentStep === 6 && (
+                            <div className="space-y-6 animate-in fade-in duration-300">
+                                <div className="text-center mb-4">
+                                    <CreditCard className="h-10 w-10 mx-auto text-primary mb-2" />
+                                    <h3 className="font-bold text-lg font-serif text-foreground">Pay Application Fee</h3>
+                                    <p className="text-sm text-muted-foreground">Complete payment to submit your application for review.</p>
+                                </div>
 
-                            {currentStep < steps.length ? (
+                                {/* Fee Summary */}
+                                <div className="rounded-lg bg-muted/50 p-4 text-sm space-y-2 border">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Invoice</span>
+                                        <span className="font-mono text-xs">{paymentInvoice?.number}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Validity</span>
+                                        <span>{formData.validity_period === '6_months' ? '6 Months' : '1 Year'}</span>
+                                    </div>
+                                    <div className="flex justify-between border-t pt-2">
+                                        <span className="text-muted-foreground font-semibold">Total</span>
+                                        <span className="font-bold text-lg">ZMW {paymentInvoice?.amount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                </div>
+
+                                {paymentState === "idle" && (
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label>Payment Provider *</Label>
+                                            <Select value={paymentChannel} onValueChange={setPaymentChannel}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select provider" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {PROVIDERS.map((p) => (
+                                                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Mobile Money Number *</Label>
+                                            <div className="relative">
+                                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                <Input
+                                                    placeholder="09xxxxxxxx or 07xxxxxxxx"
+                                                    value={paymentPhone}
+                                                    onChange={(e) => setPaymentPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                                                    className="pl-10"
+                                                    maxLength={10}
+                                                />
+                                            </div>
+                                            {paymentPhone.length > 0 && !isPaymentPhoneValid && (
+                                                <p className="text-xs text-destructive">Enter a valid Zambian mobile number (10 digits starting with 09 or 07)</p>
+                                            )}
+                                        </div>
+
+                                        <Button
+                                            onClick={handlePayment}
+                                            disabled={!isPaymentFormValid}
+                                            className="w-full h-11 bg-secondary text-secondary-foreground hover:bg-secondary/90 font-bold shadow-lg shadow-secondary/20"
+                                        >
+                                            <CreditCard className="mr-2 h-4 w-4" />
+                                            Pay ZMW {paymentInvoice?.amount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {paymentState === "processing" && (
+                                    <div className="flex flex-col items-center py-8 gap-3">
+                                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                        <p className="text-sm text-muted-foreground">Processing payment...</p>
+                                    </div>
+                                )}
+
+                                {paymentState === "pending" && (
+                                    <div className="flex flex-col items-center py-6 gap-3 text-center">
+                                        <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900/30">
+                                            <Phone className="h-6 w-6 text-amber-600" />
+                                        </div>
+                                        <p className="font-medium text-foreground">Check Your Phone</p>
+                                        <p className="text-sm text-muted-foreground">{paymentMessage}</p>
+                                        {paymentReference && <p className="text-xs text-muted-foreground font-mono">Ref: {paymentReference}</p>}
+                                        <Button onClick={handleCheckPaymentStatus} className="mt-2">
+                                            Check Status
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {paymentState === "success" && (
+                                    <div className="flex flex-col items-center py-6 gap-3 text-center">
+                                        <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/30">
+                                            <CheckCircle2 className="h-6 w-6 text-green-600" />
+                                        </div>
+                                        <p className="font-medium text-foreground">Payment Successful!</p>
+                                        <p className="text-sm text-muted-foreground">{paymentMessage}</p>
+                                        <p className="text-sm text-muted-foreground">Your application has been submitted. Redirecting...</p>
+                                        {paymentReference && <p className="text-xs text-muted-foreground font-mono">Ref: {paymentReference}</p>}
+                                    </div>
+                                )}
+
+                                {paymentState === "error" && (
+                                    <div className="flex flex-col items-center py-6 gap-3 text-center">
+                                        <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/30">
+                                            <AlertTriangle className="h-6 w-6 text-red-600" />
+                                        </div>
+                                        <p className="font-medium text-foreground">Payment Failed</p>
+                                        <p className="text-sm text-muted-foreground">{paymentMessage}</p>
+                                        <Button onClick={() => setPaymentState("idle")} variant="outline" className="mt-2">
+                                            Try Again
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Navigation Buttons — hidden on step 6 (payment has its own buttons) */}
+                        {currentStep < 6 && (
+                            <div className="flex items-center justify-between mt-12 pt-8 border-t">
+                                <Button
+                                    variant="ghost"
+                                    onClick={handleBack}
+                                    disabled={currentStep === 1 || isLoading}
+                                    className="h-11 font-bold group"
+                                >
+                                    <ChevronLeft className="mr-2 h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+                                    Previous Step
+                                </Button>
+
                                 <div className="flex gap-3">
                                     <Button
                                         variant="outline"
@@ -1139,41 +1256,26 @@ export default function CertificationApplication() {
                                         disabled={isLoading}
                                         className="h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-bold group"
                                     >
-                                        Continue
-                                        <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="flex gap-3">
-                                    <Button
-                                        variant="outline"
-                                        onClick={handleSaveDraft}
-                                        disabled={isLoading || isSavingDraft}
-                                        className="h-11 font-bold"
-                                    >
-                                        {isSavingDraft ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                        Save Draft
-                                    </Button>
-                                    <Button
-                                        onClick={handleSubmit}
-                                        disabled={isLoading}
-                                        className="h-11 bg-secondary text-secondary-foreground hover:bg-secondary/90 font-bold px-8 shadow-lg shadow-secondary/20"
-                                    >
-                                        {isLoading ? (
+                                        {isLoading && currentStep === 5 ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Submitting...
+                                                Preparing...
+                                            </>
+                                        ) : currentStep === 5 ? (
+                                            <>
+                                                Continue to Payment
+                                                <CreditCard className="ml-2 h-4 w-4" />
                                             </>
                                         ) : (
                                             <>
-                                                Final Submit & Lock
-                                                <Upload className="ml-2 h-4 w-4" />
+                                                Continue
+                                                <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                                             </>
                                         )}
                                     </Button>
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -1252,49 +1354,6 @@ export default function CertificationApplication() {
                 ingredients={selectedProduct?.ingredients || []}
                 onSave={handleSaveIngredients}
             />
-
-            {/* Payment Prompt After Submission */}
-            <Dialog open={showPaymentPrompt} onOpenChange={(open) => { if (!open) navigate("/client/applications"); setShowPaymentPrompt(open); }}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="font-serif">Application Submitted!</DialogTitle>
-                        <DialogDescription>
-                            Your application has been submitted successfully. You can pay the certification fee now or later from the Billing section.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="rounded-lg bg-muted/50 p-4 text-sm space-y-2">
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">Invoice</span>
-                            <span className="font-mono text-xs">{submittedInvoice?.number}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">Amount</span>
-                            <span className="font-semibold">ZMW {submittedInvoice?.amount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                        </div>
-                    </div>
-                    <DialogFooter className="flex-col gap-2 sm:flex-col">
-                        <Button onClick={() => { setShowPaymentPrompt(false); setShowMoMoPayment(true); }} className="w-full">
-                            Pay Now
-                        </Button>
-                        <Button variant="outline" onClick={() => { setShowPaymentPrompt(false); navigate("/client/applications"); }} className="w-full">
-                            Pay Later
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* MoMo Payment Dialog */}
-            {submittedInvoice && (
-                <MoMoPaymentDialog
-                    open={showMoMoPayment}
-                    onOpenChange={(open) => { setShowMoMoPayment(open); if (!open) navigate("/client/applications"); }}
-                    invoiceId={submittedInvoice.id}
-                    invoiceNumber={submittedInvoice.number}
-                    amount={submittedInvoice.amount}
-                    currency="ZMW"
-                    onPaymentComplete={() => { navigate("/client/applications"); }}
-                />
-            )}
         </ClientLayout>
     );
 }
