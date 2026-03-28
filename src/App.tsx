@@ -22,6 +22,8 @@ import HalalCertificationLusaka from "./pages/HalalCertificationLusaka";
 import CityLanding from "./pages/CityLanding";
 import VerifyHalalCertificate from "./pages/VerifyHalalCertificate";
 import DirectoryCategory from "./pages/DirectoryCategory";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentFailed from "./pages/PaymentFailed";
 
 // Client Auth
 import SignIn from "./pages/auth/SignIn";
@@ -155,6 +157,8 @@ const App = () => (
             <Route path="/halal-certification/:city" element={<CityLanding />} />
             <Route path="/verify-halal-certificate" element={<VerifyHalalCertificate />} />
             <Route path="/directory/:category" element={<DirectoryCategory />} />
+            <Route path="/payment/success" element={<PaymentSuccess />} />
+            <Route path="/payment/failed" element={<PaymentFailed />} />
 
             {/* Client Auth Routes */}
             <Route path="/auth/signin" element={<SignIn />} />

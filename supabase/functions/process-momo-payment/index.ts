@@ -6,6 +6,23 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function extractResponseCode(result: any): string {
+  if (!result) return "";
+  // If response is a string/number directly
+  if (typeof result.response === "string" || typeof result.response === "number") {
+    return String(result.response);
+  }
+  // If response is an object with a code property
+  if (typeof result.response === "object" && result.response !== null) {
+    if (result.response.code !== undefined) return String(result.response.code);
+    if (result.response.response_code !== undefined) return String(result.response.response_code);
+  }
+  // Fallback to top-level code
+  if (result.code !== undefined) return String(result.code);
+  if (result.response_code !== undefined) return String(result.response_code);
+  return "";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -16,7 +33,6 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Authenticate user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -38,7 +54,6 @@ Deno.serve(async (req) => {
 
     const { invoice_id, phone_number, channel: clientChannel } = await req.json();
 
-    // Validate phone number (Zambian format: 09xx or 07xx, 10 digits)
     const phoneRegex = /^0[79]\d{8}$/;
     if (!phone_number || !phoneRegex.test(phone_number)) {
       return new Response(
@@ -47,7 +62,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use service role to verify invoice
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: invoice, error: invError } = await adminClient
@@ -63,7 +77,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify invoice belongs to user's organization
     const { data: profile } = await adminClient
       .from("profiles")
       .select("organization_id")
@@ -84,7 +97,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build ZynlePay request
     const merchantId = Deno.env.get("ZYNLEPAY_MERCHANT_ID")!;
     const apiId = Deno.env.get("ZYNLEPAY_API_ID")!;
     const apiKey = Deno.env.get("ZYNLEPAY_API_KEY")!;
@@ -107,7 +119,7 @@ Deno.serve(async (req) => {
       },
     };
 
-    console.log("Calling ZynlePay API for invoice:", invoice.invoice_number);
+    console.log("Calling ZynlePay API for invoice:", invoice.invoice_number, "channel:", channel);
 
     const zynleResponse = await fetch(
       "https://payments.zynlepay.com/zynlepay/jsonapi/",
@@ -119,10 +131,11 @@ Deno.serve(async (req) => {
     );
 
     const zynleResult = await zynleResponse.json();
-    console.log("ZynlePay response:", JSON.stringify(zynleResult));
+    console.log("ZynlePay raw response:", JSON.stringify(zynleResult));
 
-    // Map ZynlePay response code to transaction status
-    const responseCode = String(zynleResult?.response || zynleResult?.code || "");
+    const responseCode = extractResponseCode(zynleResult);
+    console.log("Extracted response code:", responseCode);
+
     let txStatus = "failed";
     let message = "Payment failed. Please try again.";
 
@@ -140,7 +153,6 @@ Deno.serve(async (req) => {
       message = "Payment gateway configuration error. Please contact support.";
     }
 
-    // Record transaction
     const { data: transaction, error: txError } = await adminClient
       .from("payment_transactions")
       .insert({
@@ -162,7 +174,6 @@ Deno.serve(async (req) => {
       console.error("Failed to record transaction:", txError);
     }
 
-    // If successful, update invoice status
     if (txStatus === "completed") {
       await adminClient
         .from("invoices")
