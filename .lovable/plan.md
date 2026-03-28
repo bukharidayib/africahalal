@@ -1,40 +1,49 @@
 
 
-# Payment Before Submission — Restructured Application Flow
+# Payment Pages + Fix ZynlePay Response Parsing + MoMo Callback Endpoint
 
-## Current Flow
-Fill form (5 steps) → Submit → Invoice created → Payment prompt (optional)
+## Three Issues
 
-## New Flow
-Fill form (5 steps) → Step 6: **Payment** → Pay via MoMo → Application auto-submitted after payment
+### 1. ZynlePay Response Parsing Bug (Critical)
+The network logs show `response_code: "[object Object]"`. The edge function does `String(zynleResult?.response || zynleResult?.code || "")` — but `zynleResult.response` is likely a nested object (not a string/number). This causes every payment to fail.
 
-## How It Works
+**Fix in `supabase/functions/process-momo-payment/index.ts`:**
+- Log the full raw response for debugging
+- Extract the response code more carefully: check if `response` is an object with a `code` property, handle nested structures
+- Same fix needed in `check-payment-status/index.ts`
 
-1. **Add Step 6 "Payment"** to the stepper (after Declaration)
-2. When user clicks "Continue" on Step 5 (Declaration), the app **auto-saves as draft** and creates an invoice linked to that draft application
-3. Step 6 shows the fee summary and MoMo payment form (provider selector + phone number) inline — no separate dialog needed
-4. After successful payment, the application status is automatically changed from `draft` to `submitted` and the user is redirected to `/client/applications`
-5. Remove the post-submission payment prompt dialog (no longer needed)
+### 2. Frontend Payment Result Pages
+From the ZynlePay config, two client-facing URLs are needed:
+- `https://africanhalaal.com/payment/success`
+- `https://africanhalaal.com/payment/failed`
 
-## Files Changed
+**New files:**
+- `src/pages/PaymentSuccess.tsx` — Shows success confirmation with invoice reference, link to billing dashboard
+- `src/pages/PaymentFailed.tsx` — Shows failure message with retry option, link back to billing
 
-### `src/pages/client/CertificationApplication.tsx`
-- Add step 6 `{ id: 6, name: "Payment", icon: CreditCard }` to the steps array
-- When advancing from step 5 to step 6: auto-save draft (reuse existing `handleSaveDraft` logic), then create the invoice and store its ID in state
-- Step 6 UI: show fee summary + inline MoMo payment form (provider select, phone input, pay button) — essentially embed the payment form directly instead of using the dialog
-- On payment success: update application status to `submitted`, send notification email, redirect
-- Remove the `showPaymentPrompt` dialog and `showMoMoPayment` dialog since payment is now inline
-- The "Final Submit & Lock" button on step 5 becomes "Continue to Payment"
+**Update `src/App.tsx`** — Add routes for `/payment/success` and `/payment/failed`
 
-### `src/components/billing/MoMoPaymentDialog.tsx`
-- No changes needed — we can either reuse it as a dialog triggered from step 6, or embed its logic inline. Simplest: keep it and open it from step 6's "Pay Now" button.
+### 3. MoMo Deposit Callback Edge Function
+ZynlePay sends async payment status updates to `https://api.africanhalaal.com/payments/zynle/momo/deposit/callback`. Since this is a Supabase project, the actual callback URL should be the Supabase edge function URL.
 
-### `supabase/functions/process-momo-payment/index.ts`
-- Update to also accept `draft` status invoices (currently only allows `pending`/`overdue`) — since the invoice is created before submission, it's already `pending`, so no change needed here.
+**New file: `supabase/functions/zynlepay-momo-callback/index.ts`**
+- Receives POST from ZynlePay with payment result
+- Looks up transaction by reference number
+- Updates `payment_transactions` status
+- If successful, marks invoice as paid
+- No JWT verification (external webhook)
 
-## Key Details
-- The invoice is created when entering step 6, linked to the draft application
-- If payment succeeds, the draft is promoted to `submitted`
-- If the user closes without paying, the draft and pending invoice remain — they can return later via "My Applications" and pay from there
-- Declaration validations (signature, checkboxes) are enforced before allowing progression to step 6
+**Note:** You'll need to update your ZynlePay MoMo Deposit Callback URL to point to your Supabase edge function: `https://xdixdqyzjfdqummwpuzg.supabase.co/functions/v1/zynlepay-momo-callback`
+
+## Files
+
+| Action | File |
+|--------|------|
+| Edit | `supabase/functions/process-momo-payment/index.ts` — fix response code parsing |
+| Edit | `supabase/functions/check-payment-status/index.ts` — fix response code parsing |
+| Create | `src/pages/PaymentSuccess.tsx` |
+| Create | `src/pages/PaymentFailed.tsx` |
+| Create | `supabase/functions/zynlepay-momo-callback/index.ts` |
+| Edit | `src/App.tsx` — add payment result routes |
+| Edit | `supabase/config.toml` — add callback function config |
 
