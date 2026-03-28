@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/dialog";
 import { ProductIngredientModal, Ingredient } from "@/components/client/ProductIngredientModal";
 import { MandatoryDocuments } from "@/components/client/MandatoryDocuments";
-import { MoMoPaymentDialog } from "@/components/billing/MoMoPaymentDialog";
+// MoMoPaymentDialog kept for billing pages but not used here anymore
 
 const steps = [
     { id: 1, name: "Establishment Details", icon: Building2 },
@@ -56,6 +56,13 @@ const steps = [
     { id: 3, name: "Product Information", icon: ClipboardList },
     { id: 4, name: "Mandatory Documents", icon: FileCheck },
     { id: 5, name: "Declaration", icon: BadgeCheck },
+    { id: 6, name: "Payment", icon: CreditCard },
+];
+
+const PROVIDERS = [
+    { value: "airtel", label: "Airtel Money" },
+    { value: "mtn", label: "MTN Mobile Money" },
+    { value: "zamtel", label: "Zamtel Kwacha" },
 ];
 
 interface ProductItem {
