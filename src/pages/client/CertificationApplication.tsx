@@ -446,7 +446,7 @@ export default function CertificationApplication() {
 
     const selectedProduct = formData.products.find(p => p.id === selectedProductId);
 
-    const handleSubmit = async () => {
+    const handleAdvanceToPayment = async () => {
         if (!formData.declaration_confirmed || !formData.declaration_compliance || !formData.signature) {
             toast({
                 variant: "destructive",
@@ -461,7 +461,6 @@ export default function CertificationApplication() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not authenticated");
 
-            // Get user's profile to check for organization
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('organization_id')
@@ -470,7 +469,6 @@ export default function CertificationApplication() {
 
             let organization_id = profile?.organization_id;
 
-            // If no organization, try to find or create one
             if (!organization_id) {
                 const { data: orgData, error: orgError } = await supabase
                     .from('organizations')
@@ -480,24 +478,16 @@ export default function CertificationApplication() {
 
                 if (orgError && orgError.code === 'PGRST116') {
                     const newOrgId = crypto.randomUUID();
-                    const { error: createError } = await supabase
-                        .from('organizations')
-                        .insert({
-                            id: newOrgId,
-                            name: formData.entity_name,
-                            registration_number: formData.registration_number,
-                            sector: formData.categories[0] || "General",
-                            address: formData.address,
-                            country: formData.country
-                        });
-
-                    if (createError) throw createError;
+                    await supabase.from('organizations').insert({
+                        id: newOrgId,
+                        name: formData.entity_name,
+                        registration_number: formData.registration_number,
+                        sector: formData.categories[0] || "General",
+                        address: formData.address,
+                        country: formData.country
+                    });
                     organization_id = newOrgId;
-
-                    await supabase
-                        .from('profiles')
-                        .update({ organization_id })
-                        .eq('id', user.id);
+                    await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
                 } else if (orgError) {
                     throw orgError;
                 } else {
@@ -509,36 +499,26 @@ export default function CertificationApplication() {
             let appId: string;
 
             if (draftId) {
-                // Update existing draft to submitted
                 const { data: existingApp } = await supabase
                     .from('certification_applications')
                     .select('application_number')
                     .eq('id', draftId)
                     .single();
-
                 applicationNumber = existingApp?.application_number || `APP-${Date.now()}`;
 
-                const { error: updateErr } = await supabase
-                    .from('certification_applications')
-                    .update({
-                        status: 'submitted',
-                        submitted_at: new Date().toISOString(),
-                        scope: formData.categories.join(', '),
-                        sector: formData.categories[0] || "General",
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq('id', draftId);
-                if (updateErr) throw updateErr;
+                // Keep as draft — only update scope/sector
+                await supabase.from('certification_applications').update({
+                    scope: formData.categories.join(', '),
+                    sector: formData.categories[0] || "General",
+                    updated_at: new Date().toISOString(),
+                }).eq('id', draftId);
                 appId = draftId;
 
-                // Clear old products and re-insert
                 await supabase.from('application_products').delete().eq('application_id', draftId);
             } else {
-                // Generate application number
                 const { data: appNumberData } = await supabase.rpc('generate_application_number');
                 applicationNumber = appNumberData || `APP-${Date.now()}`;
 
-                // Insert Application
                 const { data: appData, error: appError } = await supabase
                     .from('certification_applications')
                     .insert({
@@ -547,145 +527,181 @@ export default function CertificationApplication() {
                         sector: formData.categories[0] || "General",
                         scope: formData.categories.join(', '),
                         application_number: applicationNumber,
-                        status: 'submitted',
-                        submitted_at: new Date().toISOString()
+                        status: 'draft',
                     })
                     .select('id')
                     .single();
                 if (appError) throw appError;
                 appId = appData.id;
+                setDraftId(appId);
             }
 
             // Insert Products and Ingredients
             for (const product of formData.products) {
                 const { data: productData, error: productError } = await supabase
                     .from('application_products')
-                    .insert({
-                        application_id: appId,
-                        name: product.name,
-                        brand: product.brand,
-                        category: product.category
-                    })
+                    .insert({ application_id: appId, name: product.name, brand: product.brand, category: product.category })
                     .select('id')
                     .single();
-
                 if (productError) throw productError;
 
-                // Insert ingredients for this product
                 if (product.ingredients.length > 0) {
-                    const ingredientsToInsert = product.ingredients.map(ing => ({
-                        product_id: productData.id,
-                        ingredient_name: ing.ingredient_name,
-                        percentage: ing.percentage,
-                        source: ing.source,
-                        is_halal_certified: ing.is_halal_certified,
-                        supplier_name: ing.supplier_name
-                    }));
-
-                    const { error: ingError } = await supabase
-                        .from('product_ingredients')
-                        .insert(ingredientsToInsert);
-
-                    if (ingError) throw ingError;
+                    await supabase.from('product_ingredients').insert(
+                        product.ingredients.map(ing => ({
+                            product_id: productData.id,
+                            ingredient_name: ing.ingredient_name,
+                            percentage: ing.percentage,
+                            source: ing.source,
+                            is_halal_certified: ing.is_halal_certified,
+                            supplier_name: ing.supplier_name
+                        }))
+                    );
                 }
             }
 
-            // Link uploaded documents to application
+            // Link uploaded documents
             for (const file of formData.uploadedFiles) {
-                await supabase
-                    .from('application_documents')
-                    .insert({
-                        application_id: appId,
-                        document_type: file.documentId,
-                        file_name: file.fileName,
-                        file_path: file.filePath,
-                        file_size: file.fileSize,
-                        uploaded_by: user.id
-                    });
+                await supabase.from('application_documents').insert({
+                    application_id: appId,
+                    document_type: file.documentId,
+                    file_name: file.fileName,
+                    file_path: file.filePath,
+                    file_size: file.fileSize,
+                    uploaded_by: user.id
+                });
             }
+
+            // Create invoice
+            const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number');
+            const validityLabel = formData.validity_period === '6_months' ? '6 Months' : '1 Year';
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 30);
+            const createdInvoiceNumber = invoiceNumber || `AHIS-INV-${Date.now()}`;
+
+            const { data: invoiceData } = await supabase.from('invoices').insert({
+                invoice_number: createdInvoiceNumber,
+                organization_id: organization_id,
+                application_id: appId,
+                fee_type: 'application_fee',
+                description: `Halal Certification Application Fee - ${validityLabel} Validity (${applicationNumber})`,
+                amount: formData.application_fee,
+                currency: 'ZMW',
+                due_date: dueDate.toISOString().split('T')[0],
+                status: 'pending',
+            }).select('id').single();
+
+            if (!invoiceData) throw new Error("Failed to create invoice");
+
+            setPaymentInvoice({ id: invoiceData.id, number: createdInvoiceNumber, amount: formData.application_fee });
+            setCurrentStep(6);
+
+            toast({ title: "Ready for Payment", description: "Please complete the payment to submit your application." });
+        } catch (error: any) {
+            console.error('Advance to payment error:', error);
+            toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const phoneRegex = /^0[79]\d{8}$/;
+    const isPaymentPhoneValid = phoneRegex.test(paymentPhone);
+    const isPaymentFormValid = isPaymentPhoneValid && paymentChannel !== "";
+
+    const handlePayment = async () => {
+        if (!isPaymentFormValid || !paymentInvoice) return;
+
+        setPaymentState("processing");
+        setPaymentMessage("");
+
+        try {
+            const { data, error } = await supabase.functions.invoke("process-momo-payment", {
+                body: { invoice_id: paymentInvoice.id, phone_number: paymentPhone, channel: paymentChannel },
+            });
+
+            if (error) throw error;
+
+            setPaymentMessage(data.message);
+            setPaymentReference(data.reference || "");
+            setPaymentTxId(data.transaction_id);
+
+            if (data.status === "pending") {
+                setPaymentState("pending");
+            } else if (data.status === "completed") {
+                setPaymentState("success");
+                await finalizeSubmission();
+            } else {
+                setPaymentState("error");
+            }
+        } catch (err: any) {
+            setPaymentState("error");
+            setPaymentMessage(err.message || "Payment failed. Please try again.");
+        }
+    };
+
+    const handleCheckPaymentStatus = async () => {
+        if (!paymentTxId) return;
+        try {
+            const { data, error } = await supabase.functions.invoke("check-payment-status", {
+                body: { transaction_id: paymentTxId },
+            });
+            if (error) throw error;
+            setPaymentMessage(data.message);
+            if (data.status === "completed") {
+                setPaymentState("success");
+                await finalizeSubmission();
+            } else if (data.status === "failed") {
+                setPaymentState("error");
+            }
+        } catch (err: any) {
+            toast({ variant: "destructive", title: "Error", description: err.message });
+        }
+    };
+
+    const finalizeSubmission = async () => {
+        try {
+            if (!draftId) return;
+
+            // Promote draft to submitted
+            await supabase.from('certification_applications').update({
+                status: 'submitted',
+                submitted_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            }).eq('id', draftId);
 
             // Log Audit
             await supabase.rpc('log_audit', {
                 _action: 'application_submitted',
                 _resource_type: 'certification_applications',
-                _resource_id: appId,
+                _resource_id: draftId,
                 _metadata: {
-                    step: 'submission',
+                    step: 'submission_after_payment',
                     products_count: formData.products.length,
                     documents_count: formData.uploadedFiles.length,
                     categories: formData.categories
                 }
             });
 
-            // Create invoice for application fee
-            let createdInvoiceId = "";
-            let createdInvoiceNumber = "";
-            try {
-                const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number');
-                const validityLabel = formData.validity_period === '6_months' ? '6 Months' : '1 Year';
-                const dueDate = new Date();
-                dueDate.setDate(dueDate.getDate() + 30);
-                createdInvoiceNumber = invoiceNumber || `AHIS-INV-${Date.now()}`;
-
-                const { data: invoiceData } = await supabase.from('invoices').insert({
-                    invoice_number: createdInvoiceNumber,
-                    organization_id: organization_id,
-                    application_id: appId,
-                    fee_type: 'application_fee',
-                    description: `Halal Certification Application Fee - ${validityLabel} Validity (${applicationNumber})`,
-                    amount: formData.application_fee,
-                    currency: 'ZMW',
-                    due_date: dueDate.toISOString().split('T')[0],
-                    status: 'pending',
-                }).select('id').single();
-
-                if (invoiceData) createdInvoiceId = invoiceData.id;
-            } catch (invoiceErr) {
-                console.error('Failed to create invoice:', invoiceErr);
-            }
-
-            // Send submission status email (fire and forget)
-            try {
-                const { data: org } = await supabase
-                    .from('organizations')
-                    .select('name, contact_email')
-                    .eq('id', organization_id)
-                    .single();
-
-                await supabase.functions.invoke('send-status-notification', {
+            // Send submission email (fire and forget)
+            const { data: { user } } = await supabase.auth.getUser();
+            const { data: app } = await supabase.from('certification_applications').select('application_number, organization_id').eq('id', draftId).single();
+            if (app && user) {
+                const { data: org } = await supabase.from('organizations').select('name, contact_email').eq('id', app.organization_id).single();
+                supabase.functions.invoke('send-status-notification', {
                     body: {
-                        application_id: appId,
+                        application_id: draftId,
                         new_status: 'submitted',
-                        application_number: applicationNumber,
+                        application_number: app.application_number,
                         organization_name: org?.name || formData.entity_name,
                         contact_email: org?.contact_email || user.email,
                     }
-                });
-            } catch (emailErr) {
-                console.error('Failed to send submission email:', emailErr);
+                }).catch(console.error);
             }
 
-            toast({
-                title: "Application Submitted Successfully",
-                description: `Application ${applicationNumber} has been sent for review.`,
-            });
-
-            // Show payment prompt if invoice was created
-            if (createdInvoiceId) {
-                setSubmittedInvoice({ id: createdInvoiceId, number: createdInvoiceNumber, amount: formData.application_fee });
-                setShowPaymentPrompt(true);
-            } else {
-                navigate("/client/applications");
-            }
-        } catch (error: any) {
-            console.error('Submission error:', error);
-            toast({
-                variant: "destructive",
-                title: "Submission Failed",
-                description: error.message || "An unexpected error occurred.",
-            });
-        } finally {
-            setIsLoading(false);
+            toast({ title: "Application Submitted!", description: "Your application has been submitted for review." });
+            setTimeout(() => navigate("/client/applications"), 2000);
+        } catch (err: any) {
+            console.error('Finalize submission error:', err);
         }
     };
 
