@@ -287,6 +287,11 @@ export default function CertificationApplication() {
 
     const handleNext = () => {
         if (!validateStep(currentStep)) return;
+        if (currentStep === 5) {
+            // Step 5 → 6: validate declaration, auto-save draft, create invoice
+            handleAdvanceToPayment();
+            return;
+        }
         if (currentStep < steps.length) setCurrentStep(currentStep + 1);
     };
 
