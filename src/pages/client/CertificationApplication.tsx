@@ -15,7 +15,11 @@ import {
     Loader2,
     Beaker,
     FileCheck,
-    Save
+    Save,
+    CreditCard,
+    Phone,
+    CheckCircle2,
+    AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
