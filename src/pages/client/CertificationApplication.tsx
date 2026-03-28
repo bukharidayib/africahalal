@@ -582,7 +582,7 @@ export default function CertificationApplication() {
                 invoice_number: createdInvoiceNumber,
                 organization_id: organization_id,
                 application_id: appId,
-                fee_type: 'application_fee',
+                fee_type: 'certification',
                 description: `Halal Certification Application Fee - ${validityLabel} Validity (${applicationNumber})`,
                 amount: formData.application_fee,
                 currency: 'ZMW',
