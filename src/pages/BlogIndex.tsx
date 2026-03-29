@@ -4,8 +4,6 @@ import { Info, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layout } from "@/components/layout/Layout";
-import { SEOHead } from "@/components/seo/SEOHead";
-import { StructuredData, createBreadcrumbSchema } from "@/components/seo/StructuredData";
 import { supabase } from "@/integrations/supabase/client";
 
 interface BlogPost {
@@ -35,17 +33,6 @@ export default function BlogIndex() {
 
   return (
     <Layout>
-      <SEOHead
-        title="Blog — Halal Certification News & Guides | African Halal Institute"
-        description="Read the latest articles on Halal certification in Zambia, industry news, compliance guides, and tips from the African Halal Institute."
-        canonical="https://africanhalaal.com/blog"
-        keywords="halal blog zambia, halal certification guide, halal food zambia, halal news africa"
-      />
-      <StructuredData data={createBreadcrumbSchema([
-        { name: "Home", url: "https://africanhalaal.com" },
-        { name: "Blog", url: "https://africanhalaal.com/blog" },
-      ])} />
-
       <section className="bg-primary text-primary-foreground py-16 md:py-20">
         <div className="container max-w-4xl text-center space-y-4">
           <h1 className="text-4xl md:text-5xl font-bold">AHI Blog</h1>
