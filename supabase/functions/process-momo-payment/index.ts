@@ -8,16 +8,13 @@ const corsHeaders = {
 
 function extractResponseCode(result: any): string {
   if (!result) return "";
-  // If response is a string/number directly
   if (typeof result.response === "string" || typeof result.response === "number") {
     return String(result.response);
   }
-  // If response is an object with a code property
   if (typeof result.response === "object" && result.response !== null) {
     if (result.response.code !== undefined) return String(result.response.code);
     if (result.response.response_code !== undefined) return String(result.response.response_code);
   }
-  // Fallback to top-level code
   if (result.code !== undefined) return String(result.code);
   if (result.response_code !== undefined) return String(result.response_code);
   return "";
@@ -52,14 +49,36 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { invoice_id, phone_number, channel: clientChannel } = await req.json();
+    const body = await req.json();
+    const { invoice_id, payment_method } = body;
 
-    const phoneRegex = /^0[79]\d{8}$/;
-    if (!phone_number || !phoneRegex.test(phone_number)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid phone number. Use Zambian format: 09xxxxxxxx or 07xxxxxxxx" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Determine payment type: "mobile_money" (default) or "card"
+    const isCard = payment_method === "card";
+
+    // Validate based on payment type
+    if (!isCard) {
+      const { phone_number, channel: clientChannel } = body;
+      const phoneRegex = /^0[79]\d{8}$/;
+      if (!phone_number || !phoneRegex.test(phone_number)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid phone number. Use Zambian format: 09xxxxxxxx or 07xxxxxxxx" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      const { card_number, expiry_month, expiry_year, cvv } = body;
+      if (!card_number || !expiry_month || !expiry_year || !cvv) {
+        return new Response(
+          JSON.stringify({ error: "Card number, expiry month, expiry year, and CVV are required." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (!/^\d{13,19}$/.test(card_number.replace(/\s/g, ""))) {
+        return new Response(
+          JSON.stringify({ error: "Invalid card number." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
@@ -100,40 +119,74 @@ Deno.serve(async (req) => {
     const merchantId = Deno.env.get("ZYNLEPAY_MERCHANT_ID")!;
     const apiId = Deno.env.get("ZYNLEPAY_API_ID")!;
     const apiKey = Deno.env.get("ZYNLEPAY_API_KEY")!;
-    const allowedChannels = ["airtel", "mtn", "zamtel", "momo"];
-    const channel = (clientChannel && allowedChannels.includes(clientChannel.toLowerCase()))
-      ? clientChannel.toLowerCase()
-      : (Deno.env.get("ZYNLEPAY_CHANNEL") || "momo");
-
     const referenceNo = `${invoice.invoice_number}-${Date.now()}`;
-
     const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-    const zynlePayload = {
-      auth: {
-        merchant_id: merchantId,
-        api_id: apiId,
-        api_key: apiKey,
-        service_id: "1002",
-        channel: channel,
-      },
-      data: {
-        method: "runBillPayment",
-        sender_id: phone_number,
-        reference_no: referenceNo,
-        amount: Number(invoice.amount),
-        request_id: requestId,
-      },
-      userdata: {
-        udf1: invoice.invoice_number,
-        udf2: invoice.organizations?.name || "",
-        udf3: "",
-        udf4: "",
-        udf5: "",
-      },
-    };
+    let zynlePayload: any;
 
-    console.log("Calling ZynlePay API for invoice:", invoice.invoice_number, "channel:", channel);
+    if (isCard) {
+      // Card payment via runTranAuthCapture
+      const { card_number, expiry_month, expiry_year, cvv } = body;
+      zynlePayload = {
+        auth: {
+          merchant_id: merchantId,
+          api_id: apiId,
+          api_key: apiKey,
+          service_id: "1002",
+          channel: "visa",
+        },
+        data: {
+          method: "runTranAuthCapture",
+          reference_no: referenceNo,
+          amount: Number(invoice.amount),
+          card_number: card_number.replace(/\s/g, ""),
+          expiry_month: expiry_month,
+          expiry_year: expiry_year,
+          cvv: cvv,
+          request_id: requestId,
+        },
+        userdata: {
+          udf1: invoice.invoice_number,
+          udf2: invoice.organizations?.name || "",
+          udf3: "",
+          udf4: "",
+          udf5: "",
+        },
+      };
+    } else {
+      // MoMo payment via runBillPayment
+      const { phone_number, channel: clientChannel } = body;
+      const allowedChannels = ["airtel", "mtn", "zamtel", "momo"];
+      const channel = (clientChannel && allowedChannels.includes(clientChannel.toLowerCase()))
+        ? clientChannel.toLowerCase()
+        : (Deno.env.get("ZYNLEPAY_CHANNEL") || "momo");
+
+      zynlePayload = {
+        auth: {
+          merchant_id: merchantId,
+          api_id: apiId,
+          api_key: apiKey,
+          service_id: "1002",
+          channel: channel,
+        },
+        data: {
+          method: "runBillPayment",
+          sender_id: phone_number,
+          reference_no: referenceNo,
+          amount: Number(invoice.amount),
+          request_id: requestId,
+        },
+        userdata: {
+          udf1: invoice.invoice_number,
+          udf2: invoice.organizations?.name || "",
+          udf3: "",
+          udf4: "",
+          udf5: "",
+        },
+      };
+    }
+
+    console.log("Calling ZynlePay API:", isCard ? "Card" : "MoMo", "invoice:", invoice.invoice_number);
 
     const zynleResponse = await fetch(
       "https://payments.zynlepay.com/zynlepay/jsonapi/",
@@ -155,7 +208,9 @@ Deno.serve(async (req) => {
 
     if (responseCode === "120") {
       txStatus = "pending";
-      message = "Payment initiated. Please check your phone and approve the transaction.";
+      message = isCard
+        ? "Card payment is being processed. Please wait..."
+        : "Payment initiated. Please check your phone and approve the transaction.";
     } else if (responseCode === "100") {
       txStatus = "completed";
       message = "Payment successful!";
@@ -165,6 +220,9 @@ Deno.serve(async (req) => {
     } else if (responseCode === "9902") {
       txStatus = "failed";
       message = "Payment gateway configuration error. Please contact support.";
+    } else if (responseCode === "9901") {
+      txStatus = "failed";
+      message = "Invalid payment method. Please contact support.";
     }
 
     const { data: transaction, error: txError } = await adminClient
@@ -174,7 +232,7 @@ Deno.serve(async (req) => {
         amount: invoice.amount,
         currency: invoice.currency,
         status: txStatus,
-        payment_method: "mobile_money",
+        payment_method: isCard ? "card" : "mobile_money",
         transaction_reference: referenceNo,
         paid_by: user.id,
         gateway_response: zynleResult,
@@ -207,7 +265,7 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Process MoMo payment error:", error);
+    console.error("Process payment error:", error);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
