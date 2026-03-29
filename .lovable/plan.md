@@ -1,65 +1,40 @@
 
 
-# Fix ZynlePay "Invalid Method" (9901) Error
+# Remove All SEO Components and Dependencies
 
-## Root Cause
+## What Will Be Removed
 
-The ZynlePay API expects a specific payload structure with THREE sections: `auth`, `data`, and `userdata`. Our current edge function puts everything inside `auth` only, and is missing the `method` field entirely. The API returns `9901 - Invalid method` because it cannot find the `method` parameter.
+### Files to Delete
+- `src/components/seo/SEOHead.tsx`
+- `src/components/seo/StructuredData.tsx`
+- `public/robots.txt`
+- `public/sitemap.xml`
 
-**Current (wrong) payload:**
-```text
-{
-  "auth": {
-    "merchant_id": "...",
-    "api_id": "...",
-    "api_key": "...",
-    "channel": "airtel",
-    "sender_id": "097...",     <-- wrong location
-    "reference_no": "...",     <-- wrong location
-    "amount": "3000"           <-- wrong location
-  }
-}
-```
+### Files to Edit — Remove SEO imports and usage
+These pages import `SEOHead` and/or `StructuredData`. The imports and JSX usage will be stripped:
 
-**Correct payload (from official PHP SDK):**
-```text
-{
-  "auth": {
-    "merchant_id": "...",
-    "api_id": "...",
-    "api_key": "...",
-    "service_id": "1002",      <-- MISSING from our code
-    "channel": "airtel"
-  },
-  "data": {
-    "method": "runBillPayment",  <-- MISSING
-    "sender_id": "097...",
-    "reference_no": "...",
-    "amount": 3000,
-    "request_id": "req_unique"   <-- MISSING
-  },
-  "userdata": {
-    "udf1": "", "udf2": "", "udf3": "", "udf4": "", "udf5": ""
-  }
-}
-```
+1. `src/pages/Index.tsx` — remove SEOHead, StructuredData, organizationSchema, localBusinessSchema, createFAQSchema
+2. `src/pages/About.tsx` — remove SEOHead, StructuredData, organizationSchema
+3. `src/pages/Directory.tsx` — remove SEOHead, StructuredData, createBreadcrumbSchema
+4. `src/pages/DirectoryCategory.tsx` — remove SEOHead, StructuredData, createBreadcrumbSchema
+5. `src/pages/HalalCertificationZambia.tsx` — remove SEOHead, StructuredData, createFAQSchema, createBreadcrumbSchema
+6. `src/pages/HalalCertificationLusaka.tsx` — remove SEOHead, StructuredData
+7. `src/pages/CityLanding.tsx` — remove SEOHead, StructuredData, createBreadcrumbSchema
+8. `src/pages/Verify.tsx` — remove SEOHead, StructuredData (if present)
+9. `src/pages/VerifyHalalCertificate.tsx` — remove SEOHead, StructuredData (if present)
+10. `src/pages/BlogIndex.tsx` — remove SEOHead, StructuredData (if present)
+11. `src/pages/Services.tsx` — remove SEOHead (if present)
+12. `src/pages/Contact.tsx` — remove SEOHead (if present)
 
-## Fix
+### `src/main.tsx` — Remove HelmetProvider wrapper
+Render `<App />` directly without `<HelmetProvider>`.
 
-**File: `supabase/functions/process-momo-payment/index.ts`**
-- Restructure `zynlePayload` to match the correct 3-section format
-- Add `service_id: "1002"` to `auth`
-- Move `sender_id`, `reference_no`, `amount` into `data` section
-- Add `method: "runBillPayment"` and `request_id` to `data`
-- Add `userdata` section with empty `udf1`-`udf5`
+### `index.html` — Strip SEO meta tags
+Remove all Open Graph, Twitter Card, geo tags, sitemap link, and extra keywords meta. Keep only the basic `<title>`, charset, viewport, and favicon.
 
-**File: `supabase/functions/check-payment-status/index.ts`**
-- Same structural fix: use `data.method: "checkPaymentStatus"` with proper `auth`/`data`/`userdata` sections
+### `package.json` — Remove `react-helmet-async` dependency
 
-## Files Changed
-
-| File | Change |
-|------|--------|
-| `supabase/functions/process-momo-payment/index.ts` | Fix payload structure |
-| `supabase/functions/check-payment-status/index.ts` | Fix payload structure |
+## What Stays
+- All page content, routes, and functionality remain intact
+- The basic `<title>` tag in `index.html` stays
 
