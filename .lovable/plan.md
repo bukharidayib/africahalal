@@ -1,49 +1,65 @@
 
 
-# Payment Pages + Fix ZynlePay Response Parsing + MoMo Callback Endpoint
+# Fix ZynlePay "Invalid Method" (9901) Error
 
-## Three Issues
+## Root Cause
 
-### 1. ZynlePay Response Parsing Bug (Critical)
-The network logs show `response_code: "[object Object]"`. The edge function does `String(zynleResult?.response || zynleResult?.code || "")` — but `zynleResult.response` is likely a nested object (not a string/number). This causes every payment to fail.
+The ZynlePay API expects a specific payload structure with THREE sections: `auth`, `data`, and `userdata`. Our current edge function puts everything inside `auth` only, and is missing the `method` field entirely. The API returns `9901 - Invalid method` because it cannot find the `method` parameter.
 
-**Fix in `supabase/functions/process-momo-payment/index.ts`:**
-- Log the full raw response for debugging
-- Extract the response code more carefully: check if `response` is an object with a `code` property, handle nested structures
-- Same fix needed in `check-payment-status/index.ts`
+**Current (wrong) payload:**
+```text
+{
+  "auth": {
+    "merchant_id": "...",
+    "api_id": "...",
+    "api_key": "...",
+    "channel": "airtel",
+    "sender_id": "097...",     <-- wrong location
+    "reference_no": "...",     <-- wrong location
+    "amount": "3000"           <-- wrong location
+  }
+}
+```
 
-### 2. Frontend Payment Result Pages
-From the ZynlePay config, two client-facing URLs are needed:
-- `https://africanhalaal.com/payment/success`
-- `https://africanhalaal.com/payment/failed`
+**Correct payload (from official PHP SDK):**
+```text
+{
+  "auth": {
+    "merchant_id": "...",
+    "api_id": "...",
+    "api_key": "...",
+    "service_id": "1002",      <-- MISSING from our code
+    "channel": "airtel"
+  },
+  "data": {
+    "method": "runBillPayment",  <-- MISSING
+    "sender_id": "097...",
+    "reference_no": "...",
+    "amount": 3000,
+    "request_id": "req_unique"   <-- MISSING
+  },
+  "userdata": {
+    "udf1": "", "udf2": "", "udf3": "", "udf4": "", "udf5": ""
+  }
+}
+```
 
-**New files:**
-- `src/pages/PaymentSuccess.tsx` — Shows success confirmation with invoice reference, link to billing dashboard
-- `src/pages/PaymentFailed.tsx` — Shows failure message with retry option, link back to billing
+## Fix
 
-**Update `src/App.tsx`** — Add routes for `/payment/success` and `/payment/failed`
+**File: `supabase/functions/process-momo-payment/index.ts`**
+- Restructure `zynlePayload` to match the correct 3-section format
+- Add `service_id: "1002"` to `auth`
+- Move `sender_id`, `reference_no`, `amount` into `data` section
+- Add `method: "runBillPayment"` and `request_id` to `data`
+- Add `userdata` section with empty `udf1`-`udf5`
 
-### 3. MoMo Deposit Callback Edge Function
-ZynlePay sends async payment status updates to `https://api.africanhalaal.com/payments/zynle/momo/deposit/callback`. Since this is a Supabase project, the actual callback URL should be the Supabase edge function URL.
+**File: `supabase/functions/check-payment-status/index.ts`**
+- Same structural fix: use `data.method: "checkPaymentStatus"` with proper `auth`/`data`/`userdata` sections
 
-**New file: `supabase/functions/zynlepay-momo-callback/index.ts`**
-- Receives POST from ZynlePay with payment result
-- Looks up transaction by reference number
-- Updates `payment_transactions` status
-- If successful, marks invoice as paid
-- No JWT verification (external webhook)
+## Files Changed
 
-**Note:** You'll need to update your ZynlePay MoMo Deposit Callback URL to point to your Supabase edge function: `https://xdixdqyzjfdqummwpuzg.supabase.co/functions/v1/zynlepay-momo-callback`
-
-## Files
-
-| Action | File |
-|--------|------|
-| Edit | `supabase/functions/process-momo-payment/index.ts` — fix response code parsing |
-| Edit | `supabase/functions/check-payment-status/index.ts` — fix response code parsing |
-| Create | `src/pages/PaymentSuccess.tsx` |
-| Create | `src/pages/PaymentFailed.tsx` |
-| Create | `supabase/functions/zynlepay-momo-callback/index.ts` |
-| Edit | `src/App.tsx` — add payment result routes |
-| Edit | `supabase/config.toml` — add callback function config |
+| File | Change |
+|------|--------|
+| `supabase/functions/process-momo-payment/index.ts` | Fix payload structure |
+| `supabase/functions/check-payment-status/index.ts` | Fix payload structure |
 
