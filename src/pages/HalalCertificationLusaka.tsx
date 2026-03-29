@@ -4,8 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Layout } from "@/components/layout/Layout";
-import { SEOHead } from "@/components/seo/SEOHead";
-import { StructuredData, createFAQSchema, createBreadcrumbSchema, localBusinessSchema } from "@/components/seo/StructuredData";
 
 const lusakaFaqs = [
   { question: "Where is the AHI office in Lusaka?", answer: "The African Halal Institute is headquartered in Matero, Lusaka, Zambia. Visit us during business hours or contact us at info@africanhalaal.com." },
@@ -17,19 +15,6 @@ const lusakaFaqs = [
 export default function HalalCertificationLusaka() {
   return (
     <Layout>
-      <SEOHead
-        title="Halal Certification in Lusaka — AHI Certification Services"
-        description="Get Halal certification in Lusaka, Zambia. African Halal Institute certifies restaurants, food businesses, and manufacturers in Lusaka. Visit our Matero office."
-        canonical="https://africanhalaal.com/halal-certification-lusaka"
-        keywords="halal certification lusaka, halal restaurants lusaka, halal food lusaka, halal certified lusaka, halal certificate lusaka"
-      />
-      <StructuredData data={localBusinessSchema} />
-      <StructuredData data={createFAQSchema(lusakaFaqs)} />
-      <StructuredData data={createBreadcrumbSchema([
-        { name: "Home", url: "https://africanhalaal.com" },
-        { name: "Halal Certification Zambia", url: "https://africanhalaal.com/halal-certification-zambia" },
-        { name: "Lusaka", url: "https://africanhalaal.com/halal-certification-lusaka" },
-      ])} />
 
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-24">

@@ -2,8 +2,6 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowRight, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
-import { SEOHead } from "@/components/seo/SEOHead";
-import { StructuredData, createBreadcrumbSchema } from "@/components/seo/StructuredData";
 
 const categoryData: Record<string, { title: string; description: string; h1: string }> = {
   "halal-restaurants-lusaka": {
@@ -38,18 +36,6 @@ export default function DirectoryCategory() {
 
   return (
     <Layout>
-      <SEOHead
-        title={info.title}
-        description={info.description}
-        canonical={`https://africanhalaal.com/directory/${category}`}
-        keywords={`${(category || "").replace(/-/g, " ")}, halal directory zambia, halal certified businesses`}
-      />
-      <StructuredData data={createBreadcrumbSchema([
-        { name: "Home", url: "https://africanhalaal.com" },
-        { name: "Directory", url: "https://africanhalaal.com/directory" },
-        { name: info.h1, url: `https://africanhalaal.com/directory/${category}` },
-      ])} />
-
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-20">
         <div className="container max-w-4xl text-center space-y-4">

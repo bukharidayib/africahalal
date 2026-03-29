@@ -1,7 +1,5 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { SEOHead } from "@/components/seo/SEOHead";
-import { StructuredData, organizationSchema, localBusinessSchema, createFAQSchema } from "@/components/seo/StructuredData";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -161,15 +159,6 @@ export default function Index() {
 
   return (
     <Layout>
-      <SEOHead
-        title="African Halal Institute | Halal Certification Zambia — Integrity • Compliance • Leadership"
-        description="African Halal Institute (AHI) — Leading Halal Certification Body in Zambia. Get Halal certified in Lusaka. Certification for restaurants, manufacturers, hotels, and exporters."
-        canonical="https://africanhalaal.com"
-        keywords="halal certification zambia, halal certification lusaka, african halal institute, halal certificate zambia, verify halal certificate"
-      />
-      <StructuredData data={organizationSchema} />
-      <StructuredData data={localBusinessSchema} />
-      <StructuredData data={createFAQSchema(faqs)} />
       {/* Hero Section */}
       <section className="relative bg-background overflow-hidden">
         {/* Subtle decorative elements */}

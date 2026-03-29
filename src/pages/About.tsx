@@ -1,7 +1,5 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { SEOHead } from "@/components/seo/SEOHead";
-import { StructuredData, organizationSchema } from "@/components/seo/StructuredData";
 import {
   Shield,
   Award,
@@ -49,13 +47,6 @@ const coreValues = [
 export default function About() {
   return (
     <Layout>
-      <SEOHead
-        title="About African Halal Institute — Halal Certification Authority Zambia"
-        description="Learn about the African Halal Institute, Zambia's leading Halal certification authority. Our vision, mission, core values, and commitment to Halal excellence."
-        canonical="https://africanhalaal.com/about"
-        keywords="about african halal institute, halal authority zambia, halal certification body africa"
-      />
-      <StructuredData data={organizationSchema} />
       <HeroSection
         subtitle="About AHI"
         title="Pioneering Halal Excellence Across Africa"

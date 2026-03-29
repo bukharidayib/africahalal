@@ -2,8 +2,6 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Shield, QrCode, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
-import { SEOHead } from "@/components/seo/SEOHead";
-import { StructuredData, createFAQSchema, createBreadcrumbSchema } from "@/components/seo/StructuredData";
 
 const faqs = [
   { question: "How do I verify a Halal certificate from Zambia?", answer: "Visit africanhalaal.com/verify, enter the certificate number printed on the certificate, and click Verify. The system will instantly confirm if the certificate is authentic and active." },
@@ -14,27 +12,6 @@ const faqs = [
 export default function VerifyHalalCertificate() {
   return (
     <Layout>
-      <SEOHead
-        title="Verify Halal Certificate Online — Check Zambia Halal Status"
-        description="Verify any Halal certificate issued by the African Halal Institute. Enter the certificate number or scan the QR code to check authenticity instantly."
-        canonical="https://africanhalaal.com/verify-halal-certificate"
-        keywords="verify halal certificate zambia, check halal certificate, halal certificate verification, halal status check zambia"
-      />
-      <StructuredData data={createFAQSchema(faqs)} />
-      <StructuredData data={createBreadcrumbSchema([
-        { name: "Home", url: "https://africanhalaal.com" },
-        { name: "Verify Halal Certificate", url: "https://africanhalaal.com/verify-halal-certificate" },
-      ])} />
-      <StructuredData data={{
-        "@context": "https://schema.org",
-        "@type": "WebApplication",
-        name: "AHI Halal Certificate Verification",
-        url: "https://africanhalaal.com/verify",
-        applicationCategory: "BusinessApplication",
-        operatingSystem: "Web",
-        description: "Instantly verify the authenticity of Halal certificates issued by the African Halal Institute in Zambia.",
-        offers: { "@type": "Offer", price: "0", priceCurrency: "ZMW" },
-      }} />
 
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-24">

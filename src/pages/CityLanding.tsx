@@ -2,8 +2,6 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowRight, CheckCircle, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
-import { SEOHead } from "@/components/seo/SEOHead";
-import { StructuredData, createBreadcrumbSchema } from "@/components/seo/StructuredData";
 
 const cityData: Record<string, { name: string; description: string }> = {
   ndola: { name: "Ndola", description: "Ndola, the third-largest city in Zambia and a major industrial hub on the Copperbelt, is home to food processors, manufacturers, and hospitality businesses seeking Halal certification." },
@@ -19,17 +17,6 @@ export default function CityLanding() {
 
   return (
     <Layout>
-      <SEOHead
-        title={`Halal Certification in ${info.name}, Zambia — African Halal Institute`}
-        description={`Get Halal certification in ${info.name}, Zambia. AHI certifies restaurants, manufacturers, and hotels. Apply online today.`}
-        canonical={`https://africanhalaal.com/halal-certification/${city}`}
-        keywords={`halal certification ${info.name.toLowerCase()}, halal ${info.name.toLowerCase()} zambia, halal food ${info.name.toLowerCase()}`}
-      />
-      <StructuredData data={createBreadcrumbSchema([
-        { name: "Home", url: "https://africanhalaal.com" },
-        { name: "Halal Certification Zambia", url: "https://africanhalaal.com/halal-certification-zambia" },
-        { name: info.name, url: `https://africanhalaal.com/halal-certification/${city}` },
-      ])} />
 
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-24">

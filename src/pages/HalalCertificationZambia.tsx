@@ -4,8 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Layout } from "@/components/layout/Layout";
-import { SEOHead } from "@/components/seo/SEOHead";
-import { StructuredData, createFAQSchema, createBreadcrumbSchema } from "@/components/seo/StructuredData";
 
 const faqs = [
   {
@@ -55,17 +53,6 @@ const benefits = [
 export default function HalalCertificationZambia() {
   return (
     <Layout>
-      <SEOHead
-        title="Halal Certification in Zambia — Get Certified by AHI"
-        description="Get Halal certification in Zambia from the African Halal Institute. Learn about requirements, costs, process, and benefits. Trusted authority for restaurants, manufacturers, and exporters."
-        canonical="https://africanhalaal.com/halal-certification-zambia"
-        keywords="halal certification zambia, halal certificate zambia, halal certification cost zambia, halal certification requirements zambia, get halal certified zambia"
-      />
-      <StructuredData data={createFAQSchema(faqs)} />
-      <StructuredData data={createBreadcrumbSchema([
-        { name: "Home", url: "https://africanhalaal.com" },
-        { name: "Halal Certification Zambia", url: "https://africanhalaal.com/halal-certification-zambia" },
-      ])} />
 
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-24">
