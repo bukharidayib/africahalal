@@ -611,7 +611,8 @@ export default function CertificationApplication() {
 
     const phoneRegex = /^0[79]\d{8}$/;
     const isPaymentPhoneValid = phoneRegex.test(paymentPhone);
-    const isPaymentFormValid = isPaymentPhoneValid && paymentChannel !== "";
+    const isCardValid = cardNumber.replace(/\s/g, "").length >= 13 && cardExpiryMonth.length === 2 && cardExpiryYear.length >= 2 && cardCvv.length >= 3;
+    const isPaymentFormValid = paymentMethod === "momo" ? (isPaymentPhoneValid && paymentChannel !== "") : isCardValid;
 
     const handlePayment = async () => {
         if (!isPaymentFormValid || !paymentInvoice) return;
