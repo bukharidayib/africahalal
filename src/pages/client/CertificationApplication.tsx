@@ -621,8 +621,23 @@ export default function CertificationApplication() {
         setPaymentMessage("");
 
         try {
+            const paymentBody = paymentMethod === "card"
+                ? {
+                    invoice_id: paymentInvoice.id,
+                    payment_method: "card",
+                    card_number: cardNumber.replace(/\s/g, ""),
+                    expiry_month: cardExpiryMonth,
+                    expiry_year: cardExpiryYear,
+                    cvv: cardCvv,
+                }
+                : {
+                    invoice_id: paymentInvoice.id,
+                    phone_number: paymentPhone,
+                    channel: paymentChannel,
+                };
+
             const { data, error } = await supabase.functions.invoke("process-momo-payment", {
-                body: { invoice_id: paymentInvoice.id, phone_number: paymentPhone, channel: paymentChannel },
+                body: paymentBody,
             });
 
             if (error) throw error;
