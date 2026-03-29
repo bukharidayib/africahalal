@@ -107,15 +107,29 @@ Deno.serve(async (req) => {
 
     const referenceNo = `${invoice.invoice_number}-${Date.now()}`;
 
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
     const zynlePayload = {
       auth: {
         merchant_id: merchantId,
         api_id: apiId,
         api_key: apiKey,
+        service_id: "1002",
         channel: channel,
+      },
+      data: {
+        method: "runBillPayment",
         sender_id: phone_number,
         reference_no: referenceNo,
-        amount: String(invoice.amount),
+        amount: Number(invoice.amount),
+        request_id: requestId,
+      },
+      userdata: {
+        udf1: invoice.invoice_number,
+        udf2: invoice.organizations?.name || "",
+        udf3: "",
+        udf4: "",
+        udf5: "",
       },
     };
 
