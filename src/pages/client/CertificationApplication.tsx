@@ -88,6 +88,11 @@ export default function CertificationApplication() {
     const [paymentInvoice, setPaymentInvoice] = useState<{ id: string; number: string; amount: number } | null>(null);
     const [paymentPhone, setPaymentPhone] = useState("");
     const [paymentChannel, setPaymentChannel] = useState("");
+    const [paymentMethod, setPaymentMethod] = useState<"momo" | "card">("momo");
+    const [cardNumber, setCardNumber] = useState("");
+    const [cardExpiryMonth, setCardExpiryMonth] = useState("");
+    const [cardExpiryYear, setCardExpiryYear] = useState("");
+    const [cardCvv, setCardCvv] = useState("");
     const [paymentState, setPaymentState] = useState<"idle" | "processing" | "pending" | "success" | "error">("idle");
     const [paymentMessage, setPaymentMessage] = useState("");
     const [paymentReference, setPaymentReference] = useState("");
