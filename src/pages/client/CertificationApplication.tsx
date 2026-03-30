@@ -50,7 +50,7 @@ import {
 } from "@/components/ui/dialog";
 import { ProductIngredientModal, Ingredient } from "@/components/client/ProductIngredientModal";
 import { MandatoryDocuments } from "@/components/client/MandatoryDocuments";
-// MoMoPaymentDialog kept for billing pages but not used here anymore
+import { organizationSchema, productSchema, declarationSchema, paymentPhoneSchema, cardPaymentSchema } from "@/lib/validations";
 
 const steps = [
     { id: 1, name: "Establishment Details", icon: Building2 },
