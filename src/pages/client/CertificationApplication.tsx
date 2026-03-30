@@ -406,11 +406,12 @@ export default function CertificationApplication() {
     };
 
     const handleAddProduct = () => {
-        if (!newProduct.name || !newProduct.brand) {
+        const result = productSchema.safeParse(newProduct);
+        if (!result.success) {
             toast({
                 variant: "destructive",
-                title: "Missing Information",
-                description: "Please enter product name and brand.",
+                title: "Validation Error",
+                description: result.error.errors[0].message,
             });
             return;
         }
