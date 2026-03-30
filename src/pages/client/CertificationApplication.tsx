@@ -645,9 +645,13 @@ export default function CertificationApplication() {
         }
     };
 
-    const phoneRegex = /^0[79]\d{8}$/;
-    const isPaymentPhoneValid = phoneRegex.test(paymentPhone);
-    const isCardValid = cardNumber.replace(/\s/g, "").length >= 13 && cardExpiryMonth.length === 2 && cardExpiryYear.length >= 2 && cardCvv.length >= 3;
+    const isPaymentPhoneValid = paymentPhoneSchema.safeParse(paymentPhone).success;
+    const isCardValid = cardPaymentSchema.safeParse({
+        cardNumber: cardNumber.replace(/\s/g, ""),
+        expiryMonth: cardExpiryMonth,
+        expiryYear: cardExpiryYear,
+        cvv: cardCvv,
+    }).success;
     const isPaymentFormValid = paymentMethod === "momo" ? (isPaymentPhoneValid && paymentChannel !== "") : isCardValid;
 
     const handlePayment = async () => {
