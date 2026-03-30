@@ -40,6 +40,8 @@ interface Application {
   created_at: string;
   updated_at: string;
   assigned_officer_id: string | null;
+  validity_period: string | null;
+  application_fee: number | null;
   organizations?: {
     name: string;
     registration_number: string;
