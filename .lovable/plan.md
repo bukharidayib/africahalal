@@ -1,40 +1,59 @@
 
 
-# Remove All SEO Components and Dependencies
+# Admin Payment Transaction Tracker
 
-## What Will Be Removed
+## What We're Building
 
-### Files to Delete
-- `src/components/seo/SEOHead.tsx`
-- `src/components/seo/StructuredData.tsx`
-- `public/robots.txt`
-- `public/sitemap.xml`
+A new "Payment Transactions" tab/section in the Admin Billing page that shows all payment transactions with their ZynlePay response codes and descriptions, allowing admins to track payment issues and successful transactions.
 
-### Files to Edit — Remove SEO imports and usage
-These pages import `SEOHead` and/or `StructuredData`. The imports and JSX usage will be stripped:
+## ZynlePay Response Code Reference
 
-1. `src/pages/Index.tsx` — remove SEOHead, StructuredData, organizationSchema, localBusinessSchema, createFAQSchema
-2. `src/pages/About.tsx` — remove SEOHead, StructuredData, organizationSchema
-3. `src/pages/Directory.tsx` — remove SEOHead, StructuredData, createBreadcrumbSchema
-4. `src/pages/DirectoryCategory.tsx` — remove SEOHead, StructuredData, createBreadcrumbSchema
-5. `src/pages/HalalCertificationZambia.tsx` — remove SEOHead, StructuredData, createFAQSchema, createBreadcrumbSchema
-6. `src/pages/HalalCertificationLusaka.tsx` — remove SEOHead, StructuredData
-7. `src/pages/CityLanding.tsx` — remove SEOHead, StructuredData, createBreadcrumbSchema
-8. `src/pages/Verify.tsx` — remove SEOHead, StructuredData (if present)
-9. `src/pages/VerifyHalalCertificate.tsx` — remove SEOHead, StructuredData (if present)
-10. `src/pages/BlogIndex.tsx` — remove SEOHead, StructuredData (if present)
-11. `src/pages/Services.tsx` — remove SEOHead (if present)
-12. `src/pages/Contact.tsx` — remove SEOHead (if present)
+The following codes and descriptions will be displayed:
 
-### `src/main.tsx` — Remove HelmetProvider wrapper
-Render `<App />` directly without `<HelmetProvider>`.
+| Code | Description |
+|------|-------------|
+| 100 | Transaction successful |
+| 120 | Transaction initiated |
+| 990 | Transaction pending |
+| 995 | Transaction failed |
+| 9901 | Merchant not found |
+| 9902 | Requesting Device IP is not whitelisted |
+| 9903 | Invalid Merchant API credentials or setup not complete |
+| 9904 | Merchant Account setup not complete |
+| 9905 | Invalid sender ID (mobile number) |
+| 9906 | Duplicate reference number detected |
+| 9907 | Mobile Number blacklisted |
+| 9908 | Merchant commission setup not complete |
+| 9909 | Merchant payment provider setup not complete |
+| 9910 | Merchant setup not complete |
+| 9911 | Merchant insufficient balance |
+| 9912 | Request amount exceeds disbursement limit |
+| 9913 | Invalid or wrong bank name provided |
+| 9914 | Cannot determine transaction status now, please try again later |
 
-### `index.html` — Strip SEO meta tags
-Remove all Open Graph, Twitter Card, geo tags, sitemap link, and extra keywords meta. Keep only the basic `<title>`, charset, viewport, and favicon.
+## Implementation
 
-### `package.json` — Remove `react-helmet-async` dependency
+### 1. Update `src/admin/pages/AdminBilling.tsx`
 
-## What Stays
-- All page content, routes, and functionality remain intact
-- The basic `<title>` tag in `index.html` stays
+Add a Tabs component to split the page into two tabs:
+- **Invoices** — existing invoice management (unchanged)
+- **Payment Transactions** — new table showing all `payment_transactions` records
+
+The Payment Transactions tab will:
+- Fetch from `payment_transactions` table joined with `invoices(invoice_number)` and profiles/organizations for payer info
+- Display columns: Transaction Ref, Invoice #, Amount, Payment Method, Status, Response Code, Description (mapped from code), Date
+- Color-code response codes: green for 100, yellow for 120/990, red for 995+
+- Include search and status filter
+- Show a "Check Status" button for pending transactions that calls the `check-payment-status` edge function
+- Parse `gateway_response` JSON to extract the response code
+
+### 2. Response Code Mapping
+
+Create a helper map in the component that maps each code string to its human-readable description and a color badge variant.
+
+## Files Changed
+
+| Action | File |
+|--------|------|
+| Edit | `src/admin/pages/AdminBilling.tsx` — add Tabs with Payment Transactions section |
 
