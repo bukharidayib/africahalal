@@ -50,7 +50,7 @@ import {
 } from "@/components/ui/dialog";
 import { ProductIngredientModal, Ingredient } from "@/components/client/ProductIngredientModal";
 import { MandatoryDocuments } from "@/components/client/MandatoryDocuments";
-// MoMoPaymentDialog kept for billing pages but not used here anymore
+import { organizationSchema, productSchema, declarationSchema, paymentPhoneSchema, cardPaymentSchema } from "@/lib/validations";
 
 const steps = [
     { id: 1, name: "Establishment Details", icon: Building2 },
@@ -308,16 +308,24 @@ export default function CertificationApplication() {
 
     const validateStep = (step: number): boolean => {
         switch (step) {
-            case 1:
-                if (!formData.entity_name || !formData.registration_number || !formData.address || !formData.country) {
+            case 1: {
+                const result = organizationSchema.safeParse({
+                    entity_name: formData.entity_name,
+                    registration_number: formData.registration_number,
+                    address: formData.address,
+                    country: formData.country,
+                });
+                if (!result.success) {
+                    const firstError = result.error.errors[0];
                     toast({
                         variant: "destructive",
-                        title: "Missing Information",
-                        description: "Please fill in all required fields before proceeding.",
+                        title: "Validation Error",
+                        description: firstError.message,
                     });
                     return false;
                 }
                 return true;
+            }
             case 2:
                 if (formData.categories.length === 0) {
                     toast({
@@ -337,19 +345,28 @@ export default function CertificationApplication() {
                     });
                     return false;
                 }
-                // Check if all products have at least one ingredient
-                const productsWithoutIngredients = formData.products.filter(p => p.ingredients.length === 0);
-                if (productsWithoutIngredients.length > 0) {
-                    toast({
-                        variant: "destructive",
-                        title: "Ingredients Required",
-                        description: `Please add ingredients for: ${productsWithoutIngredients.map(p => p.name).join(', ')}`,
-                    });
-                    return false;
+                // Validate each product with zod
+                for (const p of formData.products) {
+                    const pResult = productSchema.safeParse({ name: p.name, brand: p.brand, category: p.category });
+                    if (!pResult.success) {
+                        toast({
+                            variant: "destructive",
+                            title: "Product Validation Error",
+                            description: `${p.name}: ${pResult.error.errors[0].message}`,
+                        });
+                        return false;
+                    }
+                    if (p.ingredients.length === 0) {
+                        toast({
+                            variant: "destructive",
+                            title: "Ingredients Required",
+                            description: `Please add ingredients for: ${p.name}`,
+                        });
+                        return false;
+                    }
                 }
                 return true;
-            case 4:
-                // Check required documents
+            case 4: {
                 const requiredDocIds = ["business_registration", "tax_clearance", "ingredient_spec", "halal_policy"];
                 const uploadedDocIds = formData.uploadedFiles.map(f => f.documentId);
                 const missingDocs = requiredDocIds.filter(id => !uploadedDocIds.includes(id));
@@ -362,6 +379,23 @@ export default function CertificationApplication() {
                     return false;
                 }
                 return true;
+            }
+            case 5: {
+                const declResult = declarationSchema.safeParse({
+                    declaration_confirmed: formData.declaration_confirmed,
+                    declaration_compliance: formData.declaration_compliance,
+                    signature: formData.signature,
+                });
+                if (!declResult.success) {
+                    toast({
+                        variant: "destructive",
+                        title: "Declaration Incomplete",
+                        description: declResult.error.errors[0].message,
+                    });
+                    return false;
+                }
+                return true;
+            }
             default:
                 return true;
         }
@@ -372,11 +406,12 @@ export default function CertificationApplication() {
     };
 
     const handleAddProduct = () => {
-        if (!newProduct.name || !newProduct.brand) {
+        const result = productSchema.safeParse(newProduct);
+        if (!result.success) {
             toast({
                 variant: "destructive",
-                title: "Missing Information",
-                description: "Please enter product name and brand.",
+                title: "Validation Error",
+                description: result.error.errors[0].message,
             });
             return;
         }
@@ -611,9 +646,13 @@ export default function CertificationApplication() {
         }
     };
 
-    const phoneRegex = /^0[79]\d{8}$/;
-    const isPaymentPhoneValid = phoneRegex.test(paymentPhone);
-    const isCardValid = cardNumber.replace(/\s/g, "").length >= 13 && cardExpiryMonth.length === 2 && cardExpiryYear.length >= 2 && cardCvv.length >= 3;
+    const isPaymentPhoneValid = paymentPhoneSchema.safeParse(paymentPhone).success;
+    const isCardValid = cardPaymentSchema.safeParse({
+        cardNumber: cardNumber.replace(/\s/g, ""),
+        expiryMonth: cardExpiryMonth,
+        expiryYear: cardExpiryYear,
+        cvv: cardCvv,
+    }).success;
     const isPaymentFormValid = paymentMethod === "momo" ? (isPaymentPhoneValid && paymentChannel !== "") : isCardValid;
 
     const handlePayment = async () => {
