@@ -301,15 +301,32 @@ export default function ApplicationDetail() {
         const currentUser = (await supabase.auth.getUser()).data.user;
         const currentUserId = currentUser?.id || '';
 
-        // To satisfy dual control (issued_by != approved_by), 
-        // we use the assigned officer as the issuer if they are different from current user,
-        // otherwise we look for the last status changer in history.
-        let issuerId = application.assigned_officer_id;
+        // Dual-control: validate via approval_requests table
+        // The recommender (issuer) must be a different person from the approver
+        const { data: approvalData } = await supabase
+          .from('approval_requests')
+          .select('recommender_id')
+          .eq('application_id', application.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(1);
 
-        console.log('AHI Security: Starting Dual Control Check', { currentUserId, assignedOfficerId: application.assigned_officer_id });
+        let issuerId: string | null = null;
 
-        if (!issuerId || issuerId === currentUserId) {
-          // Priority 1: Check history for anyone else who touched this application
+        if (approvalData && approvalData.length > 0) {
+          const recommenderId = approvalData[0].recommender_id;
+          if (recommenderId && recommenderId !== currentUserId) {
+            issuerId = recommenderId;
+          }
+        }
+
+        // Fallback: use assigned officer if different from current user
+        if (!issuerId && application.assigned_officer_id && application.assigned_officer_id !== currentUserId) {
+          issuerId = application.assigned_officer_id;
+        }
+
+        // Fallback: find another admin who acted on this application
+        if (!issuerId) {
           const { data: history } = await supabase
             .from('application_status_history')
             .select('changed_by')
@@ -320,35 +337,46 @@ export default function ApplicationDetail() {
 
           if (history && history.length > 0) {
             issuerId = history[0].changed_by;
-            console.log('AHI Security: Picked historic changer as surrogate issuer', issuerId);
-          } else {
-            // Priority 2: Pick ANY other admin profile in the system
-            const { data: otherAdmins } = await supabase
-              .from('profiles')
-              .select('id')
-              .neq('id', currentUserId)
-              .limit(1);
-
-            if (otherAdmins && otherAdmins.length > 0) {
-              issuerId = otherAdmins[0].id;
-              console.log('AHI Security: Picked another admin as surrogate issuer', issuerId);
-            } else {
-              // Final Escape: Use a deterministic system UUID if solo testing
-              issuerId = '77777777-7777-7777-7777-777777777777';
-              console.warn('AHI Security: No other users found. Using surrogate system ID.');
-            }
           }
         }
 
-        // Final safety check: if we somehow still match, force a surrogate
-        if (issuerId === currentUserId) {
-          issuerId = '77777777-7777-7777-7777-777777777777';
-          console.error('AHI Security: Emergency override of issuerId to avoid self-approval error.');
+        if (!issuerId || issuerId === currentUserId) {
+          toast({
+            variant: 'destructive',
+            title: 'Dual-Control Required',
+            description: 'Certificate issuance requires a different officer to have recommended this application. Please ensure another officer reviews the application first.',
+          });
+          setIsSaving(false);
+          return;
+        }
+
+        // Validate dual approval via server-side function
+        const { data: dualValid } = await supabase.rpc('validate_dual_approval', {
+          _application_id: application.id,
+          _approver_id: currentUserId,
+        });
+
+        // Update the approval request status
+        if (approvalData && approvalData.length > 0) {
+          await supabase
+            .from('approval_requests')
+            .update({
+              approver_id: currentUserId,
+              status: 'approved',
+              resolved_at: new Date().toISOString(),
+            })
+            .eq('application_id', application.id)
+            .eq('status', 'pending');
         }
 
         const issueDate = new Date();
         const expiryDate = new Date();
-        expiryDate.setFullYear(issueDate.getFullYear() + 1);
+        const validityPeriod = application.validity_period;
+        if (validityPeriod === '6_months') {
+          expiryDate.setMonth(issueDate.getMonth() + 6);
+        } else {
+          expiryDate.setFullYear(issueDate.getFullYear() + 1);
+        }
 
         const certNumber = `AHI-ZAM-${issueDate.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
         generatedCertNumber = certNumber;
