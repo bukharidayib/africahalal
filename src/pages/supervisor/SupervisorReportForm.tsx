@@ -83,10 +83,13 @@ export default function SupervisorReportForm() {
     async function loadSites() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      const { data } = await supabase.from("supervisor_sites").select("id, site_name, site_address, organization_id, organizations(name)").eq("supervisor_id", session.user.id).eq("is_active", true);
+      const { data } = await (supabase
+        .from("organization_supervisors" as any)
+        .select("*, organizations(name, id)")
+        .eq("supervisor_id", session.user.id) as any);
       const siteList = (data as any[]) || [];
       setSites(siteList);
-      if (siteList.length === 1) setSelectedSite(siteList[0].id);
+      if (siteList.length === 1) setSelectedSite(siteList[0].organization_id);
       setIsLoading(false);
     }
     loadSites();
@@ -184,6 +187,29 @@ export default function SupervisorReportForm() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
+      // Resolve organization_id to supervisor_sites id (find or create)
+      const selectedOrg = sites.find((s: any) => s.organization_id === selectedSite);
+      const orgName = selectedOrg?.organizations?.name || "Site";
+      let { data: existingSite } = await supabase
+        .from("supervisor_sites")
+        .select("id")
+        .eq("supervisor_id", session.user.id)
+        .eq("organization_id", selectedSite)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (!existingSite) {
+        const { data: newSite, error: siteErr } = await supabase.from("supervisor_sites").insert({
+          supervisor_id: session.user.id,
+          organization_id: selectedSite,
+          site_name: orgName,
+        }).select("id").single();
+        if (siteErr) throw siteErr;
+        existingSite = newSite;
+      }
+
+      const siteId = existingSite!.id;
+
       // Build report_content based on type
       let reportContent: any = {};
       if (reportType === "weekly_summary") {
@@ -192,7 +218,7 @@ export default function SupervisorReportForm() {
 
       const { data: report, error: reportError } = await (supabase.from("supervisor_reports" as any).insert({
         supervisor_id: session.user.id,
-        site_id: selectedSite,
+        site_id: siteId,
         report_type: reportType,
         report_date: today,
         status: "draft",
@@ -287,7 +313,7 @@ export default function SupervisorReportForm() {
                     <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
                     <SelectContent>
                       {sites.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>{s.site_name} ({s.organizations?.name})</SelectItem>
+                        <SelectItem key={s.id} value={s.organization_id}>{s.organizations?.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
