@@ -293,7 +293,6 @@ export default function SupervisorReportForm() {
                   <SelectContent>
                     <SelectItem value="daily_checklist">Daily Checklist</SelectItem>
                     <SelectItem value="weekly_summary">Weekly Summary</SelectItem>
-                    <SelectItem value="monthly_performance">Monthly Performance</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -23,6 +23,7 @@ const navigation = [
   { name: "Dashboard", href: "/supervisor/dashboard", icon: LayoutDashboard },
   { name: "Inspections", href: "/supervisor/inspections", icon: ClipboardList },
   { name: "Reports", href: "/supervisor/reports", icon: FileText },
+  { name: "Performance", href: "/supervisor/performance", icon: BarChart3 },
   { name: "Incidents", href: "/supervisor/incidents", icon: AlertTriangle },
   { name: "NCR Management", href: "/supervisor/ncrs", icon: AlertOctagon },
   { name: "Observations", href: "/supervisor/observations", icon: BookOpen },

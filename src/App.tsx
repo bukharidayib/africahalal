@@ -247,6 +247,7 @@ const App = () => (
             <Route path="/supervisor/reports" element={<SupervisorProtectedRoute><SupervisorReports /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/reports/new" element={<SupervisorProtectedRoute><SupervisorReportForm /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/reports/:id" element={<SupervisorProtectedRoute><SupervisorReportDetail /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/performance" element={<SupervisorProtectedRoute><SupervisorPerformance /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/ncrs" element={<SupervisorProtectedRoute><SupervisorNCRs /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/ncrs/:id" element={<SupervisorProtectedRoute><SupervisorNCRDetail /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/incidents" element={<SupervisorProtectedRoute><SupervisorIncidents /></SupervisorProtectedRoute>} />
