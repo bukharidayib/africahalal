@@ -97,11 +97,22 @@ export default function SupervisorPerformance() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
+    // Find all site IDs for this org
+    const { data: siteRows } = await supabase
+      .from("supervisor_sites")
+      .select("id")
+      .eq("supervisor_id", session.user.id)
+      .eq("organization_id", selectedSite)
+      .eq("is_active", true);
+
+    const siteIds = (siteRows || []).map((s: any) => s.id);
+    if (siteIds.length === 0) { setReports([]); setTrendData([]); return; }
+
     const { data } = await supabase
       .from("supervisor_reports")
       .select("*")
       .eq("supervisor_id", session.user.id)
-      .eq("site_id", selectedSite)
+      .in("site_id", siteIds)
       .eq("report_type", "monthly_performance")
       .gte("report_date", dateFrom)
       .lte("report_date", dateTo)
