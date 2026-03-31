@@ -90,6 +90,7 @@ import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import SupervisorReports from "./pages/supervisor/SupervisorReports";
 import SupervisorReportForm from "./pages/supervisor/SupervisorReportForm";
 import SupervisorReportDetail from "./pages/supervisor/SupervisorReportDetail";
+import SupervisorPerformance from "./pages/supervisor/SupervisorPerformance";
 import SupervisorNCRs from "./pages/supervisor/SupervisorNCRs";
 import SupervisorNCRDetail from "./pages/supervisor/SupervisorNCRDetail";
 import SupervisorIncidents from "./pages/supervisor/SupervisorIncidents";
@@ -246,6 +247,7 @@ const App = () => (
             <Route path="/supervisor/reports" element={<SupervisorProtectedRoute><SupervisorReports /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/reports/new" element={<SupervisorProtectedRoute><SupervisorReportForm /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/reports/:id" element={<SupervisorProtectedRoute><SupervisorReportDetail /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/performance" element={<SupervisorProtectedRoute><SupervisorPerformance /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/ncrs" element={<SupervisorProtectedRoute><SupervisorNCRs /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/ncrs/:id" element={<SupervisorProtectedRoute><SupervisorNCRDetail /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/incidents" element={<SupervisorProtectedRoute><SupervisorIncidents /></SupervisorProtectedRoute>} />

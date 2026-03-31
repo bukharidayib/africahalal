@@ -44,14 +44,7 @@ const WEEKLY_SECTIONS = [
   { key: "recommendations", label: "Recommendations for Next Week", placeholder: "Provide recommendations, planned activities, and focus areas for the coming week..." },
 ];
 
-const KPI_FIELDS = [
-  { key: "inspections_conducted", label: "Inspections Conducted", type: "number" },
-  { key: "ncrs_raised", label: "NCRs Raised", type: "number" },
-  { key: "ncrs_resolved", label: "NCRs Resolved", type: "number" },
-  { key: "incidents_reported", label: "Incidents Reported", type: "number" },
-  { key: "staff_training_sessions", label: "Staff Training Sessions", type: "number" },
-  { key: "overall_compliance_pct", label: "Overall Compliance %", type: "number" },
-];
+// KPI_FIELDS moved to SupervisorPerformance.tsx
 
 interface ChecklistItem {
   id: string;
@@ -84,14 +77,7 @@ export default function SupervisorReportForm() {
   const [weeklyEvidence, setWeeklyEvidence] = useState<string[]>([]);
   const [uploadingWeekly, setUploadingWeekly] = useState(false);
 
-  // Monthly KPI state
-  const [kpiValues, setKpiValues] = useState<Record<string, number>>(
-    Object.fromEntries(KPI_FIELDS.map(f => [f.key, 0]))
-  );
-  const [categoryBreakdown, setCategoryBreakdown] = useState<Record<string, number>>(
-    Object.fromEntries(CATEGORIES.map(c => [c.key, 0]))
-  );
-  const [monthlyCommentary, setMonthlyCommentary] = useState("");
+  // Monthly KPI state removed - now in SupervisorPerformance.tsx
 
   useEffect(() => {
     async function loadSites() {
@@ -202,8 +188,6 @@ export default function SupervisorReportForm() {
       let reportContent: any = {};
       if (reportType === "weekly_summary") {
         reportContent = { type: "weekly", sections: weeklySections, evidence_urls: weeklyEvidence };
-      } else if (reportType === "monthly_performance") {
-        reportContent = { type: "monthly", kpis: kpiValues, category_breakdown: categoryBreakdown, commentary: monthlyCommentary };
       }
 
       const { data: report, error: reportError } = await (supabase.from("supervisor_reports" as any).insert({
@@ -248,15 +232,13 @@ export default function SupervisorReportForm() {
             description: `Compliance score: ${res.compliance_score}% (Risk: ${res.risk_level?.toUpperCase()})`,
           });
         } else {
-          // For weekly/monthly, just mark as submitted directly
+          // For weekly reports, just mark as submitted directly
           const { error: updateError } = await (supabase.from("supervisor_reports" as any).update({
             status: "submitted",
             submitted_at: new Date().toISOString(),
-            compliance_score: reportType === "monthly_performance" ? kpiValues.overall_compliance_pct : null,
-            risk_level: reportType === "monthly_performance" ? (kpiValues.overall_compliance_pct >= 80 ? "low" : kpiValues.overall_compliance_pct >= 60 ? "medium" : "high") : null,
           } as any).eq("id", (report as any).id) as any);
           if (updateError) throw updateError;
-          toast({ title: "Report Submitted", description: `${reportType === "weekly_summary" ? "Weekly" : "Monthly"} report submitted successfully.` });
+          toast({ title: "Report Submitted", description: "Weekly report submitted successfully." });
         }
       } else {
         toast({ title: "Draft Saved", description: "Your report has been saved as a draft." });
@@ -293,7 +275,6 @@ export default function SupervisorReportForm() {
                   <SelectContent>
                     <SelectItem value="daily_checklist">Daily Checklist</SelectItem>
                     <SelectItem value="weekly_summary">Weekly Summary</SelectItem>
-                    <SelectItem value="monthly_performance">Monthly Performance</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -454,69 +435,7 @@ export default function SupervisorReportForm() {
           </>
         )}
 
-        {/* === MONTHLY PERFORMANCE (KPI Entry) === */}
-        {reportType === "monthly_performance" && (
-          <>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Key Performance Indicators</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {KPI_FIELDS.map(field => (
-                    <div key={field.key} className="space-y-1.5">
-                      <Label className="text-xs">{field.label}</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={field.key === "overall_compliance_pct" ? 100 : undefined}
-                        value={kpiValues[field.key]}
-                        onChange={(e) => setKpiValues(prev => ({ ...prev, [field.key]: Number(e.target.value) }))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Category Compliance Breakdown (%)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {CATEGORIES.map(cat => (
-                    <div key={cat.key} className="space-y-1.5">
-                      <Label className="text-xs">{cat.label}</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={categoryBreakdown[cat.key]}
-                        onChange={(e) => setCategoryBreakdown(prev => ({ ...prev, [cat.key]: Number(e.target.value) }))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Trend Notes & Commentary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  value={monthlyCommentary}
-                  onChange={(e) => setMonthlyCommentary(e.target.value)}
-                  placeholder="Provide trend analysis, performance commentary, and strategic observations for this month..."
-                  rows={5}
-                  className="text-sm"
-                />
-              </CardContent>
-            </Card>
-          </>
-        )}
+        {/* Monthly Performance is now a separate module at /supervisor/performance */}
 
         <Card>
           <CardContent className="pt-6">
