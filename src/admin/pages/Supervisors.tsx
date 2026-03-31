@@ -667,9 +667,9 @@ export default function Supervisors() {
                     {reports.length === 0 ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No reports.</TableCell></TableRow>
                     ) : reports.map((r: any) => (
-                      <TableRow key={r.id}>
+                      <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => window.location.href = `/admin/supervisor-reports/${r.id}`}>
                         <TableCell>{format(new Date(r.report_date), "dd MMM yyyy")}</TableCell>
-                        <TableCell className="text-sm">{r.report_type?.replace(/_/g, " ")}</TableCell>
+                        <TableCell className="text-sm capitalize">{r.report_type?.replace(/_/g, " ")}</TableCell>
                         <TableCell><Badge variant={r.status === "submitted" ? "default" : "secondary"}>{r.status}</Badge></TableCell>
                         <TableCell>{r.compliance_score != null ? `${r.compliance_score}%` : "—"}</TableCell>
                         <TableCell>{r.risk_level ? <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${riskColors[r.risk_level] || ""}`}>{r.risk_level.toUpperCase()}</span> : "—"}</TableCell>

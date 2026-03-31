@@ -215,6 +215,7 @@ const App = () => (
               <Route path="roles/:id" element={<RoleEditor />} />
               <Route path="billing" element={<AdminBilling />} />
               <Route path="ingredients" element={<IngredientTracker />} />
+              <Route path="supervisor-reports/:id" element={<AdminSupervisorReportDetail />} />
             </Route>
 
             {/* Inspector Auth Routes (public) */}
