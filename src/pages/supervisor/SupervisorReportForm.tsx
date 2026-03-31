@@ -435,69 +435,7 @@ export default function SupervisorReportForm() {
           </>
         )}
 
-        {/* === MONTHLY PERFORMANCE (KPI Entry) === */}
-        {reportType === "monthly_performance" && (
-          <>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Key Performance Indicators</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {KPI_FIELDS.map(field => (
-                    <div key={field.key} className="space-y-1.5">
-                      <Label className="text-xs">{field.label}</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={field.key === "overall_compliance_pct" ? 100 : undefined}
-                        value={kpiValues[field.key]}
-                        onChange={(e) => setKpiValues(prev => ({ ...prev, [field.key]: Number(e.target.value) }))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Category Compliance Breakdown (%)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {CATEGORIES.map(cat => (
-                    <div key={cat.key} className="space-y-1.5">
-                      <Label className="text-xs">{cat.label}</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={categoryBreakdown[cat.key]}
-                        onChange={(e) => setCategoryBreakdown(prev => ({ ...prev, [cat.key]: Number(e.target.value) }))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Trend Notes & Commentary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  value={monthlyCommentary}
-                  onChange={(e) => setMonthlyCommentary(e.target.value)}
-                  placeholder="Provide trend analysis, performance commentary, and strategic observations for this month..."
-                  rows={5}
-                  className="text-sm"
-                />
-              </CardContent>
-            </Card>
-          </>
-        )}
+        {/* Monthly Performance is now a separate module at /supervisor/performance */}
 
         <Card>
           <CardContent className="pt-6">
