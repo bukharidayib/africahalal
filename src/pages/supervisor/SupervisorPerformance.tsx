@@ -323,7 +323,7 @@ export default function SupervisorPerformance() {
                     <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
                     <SelectContent>
                       {sites.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>{s.site_name} ({s.organizations?.name})</SelectItem>
+                        <SelectItem key={s.id} value={s.organization_id}>{s.organizations?.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
