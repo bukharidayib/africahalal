@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { SupervisorLayout } from "@/components/layout/SupervisorLayout";
+import { useParams, useNavigate } from "react-router-dom";
+import { AdminLayout } from "../components/layout/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, FileText, CheckCircle, AlertTriangle, XCircle, BarChart3, TrendingUp } from "lucide-react";
+import { Loader2, FileText, CheckCircle, AlertTriangle, XCircle, BarChart3, TrendingUp, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
@@ -48,11 +49,14 @@ const KPI_LABELS: Record<string, string> = {
   overall_compliance_pct: "Overall Compliance %",
 };
 
-export default function SupervisorReportDetail() {
+export default function AdminSupervisorReportDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [report, setReport] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [scores, setScores] = useState<any>(null);
+  const [supervisorName, setSupervisorName] = useState("");
+  const [orgName, setOrgName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -60,12 +64,23 @@ export default function SupervisorReportDetail() {
       const { data: reportData } = await (supabase.from("supervisor_reports" as any).select("*").eq("id", id).single() as any);
       setReport(reportData);
 
-      if (reportData?.report_type === "daily_checklist") {
-        const { data: itemsData } = await (supabase.from("supervisor_checklist_items" as any).select("*").eq("report_id", id).order("sort_order") as any);
-        setItems((itemsData as any[]) || []);
+      if (reportData) {
+        // Fetch supervisor name & org name
+        const [profileRes, orgRes] = await Promise.all([
+          supabase.from("profiles").select("full_name").eq("id", reportData.supervisor_id).single(),
+          supabase.from("organizations").select("name").eq("id", reportData.site_id).single(),
+        ]);
+        setSupervisorName(profileRes.data?.full_name || "Unknown");
+        setOrgName(orgRes.data?.name || "Unknown");
 
-        const { data: scoreData } = await (supabase.from("supervisor_compliance_scores" as any).select("*").eq("report_id", id).single() as any);
-        setScores(scoreData);
+        if (reportData.report_type === "daily_checklist") {
+          const [itemsRes, scoreRes] = await Promise.all([
+            (supabase.from("supervisor_checklist_items" as any).select("*").eq("report_id", id).order("sort_order") as any),
+            (supabase.from("supervisor_compliance_scores" as any).select("*").eq("report_id", id).single() as any),
+          ]);
+          setItems((itemsRes.data as any[]) || []);
+          setScores(scoreRes.data);
+        }
       }
 
       setIsLoading(false);
@@ -74,40 +89,45 @@ export default function SupervisorReportDetail() {
   }, [id]);
 
   if (isLoading) {
-    return <SupervisorLayout><div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div></SupervisorLayout>;
+    return <AdminLayout><div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div></AdminLayout>;
   }
 
   if (!report) {
-    return <SupervisorLayout><p className="text-muted-foreground text-center py-20">Report not found.</p></SupervisorLayout>;
+    return <AdminLayout><p className="text-muted-foreground text-center py-20">Report not found.</p></AdminLayout>;
   }
 
   const reportContent = report.report_content || {};
   const reportTypeLabel = report.report_type === "weekly_summary" ? "Weekly Summary" : report.report_type === "monthly_performance" ? "Monthly Performance" : "Daily Checklist";
 
   return (
-    <SupervisorLayout>
+    <AdminLayout>
       <div className="space-y-6 max-w-4xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold font-serif">Report Detail</h1>
-            <p className="text-muted-foreground mt-1">{reportTypeLabel} — {format(new Date(report.report_date), "dd MMMM yyyy")}</p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/admin/supervisors")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold tracking-tight">Supervisor Report</h2>
+            <p className="text-muted-foreground">
+              {reportTypeLabel} by <span className="font-medium text-foreground">{supervisorName}</span> — {orgName} — {format(new Date(report.report_date), "dd MMMM yyyy")}
+            </p>
           </div>
           <Badge variant={report.status === "submitted" ? "default" : "secondary"}>{report.status}</Badge>
         </div>
 
-        {/* === DAILY CHECKLIST VIEW === */}
+        {/* === DAILY CHECKLIST === */}
         {report.report_type === "daily_checklist" && (
-          <DailyChecklistView report={report} items={items} scores={scores} />
+          <DailyView report={report} items={items} scores={scores} />
         )}
 
-        {/* === WEEKLY SUMMARY VIEW === */}
+        {/* === WEEKLY SUMMARY === */}
         {report.report_type === "weekly_summary" && (
-          <WeeklySummaryView reportContent={reportContent} />
+          <WeeklyView reportContent={reportContent} />
         )}
 
-        {/* === MONTHLY PERFORMANCE VIEW === */}
+        {/* === MONTHLY PERFORMANCE === */}
         {report.report_type === "monthly_performance" && (
-          <MonthlyPerformanceView report={report} reportContent={reportContent} />
+          <MonthlyView report={report} reportContent={reportContent} />
         )}
 
         {report.notes && (
@@ -117,11 +137,11 @@ export default function SupervisorReportDetail() {
           </Card>
         )}
       </div>
-    </SupervisorLayout>
+    </AdminLayout>
   );
 }
 
-function DailyChecklistView({ report, items, scores }: { report: any; items: any[]; scores: any }) {
+function DailyView({ report, items, scores }: { report: any; items: any[]; scores: any }) {
   const categoryScores = scores?.category_scores || {};
   const groupedItems = items.reduce((acc: Record<string, any[]>, item: any) => {
     if (!acc[item.category]) acc[item.category] = [];
@@ -133,39 +153,19 @@ function DailyChecklistView({ report, items, scores }: { report: any; items: any
     <>
       {report.status === "submitted" && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-4 text-center">
-              <p className="text-3xl font-bold">{report.compliance_score}%</p>
-              <p className="text-xs text-muted-foreground mt-1">Overall Score</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 text-center">
-              <span className={`text-sm font-bold px-3 py-1 rounded-full ${riskColors[report.risk_level] || ""}`}>
-                {report.risk_level?.toUpperCase()}
-              </span>
-              <p className="text-xs text-muted-foreground mt-2">Risk Level</p>
-            </CardContent>
-          </Card>
+          <Card><CardContent className="pt-4 text-center"><p className="text-3xl font-bold">{report.compliance_score}%</p><p className="text-xs text-muted-foreground mt-1">Overall Score</p></CardContent></Card>
+          <Card><CardContent className="pt-4 text-center"><span className={`text-sm font-bold px-3 py-1 rounded-full ${riskColors[report.risk_level] || ""}`}>{report.risk_level?.toUpperCase()}</span><p className="text-xs text-muted-foreground mt-2">Risk Level</p></CardContent></Card>
           {Object.entries(categoryScores).slice(0, 2).map(([key, val]: [string, any]) => (
-            <Card key={key}>
-              <CardContent className="pt-4 text-center">
-                <p className="text-2xl font-bold">{val}%</p>
-                <p className="text-xs text-muted-foreground mt-1">{CATEGORY_LABELS[key] || key}</p>
-              </CardContent>
-            </Card>
+            <Card key={key}><CardContent className="pt-4 text-center"><p className="text-2xl font-bold">{val}%</p><p className="text-xs text-muted-foreground mt-1">{CATEGORY_LABELS[key] || key}</p></CardContent></Card>
           ))}
         </div>
       )}
-
       {Object.entries(groupedItems).map(([category, catItems]) => (
         <Card key={category}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">{CATEGORY_LABELS[category] || category}</CardTitle>
-              {categoryScores[category] != null && (
-                <span className="text-sm font-semibold text-muted-foreground">{categoryScores[category]}%</span>
-              )}
+              {categoryScores[category] != null && <span className="text-sm font-semibold text-muted-foreground">{categoryScores[category]}%</span>}
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -178,20 +178,10 @@ function DailyChecklistView({ report, items, scores }: { report: any; items: any
                       {responseIcons[item.response] || null}
                       <span className="text-sm font-medium">{item.item_description}</span>
                     </div>
-                    {item.observation_notes && (
-                      <p className="text-xs text-muted-foreground ml-6">{item.observation_notes}</p>
-                    )}
+                    {item.observation_notes && <p className="text-xs text-muted-foreground ml-6">{item.observation_notes}</p>}
                     <div className="flex items-center gap-4 ml-6">
-                      {item.observation_time && (
-                        <span className="text-[10px] text-muted-foreground">
-                          {format(new Date(item.observation_time), "HH:mm")}
-                        </span>
-                      )}
-                      {item.evidence_urls?.length > 0 && (
-                        <span className="text-[10px] text-primary flex items-center gap-1">
-                          <FileText className="h-3 w-3" /> {item.evidence_urls.length} evidence file(s)
-                        </span>
-                      )}
+                      {item.observation_time && <span className="text-[10px] text-muted-foreground">{format(new Date(item.observation_time), "HH:mm")}</span>}
+                      {item.evidence_urls?.length > 0 && <span className="text-[10px] text-primary flex items-center gap-1"><FileText className="h-3 w-3" /> {item.evidence_urls.length} evidence file(s)</span>}
                     </div>
                   </div>
                 </div>
@@ -204,7 +194,7 @@ function DailyChecklistView({ report, items, scores }: { report: any; items: any
   );
 }
 
-function WeeklySummaryView({ reportContent }: { reportContent: any }) {
+function WeeklyView({ reportContent }: { reportContent: any }) {
   const sections = reportContent?.sections || {};
   const evidenceUrls = reportContent?.evidence_urls || [];
 
@@ -215,31 +205,22 @@ function WeeklySummaryView({ reportContent }: { reportContent: any }) {
         if (!content) return null;
         return (
           <Card key={key}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">{label}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
-            </CardContent>
+            <CardHeader className="pb-3"><CardTitle className="text-lg">{label}</CardTitle></CardHeader>
+            <CardContent><p className="text-sm whitespace-pre-wrap leading-relaxed">{content}</p></CardContent>
           </Card>
         );
       })}
-
       {evidenceUrls.length > 0 && (
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-lg">Supporting Evidence</CardTitle></CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground flex items-center gap-1">
-              <FileText className="h-4 w-4" /> {evidenceUrls.length} file(s) attached
-            </p>
-          </CardContent>
+          <CardContent><p className="text-sm text-muted-foreground flex items-center gap-1"><FileText className="h-4 w-4" /> {evidenceUrls.length} file(s) attached</p></CardContent>
         </Card>
       )}
     </>
   );
 }
 
-function MonthlyPerformanceView({ report, reportContent }: { report: any; reportContent: any }) {
+function MonthlyView({ report, reportContent }: { report: any; reportContent: any }) {
   const kpis = reportContent?.kpis || {};
   const categoryBreakdown = reportContent?.category_breakdown || {};
   const commentary = reportContent?.commentary || "";
@@ -256,7 +237,6 @@ function MonthlyPerformanceView({ report, reportContent }: { report: any; report
 
   return (
     <>
-      {/* KPI Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {Object.entries(KPI_LABELS).map(([key, label]) => (
           <Card key={key}>
@@ -268,38 +248,22 @@ function MonthlyPerformanceView({ report, reportContent }: { report: any; report
         ))}
       </div>
 
-      {/* Risk & Score Overview */}
       {report.status === "submitted" && (
         <div className="grid grid-cols-2 gap-4">
-          <Card>
-            <CardContent className="pt-4 text-center">
-              <p className="text-3xl font-bold">{report.compliance_score ?? kpis.overall_compliance_pct ?? 0}%</p>
-              <p className="text-xs text-muted-foreground mt-1">Overall Score</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 text-center">
-              <span className={`text-sm font-bold px-3 py-1 rounded-full ${riskColors[report.risk_level] || ""}`}>
-                {report.risk_level?.toUpperCase() || "N/A"}
-              </span>
-              <p className="text-xs text-muted-foreground mt-2">Risk Level</p>
-            </CardContent>
-          </Card>
+          <Card><CardContent className="pt-4 text-center"><p className="text-3xl font-bold">{report.compliance_score ?? kpis.overall_compliance_pct ?? 0}%</p><p className="text-xs text-muted-foreground mt-1">Overall Score</p></CardContent></Card>
+          <Card><CardContent className="pt-4 text-center"><span className={`text-sm font-bold px-3 py-1 rounded-full ${riskColors[report.risk_level] || ""}`}>{report.risk_level?.toUpperCase() || "N/A"}</span><p className="text-xs text-muted-foreground mt-2">Risk Level</p></CardContent></Card>
         </div>
       )}
 
-      {/* Bar Chart - Category Scores */}
       {barData.length > 0 && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2"><BarChart3 className="h-5 w-5" /> Category Compliance Scores</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="text-lg flex items-center gap-2"><BarChart3 className="h-5 w-5" /> Category Compliance Scores</CardTitle></CardHeader>
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barData} layout="vertical" margin={{ left: 20, right: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} className="text-xs" />
+                  <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
                   <YAxis type="category" dataKey="name" width={120} className="text-xs" />
                   <Tooltip formatter={(value: number) => [`${value}%`, "Score"]} />
                   <Bar dataKey="score" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
@@ -310,19 +274,14 @@ function MonthlyPerformanceView({ report, reportContent }: { report: any; report
         </Card>
       )}
 
-      {/* Pie Chart - Compliance Distribution */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="h-5 w-5" /> Compliance Distribution</CardTitle>
-        </CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="h-5 w-5" /> Compliance Distribution</CardTitle></CardHeader>
         <CardContent>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={pieData} cx="50%" cy="50%" outerRadius={100} dataKey="value" label={({ name, value }) => `${name}: ${value}%`}>
-                  {pieData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                  ))}
+                  {pieData.map((_, index) => (<Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />))}
                 </Pie>
                 <Tooltip formatter={(value: number) => [`${value}%`]} />
                 <Legend />
@@ -332,7 +291,6 @@ function MonthlyPerformanceView({ report, reportContent }: { report: any; report
         </CardContent>
       </Card>
 
-      {/* Commentary */}
       {commentary && (
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-lg">Trend Notes & Commentary</CardTitle></CardHeader>

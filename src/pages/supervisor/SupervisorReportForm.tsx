@@ -36,6 +36,23 @@ const RESPONSES = [
   { value: "not_applicable", label: "N/A", color: "text-muted-foreground" },
 ];
 
+const WEEKLY_SECTIONS = [
+  { key: "executive_summary", label: "Executive Summary", placeholder: "Provide a high-level overview of this week's operations, compliance status, and key outcomes..." },
+  { key: "key_achievements", label: "Key Achievements This Week", placeholder: "List major accomplishments, milestones reached, and positive compliance outcomes..." },
+  { key: "compliance_issues", label: "Compliance Issues Identified", placeholder: "Detail any compliance deviations, concerns, or areas needing attention..." },
+  { key: "corrective_actions", label: "Corrective Actions Taken", placeholder: "Describe corrective measures implemented, follow-ups, and resolutions..." },
+  { key: "recommendations", label: "Recommendations for Next Week", placeholder: "Provide recommendations, planned activities, and focus areas for the coming week..." },
+];
+
+const KPI_FIELDS = [
+  { key: "inspections_conducted", label: "Inspections Conducted", type: "number" },
+  { key: "ncrs_raised", label: "NCRs Raised", type: "number" },
+  { key: "ncrs_resolved", label: "NCRs Resolved", type: "number" },
+  { key: "incidents_reported", label: "Incidents Reported", type: "number" },
+  { key: "staff_training_sessions", label: "Staff Training Sessions", type: "number" },
+  { key: "overall_compliance_pct", label: "Overall Compliance %", type: "number" },
+];
+
 interface ChecklistItem {
   id: string;
   category: string;
@@ -60,6 +77,22 @@ export default function SupervisorReportForm() {
   const navigate = useNavigate();
   const today = format(new Date(), "yyyy-MM-dd");
 
+  // Weekly report state
+  const [weeklySections, setWeeklySections] = useState<Record<string, string>>(
+    Object.fromEntries(WEEKLY_SECTIONS.map(s => [s.key, ""]))
+  );
+  const [weeklyEvidence, setWeeklyEvidence] = useState<string[]>([]);
+  const [uploadingWeekly, setUploadingWeekly] = useState(false);
+
+  // Monthly KPI state
+  const [kpiValues, setKpiValues] = useState<Record<string, number>>(
+    Object.fromEntries(KPI_FIELDS.map(f => [f.key, 0]))
+  );
+  const [categoryBreakdown, setCategoryBreakdown] = useState<Record<string, number>>(
+    Object.fromEntries(CATEGORIES.map(c => [c.key, 0]))
+  );
+  const [monthlyCommentary, setMonthlyCommentary] = useState("");
+
   useEffect(() => {
     async function loadSites() {
       const { data: { session } } = await supabase.auth.getSession();
@@ -74,7 +107,6 @@ export default function SupervisorReportForm() {
   }, []);
 
   useEffect(() => {
-    // Initialize checklist items from defaults
     const newItems: ChecklistItem[] = [];
     CATEGORIES.forEach(cat => {
       (DEFAULT_ITEMS[cat.key] || []).forEach((desc, idx) => {
@@ -128,13 +160,36 @@ export default function SupervisorReportForm() {
     setUploadingItemId(null);
   };
 
+  const handleWeeklyEvidenceUpload = async (file: File) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    setUploadingWeekly(true);
+    const path = `${session.user.id}/${Date.now()}-${file.name}`;
+    const { error } = await supabase.storage.from("supervisor-evidence").upload(path, file);
+    if (error) {
+      toast({ variant: "destructive", title: "Upload Failed", description: error.message });
+    } else {
+      setWeeklyEvidence(prev => [...prev, path]);
+      toast({ title: "Evidence Uploaded" });
+    }
+    setUploadingWeekly(false);
+  };
+
   const saveReport = async (submit: boolean) => {
     if (!selectedSite) { toast({ variant: "destructive", title: "Error", description: "Please select a site." }); return; }
-    
-    const filledItems = items.filter(i => i.item_description.trim());
-    if (submit && filledItems.some(i => !i.response || !i.observation_notes.trim())) {
-      toast({ variant: "destructive", title: "Incomplete", description: "All checklist items must have a response and observation notes before submission." });
-      return;
+
+    // Validation per type
+    if (reportType === "daily_checklist") {
+      const filledItems = items.filter(i => i.item_description.trim());
+      if (submit && filledItems.some(i => !i.response || !i.observation_notes.trim())) {
+        toast({ variant: "destructive", title: "Incomplete", description: "All checklist items must have a response and observation notes before submission." });
+        return;
+      }
+    } else if (reportType === "weekly_summary") {
+      if (submit && !weeklySections.executive_summary.trim()) {
+        toast({ variant: "destructive", title: "Incomplete", description: "Executive Summary is required for weekly reports." });
+        return;
+      }
     }
 
     submit ? setIsSubmitting(true) : setIsSaving(true);
@@ -143,7 +198,14 @@ export default function SupervisorReportForm() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
-      // Create report
+      // Build report_content based on type
+      let reportContent: any = {};
+      if (reportType === "weekly_summary") {
+        reportContent = { type: "weekly", sections: weeklySections, evidence_urls: weeklyEvidence };
+      } else if (reportType === "monthly_performance") {
+        reportContent = { type: "monthly", kpis: kpiValues, category_breakdown: categoryBreakdown, commentary: monthlyCommentary };
+      }
+
       const { data: report, error: reportError } = await (supabase.from("supervisor_reports" as any).insert({
         supervisor_id: session.user.id,
         site_id: selectedSite,
@@ -151,36 +213,51 @@ export default function SupervisorReportForm() {
         report_date: today,
         status: "draft",
         notes,
+        report_content: reportContent,
       } as any).select().single() as any);
 
       if (reportError) throw reportError;
 
-      // Insert checklist items
-      const itemsToInsert = filledItems.map((item, idx) => ({
-        report_id: (report as any).id,
-        category: item.category,
-        item_description: item.item_description,
-        response: item.response || null,
-        observation_notes: item.observation_notes || null,
-        observation_time: item.observation_time ? new Date(item.observation_time).toISOString() : null,
-        evidence_urls: item.evidence_urls.length > 0 ? item.evidence_urls : null,
-        sort_order: idx,
-      }));
+      // Insert checklist items only for daily reports
+      if (reportType === "daily_checklist") {
+        const filledItems = items.filter(i => i.item_description.trim());
+        const itemsToInsert = filledItems.map((item, idx) => ({
+          report_id: (report as any).id,
+          category: item.category,
+          item_description: item.item_description,
+          response: item.response || null,
+          observation_notes: item.observation_notes || null,
+          observation_time: item.observation_time ? new Date(item.observation_time).toISOString() : null,
+          evidence_urls: item.evidence_urls.length > 0 ? item.evidence_urls : null,
+          sort_order: idx,
+        }));
 
-      if (itemsToInsert.length > 0) {
-        const { error: itemsError } = await (supabase.from("supervisor_checklist_items" as any).insert(itemsToInsert as any) as any);
-        if (itemsError) throw itemsError;
+        if (itemsToInsert.length > 0) {
+          const { error: itemsError } = await (supabase.from("supervisor_checklist_items" as any).insert(itemsToInsert as any) as any);
+          if (itemsError) throw itemsError;
+        }
       }
 
       if (submit) {
-        // Call RPC to submit
-        const { data: result, error: submitError } = await supabase.rpc("submit_supervisor_report" as any, { _report_id: (report as any).id } as any);
-        if (submitError) throw submitError;
-        const res = result as any;
-        toast({
-          title: "Report Submitted",
-          description: `Compliance score: ${res.compliance_score}% (Risk: ${res.risk_level?.toUpperCase()})`,
-        });
+        if (reportType === "daily_checklist") {
+          const { data: result, error: submitError } = await supabase.rpc("submit_supervisor_report" as any, { _report_id: (report as any).id } as any);
+          if (submitError) throw submitError;
+          const res = result as any;
+          toast({
+            title: "Report Submitted",
+            description: `Compliance score: ${res.compliance_score}% (Risk: ${res.risk_level?.toUpperCase()})`,
+          });
+        } else {
+          // For weekly/monthly, just mark as submitted directly
+          const { error: updateError } = await (supabase.from("supervisor_reports" as any).update({
+            status: "submitted",
+            submitted_at: new Date().toISOString(),
+            compliance_score: reportType === "monthly_performance" ? kpiValues.overall_compliance_pct : null,
+            risk_level: reportType === "monthly_performance" ? (kpiValues.overall_compliance_pct >= 80 ? "low" : kpiValues.overall_compliance_pct >= 60 ? "medium" : "high") : null,
+          } as any).eq("id", (report as any).id) as any);
+          if (updateError) throw updateError;
+          toast({ title: "Report Submitted", description: `${reportType === "weekly_summary" ? "Weekly" : "Monthly"} report submitted successfully.` });
+        }
       } else {
         toast({ title: "Draft Saved", description: "Your report has been saved as a draft." });
       }
@@ -243,89 +320,203 @@ export default function SupervisorReportForm() {
           </CardContent>
         </Card>
 
-        {/* Checklist by category */}
-        {CATEGORIES.map(cat => {
-          const catItems = items.filter(i => i.category === cat.key);
-          return (
-            <Card key={cat.key}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">{cat.label}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {catItems.map((item, idx) => (
-                  <div key={item.id} className="border rounded-lg p-4 space-y-3 bg-muted/30">
-                    <div className="flex items-start gap-2">
-                      <span className="text-xs font-mono text-muted-foreground mt-1">{idx + 1}.</span>
-                      <div className="flex-1 space-y-3">
-                        <Input
-                          value={item.item_description}
-                          onChange={(e) => updateItem(item.id, "item_description", e.target.value)}
-                          placeholder="Checklist item description"
-                          className="font-medium"
-                        />
-                        <RadioGroup
-                          value={item.response}
-                          onValueChange={(v) => updateItem(item.id, "response", v)}
-                          className="flex flex-wrap gap-3"
-                        >
-                          {RESPONSES.map(r => (
-                            <div key={r.value} className="flex items-center space-x-1.5">
-                              <RadioGroupItem value={r.value} id={`${item.id}-${r.value}`} />
-                              <Label htmlFor={`${item.id}-${r.value}`} className={`text-xs font-medium cursor-pointer ${r.color}`}>{r.label}</Label>
-                            </div>
-                          ))}
-                        </RadioGroup>
-                        <Textarea
-                          value={item.observation_notes}
-                          onChange={(e) => updateItem(item.id, "observation_notes", e.target.value)}
-                          placeholder="Observation notes (required)"
-                          rows={2}
-                          className="text-sm"
-                        />
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1">
+        {/* === DAILY CHECKLIST === */}
+        {reportType === "daily_checklist" && (
+          <>
+            {CATEGORIES.map(cat => {
+              const catItems = items.filter(i => i.category === cat.key);
+              return (
+                <Card key={cat.key}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">{cat.label}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {catItems.map((item, idx) => (
+                      <div key={item.id} className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs font-mono text-muted-foreground mt-1">{idx + 1}.</span>
+                          <div className="flex-1 space-y-3">
                             <Input
-                              type="datetime-local"
-                              value={item.observation_time}
-                              onChange={(e) => updateItem(item.id, "observation_time", e.target.value)}
+                              value={item.item_description}
+                              onChange={(e) => updateItem(item.id, "item_description", e.target.value)}
+                              placeholder="Checklist item description"
+                              className="font-medium"
+                            />
+                            <RadioGroup
+                              value={item.response}
+                              onValueChange={(v) => updateItem(item.id, "response", v)}
+                              className="flex flex-wrap gap-3"
+                            >
+                              {RESPONSES.map(r => (
+                                <div key={r.value} className="flex items-center space-x-1.5">
+                                  <RadioGroupItem value={r.value} id={`${item.id}-${r.value}`} />
+                                  <Label htmlFor={`${item.id}-${r.value}`} className={`text-xs font-medium cursor-pointer ${r.color}`}>{r.label}</Label>
+                                </div>
+                              ))}
+                            </RadioGroup>
+                            <Textarea
+                              value={item.observation_notes}
+                              onChange={(e) => updateItem(item.id, "observation_notes", e.target.value)}
+                              placeholder="Observation notes (required)"
+                              rows={2}
                               className="text-sm"
                             />
-                          </div>
-                          <label className="cursor-pointer">
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept="image/*,.pdf,.doc,.docx"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleEvidenceUpload(item.id, file);
-                              }}
-                            />
-                            <div className="flex items-center gap-1 text-xs text-primary hover:underline">
-                              {uploadingItemId === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                              Upload Evidence
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1">
+                                <Input
+                                  type="datetime-local"
+                                  value={item.observation_time}
+                                  onChange={(e) => updateItem(item.id, "observation_time", e.target.value)}
+                                  className="text-sm"
+                                />
+                              </div>
+                              <label className="cursor-pointer">
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*,.pdf,.doc,.docx"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleEvidenceUpload(item.id, file);
+                                  }}
+                                />
+                                <div className="flex items-center gap-1 text-xs text-primary hover:underline">
+                                  {uploadingItemId === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                                  Upload Evidence
+                                </div>
+                              </label>
+                              {item.evidence_urls.length > 0 && (
+                                <span className="text-xs text-muted-foreground">{item.evidence_urls.length} file(s)</span>
+                              )}
                             </div>
-                          </label>
-                          {item.evidence_urls.length > 0 && (
-                            <span className="text-xs text-muted-foreground">{item.evidence_urls.length} file(s)</span>
+                          </div>
+                          {item.id.includes("custom") && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeItem(item.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           )}
                         </div>
                       </div>
-                      {item.id.includes("custom") && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeItem(item.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                <Button variant="outline" size="sm" onClick={() => addItem(cat.key)}>
-                  <Plus className="mr-1 h-3 w-3" /> Add Item
-                </Button>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={() => addItem(cat.key)}>
+                      <Plus className="mr-1 h-3 w-3" /> Add Item
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </>
+        )}
+
+        {/* === WEEKLY SUMMARY (Long-Form Document) === */}
+        {reportType === "weekly_summary" && (
+          <>
+            {WEEKLY_SECTIONS.map(section => (
+              <Card key={section.key}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">{section.label}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    value={weeklySections[section.key]}
+                    onChange={(e) => setWeeklySections(prev => ({ ...prev, [section.key]: e.target.value }))}
+                    placeholder={section.placeholder}
+                    rows={6}
+                    className="text-sm"
+                  />
+                </CardContent>
+              </Card>
+            ))}
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Supporting Evidence</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-primary hover:underline">
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleWeeklyEvidenceUpload(file);
+                    }}
+                  />
+                  {uploadingWeekly ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  Upload Evidence File
+                </label>
+                {weeklyEvidence.length > 0 && (
+                  <div className="text-xs text-muted-foreground">{weeklyEvidence.length} file(s) attached</div>
+                )}
               </CardContent>
             </Card>
-          );
-        })}
+          </>
+        )}
+
+        {/* === MONTHLY PERFORMANCE (KPI Entry) === */}
+        {reportType === "monthly_performance" && (
+          <>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Key Performance Indicators</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {KPI_FIELDS.map(field => (
+                    <div key={field.key} className="space-y-1.5">
+                      <Label className="text-xs">{field.label}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={field.key === "overall_compliance_pct" ? 100 : undefined}
+                        value={kpiValues[field.key]}
+                        onChange={(e) => setKpiValues(prev => ({ ...prev, [field.key]: Number(e.target.value) }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Category Compliance Breakdown (%)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {CATEGORIES.map(cat => (
+                    <div key={cat.key} className="space-y-1.5">
+                      <Label className="text-xs">{cat.label}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={categoryBreakdown[cat.key]}
+                        onChange={(e) => setCategoryBreakdown(prev => ({ ...prev, [cat.key]: Number(e.target.value) }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Trend Notes & Commentary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  value={monthlyCommentary}
+                  onChange={(e) => setMonthlyCommentary(e.target.value)}
+                  placeholder="Provide trend analysis, performance commentary, and strategic observations for this month..."
+                  rows={5}
+                  className="text-sm"
+                />
+              </CardContent>
+            </Card>
+          </>
+        )}
 
         <Card>
           <CardContent className="pt-6">
