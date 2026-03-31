@@ -77,14 +77,7 @@ export default function SupervisorReportForm() {
   const [weeklyEvidence, setWeeklyEvidence] = useState<string[]>([]);
   const [uploadingWeekly, setUploadingWeekly] = useState(false);
 
-  // Monthly KPI state
-  const [kpiValues, setKpiValues] = useState<Record<string, number>>(
-    Object.fromEntries(KPI_FIELDS.map(f => [f.key, 0]))
-  );
-  const [categoryBreakdown, setCategoryBreakdown] = useState<Record<string, number>>(
-    Object.fromEntries(CATEGORIES.map(c => [c.key, 0]))
-  );
-  const [monthlyCommentary, setMonthlyCommentary] = useState("");
+  // Monthly KPI state removed - now in SupervisorPerformance.tsx
 
   useEffect(() => {
     async function loadSites() {
