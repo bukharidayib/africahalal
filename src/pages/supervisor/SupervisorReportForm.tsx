@@ -83,10 +83,10 @@ export default function SupervisorReportForm() {
     async function loadSites() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      const { data } = await (supabase.from("organization_supervisors" as any).select("*, organizations(name, id)").eq("supervisor_id", session.user.id) as any);
+      const { data } = await supabase.from("supervisor_sites").select("id, site_name, site_address, organization_id, organizations(name)").eq("supervisor_id", session.user.id).eq("is_active", true);
       const siteList = (data as any[]) || [];
       setSites(siteList);
-      if (siteList.length === 1) setSelectedSite(siteList[0].organization_id);
+      if (siteList.length === 1) setSelectedSite(siteList[0].id);
       setIsLoading(false);
     }
     loadSites();
@@ -287,7 +287,7 @@ export default function SupervisorReportForm() {
                     <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
                     <SelectContent>
                       {sites.map((s: any) => (
-                        <SelectItem key={s.id} value={s.organization_id}>{s.organizations?.name}</SelectItem>
+                        <SelectItem key={s.id} value={s.id}>{s.site_name} ({s.organizations?.name})</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
