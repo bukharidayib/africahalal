@@ -187,6 +187,29 @@ export default function SupervisorReportForm() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
+      // Resolve organization_id to supervisor_sites id (find or create)
+      const selectedOrg = sites.find((s: any) => s.organization_id === selectedSite);
+      const orgName = selectedOrg?.organizations?.name || "Site";
+      let { data: existingSite } = await supabase
+        .from("supervisor_sites")
+        .select("id")
+        .eq("supervisor_id", session.user.id)
+        .eq("organization_id", selectedSite)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (!existingSite) {
+        const { data: newSite, error: siteErr } = await supabase.from("supervisor_sites").insert({
+          supervisor_id: session.user.id,
+          organization_id: selectedSite,
+          site_name: orgName,
+        }).select("id").single();
+        if (siteErr) throw siteErr;
+        existingSite = newSite;
+      }
+
+      const siteId = existingSite!.id;
+
       // Build report_content based on type
       let reportContent: any = {};
       if (reportType === "weekly_summary") {
@@ -195,7 +218,7 @@ export default function SupervisorReportForm() {
 
       const { data: report, error: reportError } = await (supabase.from("supervisor_reports" as any).insert({
         supervisor_id: session.user.id,
-        site_id: selectedSite,
+        site_id: siteId,
         report_type: reportType,
         report_date: today,
         status: "draft",
