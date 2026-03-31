@@ -83,10 +83,13 @@ export default function SupervisorReportForm() {
     async function loadSites() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      const { data } = await supabase.from("supervisor_sites").select("id, site_name, site_address, organization_id, organizations(name)").eq("supervisor_id", session.user.id).eq("is_active", true);
+      const { data } = await (supabase
+        .from("organization_supervisors" as any)
+        .select("*, organizations(name, id)")
+        .eq("supervisor_id", session.user.id) as any);
       const siteList = (data as any[]) || [];
       setSites(siteList);
-      if (siteList.length === 1) setSelectedSite(siteList[0].id);
+      if (siteList.length === 1) setSelectedSite(siteList[0].organization_id);
       setIsLoading(false);
     }
     loadSites();
