@@ -232,15 +232,13 @@ export default function SupervisorReportForm() {
             description: `Compliance score: ${res.compliance_score}% (Risk: ${res.risk_level?.toUpperCase()})`,
           });
         } else {
-          // For weekly/monthly, just mark as submitted directly
+          // For weekly reports, just mark as submitted directly
           const { error: updateError } = await (supabase.from("supervisor_reports" as any).update({
             status: "submitted",
             submitted_at: new Date().toISOString(),
-            compliance_score: reportType === "monthly_performance" ? kpiValues.overall_compliance_pct : null,
-            risk_level: reportType === "monthly_performance" ? (kpiValues.overall_compliance_pct >= 80 ? "low" : kpiValues.overall_compliance_pct >= 60 ? "medium" : "high") : null,
           } as any).eq("id", (report as any).id) as any);
           if (updateError) throw updateError;
-          toast({ title: "Report Submitted", description: `${reportType === "weekly_summary" ? "Weekly" : "Monthly"} report submitted successfully.` });
+          toast({ title: "Report Submitted", description: "Weekly report submitted successfully." });
         }
       } else {
         toast({ title: "Draft Saved", description: "Your report has been saved as a draft." });
