@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   FlaskConical,
   ClipboardList,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
