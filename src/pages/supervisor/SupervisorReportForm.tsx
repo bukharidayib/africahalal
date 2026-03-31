@@ -188,8 +188,6 @@ export default function SupervisorReportForm() {
       let reportContent: any = {};
       if (reportType === "weekly_summary") {
         reportContent = { type: "weekly", sections: weeklySections, evidence_urls: weeklyEvidence };
-      } else if (reportType === "monthly_performance") {
-        reportContent = { type: "monthly", kpis: kpiValues, category_breakdown: categoryBreakdown, commentary: monthlyCommentary };
       }
 
       const { data: report, error: reportError } = await (supabase.from("supervisor_reports" as any).insert({
