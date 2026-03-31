@@ -90,6 +90,7 @@ import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import SupervisorReports from "./pages/supervisor/SupervisorReports";
 import SupervisorReportForm from "./pages/supervisor/SupervisorReportForm";
 import SupervisorReportDetail from "./pages/supervisor/SupervisorReportDetail";
+import SupervisorPerformance from "./pages/supervisor/SupervisorPerformance";
 import SupervisorNCRs from "./pages/supervisor/SupervisorNCRs";
 import SupervisorNCRDetail from "./pages/supervisor/SupervisorNCRDetail";
 import SupervisorIncidents from "./pages/supervisor/SupervisorIncidents";
