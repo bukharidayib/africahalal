@@ -79,6 +79,7 @@ import RolesPermissions from "./admin/pages/RolesPermissions";
 import RoleEditor from "./admin/pages/RoleEditor";
 import AdminBilling from "./admin/pages/AdminBilling";
 import IngredientTracker from "./admin/pages/IngredientTracker";
+import AdminSupervisorReportDetail from "./admin/pages/AdminSupervisorReportDetail";
 
 // Supervisor Portal
 import { SupervisorProtectedRoute } from "./components/auth/SupervisorProtectedRoute";
