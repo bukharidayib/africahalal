@@ -1,59 +1,70 @@
 
 
-# Admin Payment Transaction Tracker
+# Supervisor Reports Overhaul + Admin Visibility
 
-## What We're Building
+## Summary of Changes
 
-A new "Payment Transactions" tab/section in the Admin Billing page that shows all payment transactions with their ZynlePay response codes and descriptions, allowing admins to track payment issues and successful transactions.
+### 1. Weekly Report → Long-Form Document Style
+Currently all report types use the same checklist format. The weekly report should behave like a Word document — rich text sections instead of checklist items.
 
-## ZynlePay Response Code Reference
+**Approach**: When `report_type === "weekly_summary"` in the form, hide the checklist UI and show a structured long-form editor with these sections:
+- Executive Summary
+- Key Achievements This Week
+- Compliance Issues Identified
+- Corrective Actions Taken
+- Recommendations for Next Week
+- Supporting Evidence (file uploads)
 
-The following codes and descriptions will be displayed:
+Store the content in the existing `notes` field as structured JSON (or add a `report_content` JSONB column to `supervisor_reports`). No checklist items are created for weekly reports.
 
-| Code | Description |
-|------|-------------|
-| 100 | Transaction successful |
-| 120 | Transaction initiated |
-| 990 | Transaction pending |
-| 995 | Transaction failed |
-| 9901 | Merchant not found |
-| 9902 | Requesting Device IP is not whitelisted |
-| 9903 | Invalid Merchant API credentials or setup not complete |
-| 9904 | Merchant Account setup not complete |
-| 9905 | Invalid sender ID (mobile number) |
-| 9906 | Duplicate reference number detected |
-| 9907 | Mobile Number blacklisted |
-| 9908 | Merchant commission setup not complete |
-| 9909 | Merchant payment provider setup not complete |
-| 9910 | Merchant setup not complete |
-| 9911 | Merchant insufficient balance |
-| 9912 | Request amount exceeds disbursement limit |
-| 9913 | Invalid or wrong bank name provided |
-| 9914 | Cannot determine transaction status now, please try again later |
+### 2. Monthly Performance → KPI Dashboard Report
+When `report_type === "monthly_performance"`, replace the checklist with a performance data entry form:
+- Overall compliance % (manual entry or auto-calculated from that month's daily reports)
+- KPI fields: Inspections conducted, NCRs raised, NCRs resolved, Incidents reported, Staff training sessions
+- Category breakdown scores
+- Trend notes / commentary
 
-## Implementation
+On the detail view (`SupervisorReportDetail`), render this data with:
+- KPI summary cards (large number + label)
+- Bar chart for category scores (using existing Recharts via `chart.tsx`)
+- Pie chart for compliance distribution
+- Trend line if historical data exists
 
-### 1. Update `src/admin/pages/AdminBilling.tsx`
+### 3. Database Migration
+Add a `report_content` JSONB column to `supervisor_reports` to store the structured weekly and monthly data separately from checklist items.
 
-Add a Tabs component to split the page into two tabs:
-- **Invoices** — existing invoice management (unchanged)
-- **Payment Transactions** — new table showing all `payment_transactions` records
+```sql
+ALTER TABLE public.supervisor_reports 
+ADD COLUMN report_content jsonb DEFAULT '{}'::jsonb;
+```
 
-The Payment Transactions tab will:
-- Fetch from `payment_transactions` table joined with `invoices(invoice_number)` and profiles/organizations for payer info
-- Display columns: Transaction Ref, Invoice #, Amount, Payment Method, Status, Response Code, Description (mapped from code), Date
-- Color-code response codes: green for 100, yellow for 120/990, red for 995+
-- Include search and status filter
-- Show a "Check Status" button for pending transactions that calls the `check-payment-status` edge function
-- Parse `gateway_response` JSON to extract the response code
+### 4. Admin Portal — View All Reports with Detail
+Currently the admin Supervisors page shows a basic reports table. Enhance it:
+- Make report rows clickable → navigate to a new `AdminSupervisorReportDetail` page
+- Show supervisor name, company name in the reports table
+- For weekly reports: render the long-form content
+- For monthly reports: render charts and KPIs
+- Add route `/admin/supervisor-reports/:id`
 
-### 2. Response Code Mapping
-
-Create a helper map in the component that maps each code string to its human-readable description and a color badge variant.
+### 5. Supervisor Multi-Company Support
+Supervisors can already belong to multiple companies via `organization_supervisors` (one row per assignment). The current form already handles this with a dropdown when `sites.length > 1`. No schema change needed — this already works like inspectors.
 
 ## Files Changed
 
 | Action | File |
 |--------|------|
-| Edit | `src/admin/pages/AdminBilling.tsx` — add Tabs with Payment Transactions section |
+| Migration | Add `report_content` JSONB column to `supervisor_reports` |
+| Edit | `src/pages/supervisor/SupervisorReportForm.tsx` — conditional UI for weekly (long-form) and monthly (KPI entry) |
+| Edit | `src/pages/supervisor/SupervisorReportDetail.tsx` — conditional rendering: checklist for daily, document for weekly, charts/KPIs for monthly |
+| Create | `src/admin/pages/AdminSupervisorReportDetail.tsx` — admin view of any supervisor report with charts |
+| Edit | `src/admin/pages/Supervisors.tsx` — make report rows clickable, add supervisor/company columns |
+| Edit | `src/App.tsx` — add admin route for supervisor report detail |
+
+## Implementation Order
+1. Database migration (add `report_content` column)
+2. Update `SupervisorReportForm.tsx` — three distinct form modes
+3. Update `SupervisorReportDetail.tsx` — three distinct display modes with charts
+4. Create `AdminSupervisorReportDetail.tsx` — admin view with full charts
+5. Update `Supervisors.tsx` — clickable rows, enriched table
+6. Update `App.tsx` — add route
 
