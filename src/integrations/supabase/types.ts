@@ -2002,6 +2002,7 @@ export type Database = {
           created_at: string
           id: string
           notes: string | null
+          report_content: Json | null
           report_date: string
           report_type: string
           risk_level: string | null
@@ -2015,6 +2016,7 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          report_content?: Json | null
           report_date?: string
           report_type: string
           risk_level?: string | null
@@ -2028,6 +2030,7 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          report_content?: Json | null
           report_date?: string
           report_type?: string
           risk_level?: string | null
