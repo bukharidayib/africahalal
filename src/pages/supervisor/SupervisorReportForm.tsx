@@ -44,14 +44,7 @@ const WEEKLY_SECTIONS = [
   { key: "recommendations", label: "Recommendations for Next Week", placeholder: "Provide recommendations, planned activities, and focus areas for the coming week..." },
 ];
 
-const KPI_FIELDS = [
-  { key: "inspections_conducted", label: "Inspections Conducted", type: "number" },
-  { key: "ncrs_raised", label: "NCRs Raised", type: "number" },
-  { key: "ncrs_resolved", label: "NCRs Resolved", type: "number" },
-  { key: "incidents_reported", label: "Incidents Reported", type: "number" },
-  { key: "staff_training_sessions", label: "Staff Training Sessions", type: "number" },
-  { key: "overall_compliance_pct", label: "Overall Compliance %", type: "number" },
-];
+// KPI_FIELDS moved to SupervisorPerformance.tsx
 
 interface ChecklistItem {
   id: string;
