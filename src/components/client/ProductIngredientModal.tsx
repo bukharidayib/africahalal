@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Beaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -114,31 +113,6 @@ export function ProductIngredientModal({
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="ing-percentage">Percentage (%)</Label>
-                                <Input
-                                    id="ing-percentage"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="0.01"
-                                    placeholder="e.g. 60"
-                                    value={newIngredient.percentage ?? ""}
-                                    onChange={(e) => setNewIngredient(prev => ({ 
-                                        ...prev, 
-                                        percentage: e.target.value ? parseFloat(e.target.value) : null 
-                                    }))}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="ing-source">Source/Origin</Label>
-                                <Input
-                                    id="ing-source"
-                                    placeholder="e.g. Local Farm, Imported"
-                                    value={newIngredient.source}
-                                    onChange={(e) => setNewIngredient(prev => ({ ...prev, source: e.target.value }))}
-                                />
-                            </div>
-                            <div className="space-y-2">
                                 <Label htmlFor="ing-supplier">Supplier Name</Label>
                                 <Input
                                     id="ing-supplier"
@@ -148,20 +122,7 @@ export function ProductIngredientModal({
                                 />
                             </div>
                         </div>
-                        <div className="flex items-center justify-between mt-4">
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="ing-halal"
-                                    checked={newIngredient.is_halal_certified}
-                                    onCheckedChange={(checked) => setNewIngredient(prev => ({ 
-                                        ...prev, 
-                                        is_halal_certified: checked === true 
-                                    }))}
-                                />
-                                <Label htmlFor="ing-halal" className="text-sm cursor-pointer">
-                                    Halal Certified Ingredient
-                                </Label>
-                            </div>
+                        <div className="flex justify-end mt-4">
                             <Button type="button" size="sm" onClick={handleAddIngredient}>
                                 <Plus className="h-4 w-4 mr-1" />
                                 Add
@@ -186,9 +147,7 @@ export function ProductIngredientModal({
                                     <thead className="bg-muted">
                                         <tr>
                                             <th className="px-3 py-2 text-left font-semibold">Ingredient</th>
-                                            <th className="px-3 py-2 text-left font-semibold">%</th>
                                             <th className="px-3 py-2 text-left font-semibold">Supplier</th>
-                                            <th className="px-3 py-2 text-center font-semibold">Halal</th>
                                             <th className="px-3 py-2 text-right font-semibold">Action</th>
                                         </tr>
                                     </thead>
@@ -197,17 +156,7 @@ export function ProductIngredientModal({
                                             <tr key={ing.id} className="border-t">
                                                 <td className="px-3 py-2 font-medium">{ing.ingredient_name}</td>
                                                 <td className="px-3 py-2 text-muted-foreground">
-                                                    {ing.percentage != null ? `${ing.percentage}%` : "-"}
-                                                </td>
-                                                <td className="px-3 py-2 text-muted-foreground">
                                                     {ing.supplier_name || "-"}
-                                                </td>
-                                                <td className="px-3 py-2 text-center">
-                                                    {ing.is_halal_certified ? (
-                                                        <span className="text-green-600">✓</span>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">-</span>
-                                                    )}
                                                 </td>
                                                 <td className="px-3 py-2 text-right">
                                                     <Button

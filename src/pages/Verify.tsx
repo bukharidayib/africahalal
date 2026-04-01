@@ -150,7 +150,6 @@ export default function Verify() {
 
   return (
     <Layout>
-      {/* Hero */}
       <HeroSection
         subtitle="Certificate Verification"
         title="Verify Halal Certificate Authenticity"

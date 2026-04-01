@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, Clock, AlertTriangle, CheckCircle2, Loader2, Search,
-  Receipt, Plus, Eye, Pencil, Trash2
+  Receipt, Plus, Eye, Pencil, Trash2, RefreshCw, CreditCard
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -27,6 +27,43 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+// --- ZynlePay response code map ---
+const ZYNLE_CODES: Record<string, { description: string; color: 'green' | 'yellow' | 'red' }> = {
+  '100': { description: 'Transaction successful', color: 'green' },
+  '120': { description: 'Transaction initiated', color: 'yellow' },
+  '990': { description: 'Transaction pending', color: 'yellow' },
+  '995': { description: 'Transaction failed', color: 'red' },
+  '9901': { description: 'Merchant not found', color: 'red' },
+  '9902': { description: 'Requesting Device IP is not whitelisted', color: 'red' },
+  '9903': { description: 'Invalid Merchant API credentials or setup not complete', color: 'red' },
+  '9904': { description: 'Merchant Account setup not complete', color: 'red' },
+  '9905': { description: 'Invalid sender ID (mobile number)', color: 'red' },
+  '9906': { description: 'Duplicate reference number detected', color: 'red' },
+  '9907': { description: 'Mobile Number blacklisted', color: 'red' },
+  '9908': { description: 'Merchant commission setup not complete', color: 'red' },
+  '9909': { description: 'Merchant payment provider setup not complete', color: 'red' },
+  '9910': { description: 'Merchant setup not complete', color: 'red' },
+  '9911': { description: 'Merchant insufficient balance', color: 'red' },
+  '9912': { description: 'Request amount exceeds disbursement limit', color: 'red' },
+  '9913': { description: 'Invalid or wrong bank name provided', color: 'red' },
+  '9914': { description: 'Cannot determine transaction status now, please try again later', color: 'red' },
+};
+
+function extractResponseCode(gatewayResponse: any): string {
+  if (!gatewayResponse) return '';
+  if (typeof gatewayResponse.response === 'string' || typeof gatewayResponse.response === 'number') {
+    return String(gatewayResponse.response);
+  }
+  if (typeof gatewayResponse.response === 'object' && gatewayResponse.response !== null) {
+    if (gatewayResponse.response.code !== undefined) return String(gatewayResponse.response.code);
+    if (gatewayResponse.response.response_code !== undefined) return String(gatewayResponse.response.response_code);
+  }
+  if (gatewayResponse.code !== undefined) return String(gatewayResponse.code);
+  if (gatewayResponse.response_code !== undefined) return String(gatewayResponse.response_code);
+  return '';
+}
 
 interface Invoice {
   id: string;
@@ -43,6 +80,21 @@ interface Invoice {
   application_id: string | null;
   organizations?: { name: string } | null;
   certification_applications?: { application_number: string; validity_period: string | null } | null;
+}
+
+interface PaymentTransaction {
+  id: string;
+  invoice_id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  payment_method: string | null;
+  transaction_reference: string | null;
+  zynlepay_reference: string | null;
+  gateway_response: any;
+  created_at: string;
+  paid_by: string | null;
+  invoices?: { invoice_number: string; organizations?: { name: string } | null } | null;
 }
 
 interface BillingStats {
@@ -88,7 +140,15 @@ export default function AdminBilling() {
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => { fetchData(); }, []);
+  // Payment transactions state
+  const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
+  const [filteredTx, setFilteredTx] = useState<PaymentTransaction[]>([]);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txSearch, setTxSearch] = useState('');
+  const [txStatusFilter, setTxStatusFilter] = useState('all');
+  const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
+
+  useEffect(() => { fetchData(); fetchTransactions(); }, []);
 
   useEffect(() => {
     let result = invoices;
@@ -103,6 +163,21 @@ export default function AdminBilling() {
     }
     setFiltered(result);
   }, [invoices, search, statusFilter]);
+
+  useEffect(() => {
+    let result = transactions;
+    if (txStatusFilter !== 'all') result = result.filter(t => t.status === txStatusFilter);
+    if (txSearch) {
+      const s = txSearch.toLowerCase();
+      result = result.filter(t =>
+        (t.transaction_reference || '').toLowerCase().includes(s) ||
+        (t.zynlepay_reference || '').toLowerCase().includes(s) ||
+        (t.invoices?.invoice_number || '').toLowerCase().includes(s) ||
+        (t.invoices?.organizations?.name || '').toLowerCase().includes(s)
+      );
+    }
+    setFilteredTx(result);
+  }, [transactions, txSearch, txStatusFilter]);
 
   const fetchData = async () => {
     try {
@@ -126,6 +201,39 @@ export default function AdminBilling() {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    setTxLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('payment_transactions')
+        .select('*, invoices(invoice_number, organizations(name))')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setTransactions((data || []) as PaymentTransaction[]);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+      setTxLoading(false);
+    }
+  };
+
+  const handleCheckStatus = async (tx: PaymentTransaction) => {
+    setCheckingStatusId(tx.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('check-payment-status', {
+        body: { transaction_id: tx.id },
+      });
+      if (error) throw error;
+      toast({ title: 'Status Updated', description: data?.message || 'Status checked.' });
+      fetchTransactions();
+      fetchData();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+      setCheckingStatusId(null);
     }
   };
 
@@ -198,7 +306,6 @@ export default function AdminBilling() {
       if (editForm.status === 'paid' && editInvoice.status !== 'paid') updateData.paid_at = new Date().toISOString();
       const { error } = await supabase.from('invoices').update(updateData).eq('id', editInvoice.id);
       if (error) throw error;
-      // Sync validity period to linked application
       if (editInvoice.application_id && editForm.validity_period) {
         const appFee = editForm.validity_period === '6_months' ? 1500 : editForm.validity_period === '1_year' ? 3000 : null;
         await supabase.from('certification_applications').update({
@@ -224,7 +331,6 @@ export default function AdminBilling() {
     if (!deleteInvoice) return;
     setIsDeleting(true);
     try {
-      // Delete activity log first
       await supabase.from('invoice_activity_log').delete().eq('invoice_id', deleteInvoice.id);
       const { error } = await supabase.from('invoices').delete().eq('id', deleteInvoice.id);
       if (error) throw error;
@@ -245,6 +351,27 @@ export default function AdminBilling() {
     };
     const c = config[status] || { variant: 'outline' as const, label: status };
     return <Badge variant={c.variant}>{c.label}</Badge>;
+  };
+
+  const txStatusBadge = (status: string) => {
+    const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+      completed: { variant: 'default', label: 'Completed' },
+      pending: { variant: 'secondary', label: 'Pending' },
+      failed: { variant: 'destructive', label: 'Failed' },
+    };
+    const c = config[status] || { variant: 'outline' as const, label: status };
+    return <Badge variant={c.variant}>{c.label}</Badge>;
+  };
+
+  const responseCodeBadge = (code: string) => {
+    if (!code) return <span className="text-muted-foreground text-xs">—</span>;
+    const info = ZYNLE_CODES[code];
+    const colorClass = info?.color === 'green'
+      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+      : info?.color === 'yellow'
+        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+        : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+    return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${colorClass}`}>{code}</span>;
   };
 
   const feeTypeLabel = (type: string) => {
@@ -358,76 +485,175 @@ export default function AdminBilling() {
           </Card>
         </div>
 
-        {/* Invoice List */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search invoices..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[160px]"><SelectValue placeholder="Filter status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-            ) : filtered.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Receipt className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                <p className="text-sm">No invoices found.</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice #</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((inv) => (
-                    <TableRow key={inv.id}>
-                      <TableCell className="font-mono text-sm">{inv.invoice_number}</TableCell>
-                      <TableCell>{inv.organizations?.name || '—'}</TableCell>
-                      <TableCell>{feeTypeLabel(inv.fee_type)}</TableCell>
-                      <TableCell className="font-semibold">ZMW {Number(inv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
-                      <TableCell>{format(new Date(inv.due_date), 'dd MMM yyyy')}</TableCell>
-                      <TableCell>{statusBadge(inv.status)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenView(inv)} title="View">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEdit(inv)} title="Edit">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteInvoice(inv)} title="Delete">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        {/* Tabs: Invoices + Payment Transactions */}
+        <Tabs defaultValue="invoices" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="invoices" className="gap-2"><Receipt className="h-4 w-4" /> Invoices</TabsTrigger>
+            <TabsTrigger value="transactions" className="gap-2"><CreditCard className="h-4 w-4" /> Payment Transactions</TabsTrigger>
+          </TabsList>
+
+          {/* Invoices Tab */}
+          <TabsContent value="invoices">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search invoices..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                  </div>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[160px]"><SelectValue placeholder="Filter status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="overdue">Overdue</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                ) : filtered.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Receipt className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">No invoices found.</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Invoice #</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((inv) => (
+                        <TableRow key={inv.id}>
+                          <TableCell className="font-mono text-sm">{inv.invoice_number}</TableCell>
+                          <TableCell>{inv.organizations?.name || '—'}</TableCell>
+                          <TableCell>{feeTypeLabel(inv.fee_type)}</TableCell>
+                          <TableCell className="font-semibold">ZMW {Number(inv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell>{format(new Date(inv.due_date), 'dd MMM yyyy')}</TableCell>
+                          <TableCell>{statusBadge(inv.status)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenView(inv)} title="View">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEdit(inv)} title="Edit">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteInvoice(inv)} title="Delete">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Payment Transactions Tab */}
+          <TabsContent value="transactions">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search transactions..." value={txSearch} onChange={(e) => setTxSearch(e.target.value)} className="pl-9" />
+                  </div>
+                  <Select value={txStatusFilter} onValueChange={setTxStatusFilter}>
+                    <SelectTrigger className="w-[160px]"><SelectValue placeholder="Filter status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="sm" onClick={fetchTransactions} disabled={txLoading}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${txLoading ? 'animate-spin' : ''}`} /> Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {txLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                ) : filteredTx.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">No payment transactions found.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Reference</TableHead>
+                          <TableHead>Invoice #</TableHead>
+                          <TableHead>Client</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Method</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Code</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredTx.map((tx) => {
+                          const code = extractResponseCode(tx.gateway_response);
+                          const codeInfo = ZYNLE_CODES[code];
+                          return (
+                            <TableRow key={tx.id}>
+                              <TableCell className="font-mono text-xs">{tx.transaction_reference || tx.zynlepay_reference || '—'}</TableCell>
+                              <TableCell className="font-mono text-sm">{tx.invoices?.invoice_number || '—'}</TableCell>
+                              <TableCell>{tx.invoices?.organizations?.name || '—'}</TableCell>
+                              <TableCell className="font-semibold">ZMW {Number(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
+                              <TableCell className="capitalize">{tx.payment_method?.replace(/_/g, ' ') || '—'}</TableCell>
+                              <TableCell>{txStatusBadge(tx.status)}</TableCell>
+                              <TableCell>{responseCodeBadge(code)}</TableCell>
+                              <TableCell className="text-xs max-w-[200px] truncate" title={codeInfo?.description || ''}>
+                                {codeInfo?.description || (code ? `Unknown code: ${code}` : '—')}
+                              </TableCell>
+                              <TableCell className="text-sm">{format(new Date(tx.created_at), 'dd MMM yyyy HH:mm')}</TableCell>
+                              <TableCell className="text-right">
+                                {tx.status === 'pending' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleCheckStatus(tx)}
+                                    disabled={checkingStatusId === tx.id}
+                                  >
+                                    {checkingStatusId === tx.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                                    Check
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* View Invoice Dialog */}
         <Dialog open={!!viewInvoice} onOpenChange={(open) => !open && setViewInvoice(null)}>

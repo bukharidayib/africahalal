@@ -1333,6 +1333,8 @@ export type Database = {
           payment_method: string | null
           status: string
           transaction_reference: string | null
+          zynlepay_reference: string | null
+          zynlepay_transaction_id: string | null
         }
         Insert: {
           amount: number
@@ -1345,6 +1347,8 @@ export type Database = {
           payment_method?: string | null
           status?: string
           transaction_reference?: string | null
+          zynlepay_reference?: string | null
+          zynlepay_transaction_id?: string | null
         }
         Update: {
           amount?: number
@@ -1357,6 +1361,8 @@ export type Database = {
           payment_method?: string | null
           status?: string
           transaction_reference?: string | null
+          zynlepay_reference?: string | null
+          zynlepay_transaction_id?: string | null
         }
         Relationships: [
           {
@@ -1996,6 +2002,7 @@ export type Database = {
           created_at: string
           id: string
           notes: string | null
+          report_content: Json | null
           report_date: string
           report_type: string
           risk_level: string | null
@@ -2009,6 +2016,7 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          report_content?: Json | null
           report_date?: string
           report_type: string
           risk_level?: string | null
@@ -2022,6 +2030,7 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          report_content?: Json | null
           report_date?: string
           report_type?: string
           risk_level?: string | null

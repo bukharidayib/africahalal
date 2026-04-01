@@ -15,7 +15,13 @@ import {
     Loader2,
     Beaker,
     FileCheck,
-    Save
+    Save,
+    CreditCard,
+    Phone,
+    CheckCircle2,
+    AlertTriangle,
+    Smartphone,
+    Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,6 +50,7 @@ import {
 } from "@/components/ui/dialog";
 import { ProductIngredientModal, Ingredient } from "@/components/client/ProductIngredientModal";
 import { MandatoryDocuments } from "@/components/client/MandatoryDocuments";
+import { organizationSchema, productSchema, declarationSchema, paymentPhoneSchema, cardPaymentSchema } from "@/lib/validations";
 
 const steps = [
     { id: 1, name: "Establishment Details", icon: Building2 },
@@ -51,6 +58,13 @@ const steps = [
     { id: 3, name: "Product Information", icon: ClipboardList },
     { id: 4, name: "Mandatory Documents", icon: FileCheck },
     { id: 5, name: "Declaration", icon: BadgeCheck },
+    { id: 6, name: "Payment", icon: CreditCard },
+];
+
+const PROVIDERS = [
+    { value: "airtel", label: "Airtel Money" },
+    { value: "mtn", label: "MTN Mobile Money" },
+    { value: "zamtel", label: "Zamtel Kwacha" },
 ];
 
 interface ProductItem {
@@ -73,6 +87,18 @@ export default function CertificationApplication() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+    const [paymentInvoice, setPaymentInvoice] = useState<{ id: string; number: string; amount: number } | null>(null);
+    const [paymentPhone, setPaymentPhone] = useState("");
+    const [paymentChannel, setPaymentChannel] = useState("");
+    const [paymentMethod, setPaymentMethod] = useState<"momo" | "card">("momo");
+    const [cardNumber, setCardNumber] = useState("");
+    const [cardExpiryMonth, setCardExpiryMonth] = useState("");
+    const [cardExpiryYear, setCardExpiryYear] = useState("");
+    const [cardCvv, setCardCvv] = useState("");
+    const [paymentState, setPaymentState] = useState<"idle" | "processing" | "pending" | "success" | "error">("idle");
+    const [paymentMessage, setPaymentMessage] = useState("");
+    const [paymentReference, setPaymentReference] = useState("");
+    const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
     const [ingredientModalOpen, setIngredientModalOpen] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const [businesses, setBusinesses] = useState<{ id: string; entity_name: string; pacra_number: string }[]>([]);
@@ -268,6 +294,11 @@ export default function CertificationApplication() {
 
     const handleNext = () => {
         if (!validateStep(currentStep)) return;
+        if (currentStep === 5) {
+            // Step 5 → 6: validate declaration, auto-save draft, create invoice
+            handleAdvanceToPayment();
+            return;
+        }
         if (currentStep < steps.length) setCurrentStep(currentStep + 1);
     };
 
@@ -277,16 +308,24 @@ export default function CertificationApplication() {
 
     const validateStep = (step: number): boolean => {
         switch (step) {
-            case 1:
-                if (!formData.entity_name || !formData.registration_number || !formData.address || !formData.country) {
+            case 1: {
+                const result = organizationSchema.safeParse({
+                    entity_name: formData.entity_name,
+                    registration_number: formData.registration_number,
+                    address: formData.address,
+                    country: formData.country,
+                });
+                if (!result.success) {
+                    const firstError = result.error.errors[0];
                     toast({
                         variant: "destructive",
-                        title: "Missing Information",
-                        description: "Please fill in all required fields before proceeding.",
+                        title: "Validation Error",
+                        description: firstError.message,
                     });
                     return false;
                 }
                 return true;
+            }
             case 2:
                 if (formData.categories.length === 0) {
                     toast({
@@ -306,19 +345,28 @@ export default function CertificationApplication() {
                     });
                     return false;
                 }
-                // Check if all products have at least one ingredient
-                const productsWithoutIngredients = formData.products.filter(p => p.ingredients.length === 0);
-                if (productsWithoutIngredients.length > 0) {
-                    toast({
-                        variant: "destructive",
-                        title: "Ingredients Required",
-                        description: `Please add ingredients for: ${productsWithoutIngredients.map(p => p.name).join(', ')}`,
-                    });
-                    return false;
+                // Validate each product with zod
+                for (const p of formData.products) {
+                    const pResult = productSchema.safeParse({ name: p.name, brand: p.brand, category: p.category });
+                    if (!pResult.success) {
+                        toast({
+                            variant: "destructive",
+                            title: "Product Validation Error",
+                            description: `${p.name}: ${pResult.error.errors[0].message}`,
+                        });
+                        return false;
+                    }
+                    if (p.ingredients.length === 0) {
+                        toast({
+                            variant: "destructive",
+                            title: "Ingredients Required",
+                            description: `Please add ingredients for: ${p.name}`,
+                        });
+                        return false;
+                    }
                 }
                 return true;
-            case 4:
-                // Check required documents
+            case 4: {
                 const requiredDocIds = ["business_registration", "tax_clearance", "ingredient_spec", "halal_policy"];
                 const uploadedDocIds = formData.uploadedFiles.map(f => f.documentId);
                 const missingDocs = requiredDocIds.filter(id => !uploadedDocIds.includes(id));
@@ -331,6 +379,23 @@ export default function CertificationApplication() {
                     return false;
                 }
                 return true;
+            }
+            case 5: {
+                const declResult = declarationSchema.safeParse({
+                    declaration_confirmed: formData.declaration_confirmed,
+                    declaration_compliance: formData.declaration_compliance,
+                    signature: formData.signature,
+                });
+                if (!declResult.success) {
+                    toast({
+                        variant: "destructive",
+                        title: "Declaration Incomplete",
+                        description: declResult.error.errors[0].message,
+                    });
+                    return false;
+                }
+                return true;
+            }
             default:
                 return true;
         }
@@ -341,11 +406,12 @@ export default function CertificationApplication() {
     };
 
     const handleAddProduct = () => {
-        if (!newProduct.name || !newProduct.brand) {
+        const result = productSchema.safeParse(newProduct);
+        if (!result.success) {
             toast({
                 variant: "destructive",
-                title: "Missing Information",
-                description: "Please enter product name and brand.",
+                title: "Validation Error",
+                description: result.error.errors[0].message,
             });
             return;
         }
@@ -422,7 +488,7 @@ export default function CertificationApplication() {
 
     const selectedProduct = formData.products.find(p => p.id === selectedProductId);
 
-    const handleSubmit = async () => {
+    const handleAdvanceToPayment = async () => {
         if (!formData.declaration_confirmed || !formData.declaration_compliance || !formData.signature) {
             toast({
                 variant: "destructive",
@@ -437,7 +503,6 @@ export default function CertificationApplication() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not authenticated");
 
-            // Get user's profile to check for organization
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('organization_id')
@@ -446,7 +511,6 @@ export default function CertificationApplication() {
 
             let organization_id = profile?.organization_id;
 
-            // If no organization, try to find or create one
             if (!organization_id) {
                 const { data: orgData, error: orgError } = await supabase
                     .from('organizations')
@@ -456,24 +520,16 @@ export default function CertificationApplication() {
 
                 if (orgError && orgError.code === 'PGRST116') {
                     const newOrgId = crypto.randomUUID();
-                    const { error: createError } = await supabase
-                        .from('organizations')
-                        .insert({
-                            id: newOrgId,
-                            name: formData.entity_name,
-                            registration_number: formData.registration_number,
-                            sector: formData.categories[0] || "General",
-                            address: formData.address,
-                            country: formData.country
-                        });
-
-                    if (createError) throw createError;
+                    await supabase.from('organizations').insert({
+                        id: newOrgId,
+                        name: formData.entity_name,
+                        registration_number: formData.registration_number,
+                        sector: formData.categories[0] || "General",
+                        address: formData.address,
+                        country: formData.country
+                    });
                     organization_id = newOrgId;
-
-                    await supabase
-                        .from('profiles')
-                        .update({ organization_id })
-                        .eq('id', user.id);
+                    await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
                 } else if (orgError) {
                     throw orgError;
                 } else {
@@ -485,36 +541,26 @@ export default function CertificationApplication() {
             let appId: string;
 
             if (draftId) {
-                // Update existing draft to submitted
                 const { data: existingApp } = await supabase
                     .from('certification_applications')
                     .select('application_number')
                     .eq('id', draftId)
                     .single();
-
                 applicationNumber = existingApp?.application_number || `APP-${Date.now()}`;
 
-                const { error: updateErr } = await supabase
-                    .from('certification_applications')
-                    .update({
-                        status: 'submitted',
-                        submitted_at: new Date().toISOString(),
-                        scope: formData.categories.join(', '),
-                        sector: formData.categories[0] || "General",
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq('id', draftId);
-                if (updateErr) throw updateErr;
+                // Keep as draft — only update scope/sector
+                await supabase.from('certification_applications').update({
+                    scope: formData.categories.join(', '),
+                    sector: formData.categories[0] || "General",
+                    updated_at: new Date().toISOString(),
+                }).eq('id', draftId);
                 appId = draftId;
 
-                // Clear old products and re-insert
                 await supabase.from('application_products').delete().eq('application_id', draftId);
             } else {
-                // Generate application number
                 const { data: appNumberData } = await supabase.rpc('generate_application_number');
                 applicationNumber = appNumberData || `APP-${Date.now()}`;
 
-                // Insert Application
                 const { data: appData, error: appError } = await supabase
                     .from('certification_applications')
                     .insert({
@@ -523,133 +569,201 @@ export default function CertificationApplication() {
                         sector: formData.categories[0] || "General",
                         scope: formData.categories.join(', '),
                         application_number: applicationNumber,
-                        status: 'submitted',
-                        submitted_at: new Date().toISOString()
+                        status: 'draft',
                     })
                     .select('id')
                     .single();
                 if (appError) throw appError;
                 appId = appData.id;
+                setDraftId(appId);
             }
 
             // Insert Products and Ingredients
             for (const product of formData.products) {
                 const { data: productData, error: productError } = await supabase
                     .from('application_products')
-                    .insert({
-                        application_id: appId,
-                        name: product.name,
-                        brand: product.brand,
-                        category: product.category
-                    })
+                    .insert({ application_id: appId, name: product.name, brand: product.brand, category: product.category })
                     .select('id')
                     .single();
-
                 if (productError) throw productError;
 
-                // Insert ingredients for this product
                 if (product.ingredients.length > 0) {
-                    const ingredientsToInsert = product.ingredients.map(ing => ({
-                        product_id: productData.id,
-                        ingredient_name: ing.ingredient_name,
-                        percentage: ing.percentage,
-                        source: ing.source,
-                        is_halal_certified: ing.is_halal_certified,
-                        supplier_name: ing.supplier_name
-                    }));
-
-                    const { error: ingError } = await supabase
-                        .from('product_ingredients')
-                        .insert(ingredientsToInsert);
-
-                    if (ingError) throw ingError;
+                    await supabase.from('product_ingredients').insert(
+                        product.ingredients.map(ing => ({
+                            product_id: productData.id,
+                            ingredient_name: ing.ingredient_name,
+                            percentage: ing.percentage,
+                            source: ing.source,
+                            is_halal_certified: ing.is_halal_certified,
+                            supplier_name: ing.supplier_name
+                        }))
+                    );
                 }
             }
 
-            // Link uploaded documents to application
+            // Link uploaded documents
             for (const file of formData.uploadedFiles) {
-                await supabase
-                    .from('application_documents')
-                    .insert({
-                        application_id: appId,
-                        document_type: file.documentId,
-                        file_name: file.fileName,
-                        file_path: file.filePath,
-                        file_size: file.fileSize,
-                        uploaded_by: user.id
-                    });
+                await supabase.from('application_documents').insert({
+                    application_id: appId,
+                    document_type: file.documentId,
+                    file_name: file.fileName,
+                    file_path: file.filePath,
+                    file_size: file.fileSize,
+                    uploaded_by: user.id
+                });
             }
+
+            // Create invoice
+            const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number');
+            const validityLabel = formData.validity_period === '6_months' ? '6 Months' : '1 Year';
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 30);
+            const createdInvoiceNumber = invoiceNumber || `AHIS-INV-${Date.now()}`;
+
+            const { data: invoiceData } = await supabase.from('invoices').insert({
+                invoice_number: createdInvoiceNumber,
+                organization_id: organization_id,
+                application_id: appId,
+                fee_type: 'certification',
+                description: `Halal Certification Application Fee - ${validityLabel} Validity (${applicationNumber})`,
+                amount: formData.application_fee,
+                currency: 'ZMW',
+                due_date: dueDate.toISOString().split('T')[0],
+                status: 'pending',
+            }).select('id').single();
+
+            if (!invoiceData) throw new Error("Failed to create invoice");
+
+            setPaymentInvoice({ id: invoiceData.id, number: createdInvoiceNumber, amount: formData.application_fee });
+            setCurrentStep(6);
+
+            toast({ title: "Ready for Payment", description: "Please complete the payment to submit your application." });
+        } catch (error: any) {
+            console.error('Advance to payment error:', error);
+            toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const isPaymentPhoneValid = paymentPhoneSchema.safeParse(paymentPhone).success;
+    const isCardValid = cardPaymentSchema.safeParse({
+        cardNumber: cardNumber.replace(/\s/g, ""),
+        expiryMonth: cardExpiryMonth,
+        expiryYear: cardExpiryYear,
+        cvv: cardCvv,
+    }).success;
+    const isPaymentFormValid = paymentMethod === "momo" ? (isPaymentPhoneValid && paymentChannel !== "") : isCardValid;
+
+    const handlePayment = async () => {
+        if (!isPaymentFormValid || !paymentInvoice) return;
+
+        setPaymentState("processing");
+        setPaymentMessage("");
+
+        try {
+            const paymentBody = paymentMethod === "card"
+                ? {
+                    invoice_id: paymentInvoice.id,
+                    payment_method: "card",
+                    card_number: cardNumber.replace(/\s/g, ""),
+                    expiry_month: cardExpiryMonth,
+                    expiry_year: cardExpiryYear,
+                    cvv: cardCvv,
+                }
+                : {
+                    invoice_id: paymentInvoice.id,
+                    phone_number: paymentPhone,
+                    channel: paymentChannel,
+                };
+
+            const { data, error } = await supabase.functions.invoke("process-momo-payment", {
+                body: paymentBody,
+            });
+
+            if (error) throw error;
+
+            setPaymentMessage(data.message);
+            setPaymentReference(data.reference || "");
+            setPaymentTxId(data.transaction_id);
+
+            if (data.status === "pending") {
+                setPaymentState("pending");
+            } else if (data.status === "completed") {
+                setPaymentState("success");
+                await finalizeSubmission();
+            } else {
+                setPaymentState("error");
+            }
+        } catch (err: any) {
+            setPaymentState("error");
+            setPaymentMessage(err.message || "Payment failed. Please try again.");
+        }
+    };
+
+    const handleCheckPaymentStatus = async () => {
+        if (!paymentTxId) return;
+        try {
+            const { data, error } = await supabase.functions.invoke("check-payment-status", {
+                body: { transaction_id: paymentTxId },
+            });
+            if (error) throw error;
+            setPaymentMessage(data.message);
+            if (data.status === "completed") {
+                setPaymentState("success");
+                await finalizeSubmission();
+            } else if (data.status === "failed") {
+                setPaymentState("error");
+            }
+        } catch (err: any) {
+            toast({ variant: "destructive", title: "Error", description: err.message });
+        }
+    };
+
+    const finalizeSubmission = async () => {
+        try {
+            if (!draftId) return;
+
+            // Promote draft to submitted
+            await supabase.from('certification_applications').update({
+                status: 'submitted',
+                submitted_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            }).eq('id', draftId);
 
             // Log Audit
             await supabase.rpc('log_audit', {
                 _action: 'application_submitted',
                 _resource_type: 'certification_applications',
-                _resource_id: appId,
+                _resource_id: draftId,
                 _metadata: {
-                    step: 'submission',
+                    step: 'submission_after_payment',
                     products_count: formData.products.length,
                     documents_count: formData.uploadedFiles.length,
                     categories: formData.categories
                 }
             });
 
-            // Create invoice for application fee
-            try {
-                const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number');
-                const validityLabel = formData.validity_period === '6_months' ? '6 Months' : '1 Year';
-                const dueDate = new Date();
-                dueDate.setDate(dueDate.getDate() + 30);
-
-                await supabase.from('invoices').insert({
-                    invoice_number: invoiceNumber || `AHIS-INV-${Date.now()}`,
-                    organization_id: organization_id,
-                    application_id: appId,
-                    fee_type: 'application_fee',
-                    description: `Halal Certification Application Fee - ${validityLabel} Validity (${applicationNumber})`,
-                    amount: formData.application_fee,
-                    currency: 'ZMW',
-                    due_date: dueDate.toISOString().split('T')[0],
-                    status: 'pending',
-                });
-            } catch (invoiceErr) {
-                console.error('Failed to create invoice:', invoiceErr);
-            }
-
-            // Send submission status email (fire and forget)
-            try {
-                const { data: org } = await supabase
-                    .from('organizations')
-                    .select('name, contact_email')
-                    .eq('id', organization_id)
-                    .single();
-
-                await supabase.functions.invoke('send-status-notification', {
+            // Send submission email (fire and forget)
+            const { data: { user } } = await supabase.auth.getUser();
+            const { data: app } = await supabase.from('certification_applications').select('application_number, organization_id').eq('id', draftId).single();
+            if (app && user) {
+                const { data: org } = await supabase.from('organizations').select('name, contact_email').eq('id', app.organization_id).single();
+                supabase.functions.invoke('send-status-notification', {
                     body: {
-                        application_id: appId,
+                        application_id: draftId,
                         new_status: 'submitted',
-                        application_number: applicationNumber,
+                        application_number: app.application_number,
                         organization_name: org?.name || formData.entity_name,
                         contact_email: org?.contact_email || user.email,
                     }
-                });
-            } catch (emailErr) {
-                console.error('Failed to send submission email:', emailErr);
+                }).catch(console.error);
             }
 
-            toast({
-                title: "Application Submitted Successfully",
-                description: `Application ${applicationNumber} has been sent for review.`,
-            });
-            navigate("/client/applications");
-        } catch (error: any) {
-            console.error('Submission error:', error);
-            toast({
-                variant: "destructive",
-                title: "Submission Failed",
-                description: error.message || "An unexpected error occurred.",
-            });
-        } finally {
-            setIsLoading(false);
+            toast({ title: "Application Submitted!", description: "Your application has been submitted for review." });
+            setTimeout(() => navigate("/client/applications"), 2000);
+        } catch (err: any) {
+            console.error('Finalize submission error:', err);
         }
     };
 
@@ -1059,19 +1173,235 @@ export default function CertificationApplication() {
                             </div>
                         )}
 
-                        {/* Navigation Buttons */}
-                        <div className="flex items-center justify-between mt-12 pt-8 border-t">
-                            <Button
-                                variant="ghost"
-                                onClick={handleBack}
-                                disabled={currentStep === 1 || isLoading}
-                                className="h-11 font-bold group"
-                            >
-                                <ChevronLeft className="mr-2 h-5 w-5 group-hover:-translate-x-1 transition-transform" />
-                                Previous Step
-                            </Button>
+                        {/* Step 6: Payment */}
+                        {currentStep === 6 && (
+                            <div className="space-y-6 animate-in fade-in duration-300">
+                                <div className="text-center mb-4">
+                                    <CreditCard className="h-10 w-10 mx-auto text-primary mb-2" />
+                                    <h3 className="font-bold text-lg font-serif text-foreground">Pay Application Fee</h3>
+                                    <p className="text-sm text-muted-foreground">Complete payment to submit your application for review.</p>
+                                </div>
 
-                            {currentStep < steps.length ? (
+                                {/* Fee Summary */}
+                                <div className="rounded-lg bg-muted/50 p-4 text-sm space-y-2 border">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Invoice</span>
+                                        <span className="font-mono text-xs">{paymentInvoice?.number}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Validity</span>
+                                        <span>{formData.validity_period === '6_months' ? '6 Months' : '1 Year'}</span>
+                                    </div>
+                                    <div className="flex justify-between border-t pt-2">
+                                        <span className="text-muted-foreground font-semibold">Total</span>
+                                        <span className="font-bold text-lg">ZMW {paymentInvoice?.amount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                </div>
+
+                                {paymentState === "idle" && (
+                                    <div className="space-y-4">
+                                        {/* Payment Method Tabs */}
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPaymentMethod("momo")}
+                                                className={`flex items-center justify-center gap-2 rounded-lg border-2 p-3 text-sm font-semibold transition-all ${
+                                                    paymentMethod === "momo"
+                                                        ? "border-primary bg-primary/5 text-primary"
+                                                        : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                                                }`}
+                                            >
+                                                <Smartphone className="h-4 w-4" />
+                                                Mobile Money
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPaymentMethod("card")}
+                                                className={`flex items-center justify-center gap-2 rounded-lg border-2 p-3 text-sm font-semibold transition-all ${
+                                                    paymentMethod === "card"
+                                                        ? "border-primary bg-primary/5 text-primary"
+                                                        : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                                                }`}
+                                            >
+                                                <CreditCard className="h-4 w-4" />
+                                                Bank Card
+                                            </button>
+                                        </div>
+
+                                        {/* Mobile Money Form */}
+                                        {paymentMethod === "momo" && (
+                                            <>
+                                                <div className="space-y-2">
+                                                    <Label>Payment Provider *</Label>
+                                                    <Select value={paymentChannel} onValueChange={setPaymentChannel}>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select provider" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {PROVIDERS.map((p) => (
+                                                                <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <Label>Mobile Money Number *</Label>
+                                                    <div className="relative">
+                                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                        <Input
+                                                            placeholder="09xxxxxxxx or 07xxxxxxxx"
+                                                            value={paymentPhone}
+                                                            onChange={(e) => setPaymentPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                                                            className="pl-10"
+                                                            maxLength={10}
+                                                        />
+                                                    </div>
+                                                    {paymentPhone.length > 0 && !isPaymentPhoneValid && (
+                                                        <p className="text-xs text-destructive">Enter a valid Zambian mobile number (10 digits starting with 09 or 07)</p>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* Card Payment Form */}
+                                        {paymentMethod === "card" && (
+                                            <>
+                                                <div className="space-y-2">
+                                                    <Label>Card Number *</Label>
+                                                    <div className="relative">
+                                                        <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                        <Input
+                                                            placeholder="1234 5678 9012 3456"
+                                                            value={cardNumber}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value.replace(/\D/g, "").slice(0, 16);
+                                                                setCardNumber(val.replace(/(.{4})/g, "$1 ").trim());
+                                                            }}
+                                                            className="pl-10"
+                                                            maxLength={19}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-3 gap-3">
+                                                    <div className="space-y-2">
+                                                        <Label>Month *</Label>
+                                                        <Select value={cardExpiryMonth} onValueChange={setCardExpiryMonth}>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="MM" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")).map(m => (
+                                                                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Year *</Label>
+                                                        <Select value={cardExpiryYear} onValueChange={setCardExpiryYear}>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="YY" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {Array.from({ length: 10 }, (_, i) => String(new Date().getFullYear() + i).slice(-2)).map(y => (
+                                                                    <SelectItem key={y} value={y}>{y}</SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>CVV *</Label>
+                                                        <Input
+                                                            placeholder="123"
+                                                            value={cardCvv}
+                                                            onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                                                            maxLength={4}
+                                                            type="password"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <Lock className="h-3 w-3" />
+                                                    <span>Your card details are securely processed. We do not store card information.</span>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        <Button
+                                            onClick={handlePayment}
+                                            disabled={!isPaymentFormValid}
+                                            className="w-full h-11 bg-secondary text-secondary-foreground hover:bg-secondary/90 font-bold shadow-lg shadow-secondary/20"
+                                        >
+                                            {paymentMethod === "card" ? <CreditCard className="mr-2 h-4 w-4" /> : <Phone className="mr-2 h-4 w-4" />}
+                                            Pay ZMW {paymentInvoice?.amount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {paymentState === "processing" && (
+                                    <div className="flex flex-col items-center py-8 gap-3">
+                                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                        <p className="text-sm text-muted-foreground">Processing payment...</p>
+                                    </div>
+                                )}
+
+                                {paymentState === "pending" && (
+                                    <div className="flex flex-col items-center py-6 gap-3 text-center">
+                                        <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900/30">
+                                            <Phone className="h-6 w-6 text-amber-600" />
+                                        </div>
+                                        <p className="font-medium text-foreground">Check Your Phone</p>
+                                        <p className="text-sm text-muted-foreground">{paymentMessage}</p>
+                                        {paymentReference && <p className="text-xs text-muted-foreground font-mono">Ref: {paymentReference}</p>}
+                                        <Button onClick={handleCheckPaymentStatus} className="mt-2">
+                                            Check Status
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {paymentState === "success" && (
+                                    <div className="flex flex-col items-center py-6 gap-3 text-center">
+                                        <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/30">
+                                            <CheckCircle2 className="h-6 w-6 text-green-600" />
+                                        </div>
+                                        <p className="font-medium text-foreground">Payment Successful!</p>
+                                        <p className="text-sm text-muted-foreground">{paymentMessage}</p>
+                                        <p className="text-sm text-muted-foreground">Your application has been submitted. Redirecting...</p>
+                                        {paymentReference && <p className="text-xs text-muted-foreground font-mono">Ref: {paymentReference}</p>}
+                                    </div>
+                                )}
+
+                                {paymentState === "error" && (
+                                    <div className="flex flex-col items-center py-6 gap-3 text-center">
+                                        <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/30">
+                                            <AlertTriangle className="h-6 w-6 text-red-600" />
+                                        </div>
+                                        <p className="font-medium text-foreground">Payment Failed</p>
+                                        <p className="text-sm text-muted-foreground">{paymentMessage}</p>
+                                        <Button onClick={() => setPaymentState("idle")} variant="outline" className="mt-2">
+                                            Try Again
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Navigation Buttons — hidden on step 6 (payment has its own buttons) */}
+                        {currentStep < 6 && (
+                            <div className="flex items-center justify-between mt-12 pt-8 border-t">
+                                <Button
+                                    variant="ghost"
+                                    onClick={handleBack}
+                                    disabled={currentStep === 1 || isLoading}
+                                    className="h-11 font-bold group"
+                                >
+                                    <ChevronLeft className="mr-2 h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+                                    Previous Step
+                                </Button>
+
                                 <div className="flex gap-3">
                                     <Button
                                         variant="outline"
@@ -1087,41 +1417,26 @@ export default function CertificationApplication() {
                                         disabled={isLoading}
                                         className="h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-bold group"
                                     >
-                                        Continue
-                                        <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="flex gap-3">
-                                    <Button
-                                        variant="outline"
-                                        onClick={handleSaveDraft}
-                                        disabled={isLoading || isSavingDraft}
-                                        className="h-11 font-bold"
-                                    >
-                                        {isSavingDraft ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                        Save Draft
-                                    </Button>
-                                    <Button
-                                        onClick={handleSubmit}
-                                        disabled={isLoading}
-                                        className="h-11 bg-secondary text-secondary-foreground hover:bg-secondary/90 font-bold px-8 shadow-lg shadow-secondary/20"
-                                    >
-                                        {isLoading ? (
+                                        {isLoading && currentStep === 5 ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Submitting...
+                                                Preparing...
+                                            </>
+                                        ) : currentStep === 5 ? (
+                                            <>
+                                                Continue to Payment
+                                                <CreditCard className="ml-2 h-4 w-4" />
                                             </>
                                         ) : (
                                             <>
-                                                Final Submit & Lock
-                                                <Upload className="ml-2 h-4 w-4" />
+                                                Continue
+                                                <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                                             </>
                                         )}
                                     </Button>
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 

@@ -93,7 +93,6 @@ export default function Directory() {
 
   return (
     <Layout>
-      {/* Hero */}
       <HeroSection
         subtitle="Certified Directory"
         title="Global Certified Registry"

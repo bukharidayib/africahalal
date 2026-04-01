@@ -47,7 +47,6 @@ const coreValues = [
 export default function About() {
   return (
     <Layout>
-      {/* Hero */}
       <HeroSection
         subtitle="About AHI"
         title="Pioneering Halal Excellence Across Africa"

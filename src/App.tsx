@@ -16,6 +16,14 @@ import Verify from "./pages/Verify";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import BlogDetail from "./pages/BlogDetail";
+import BlogIndex from "./pages/BlogIndex";
+import HalalCertificationZambia from "./pages/HalalCertificationZambia";
+import HalalCertificationLusaka from "./pages/HalalCertificationLusaka";
+import CityLanding from "./pages/CityLanding";
+import VerifyHalalCertificate from "./pages/VerifyHalalCertificate";
+import DirectoryCategory from "./pages/DirectoryCategory";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentFailed from "./pages/PaymentFailed";
 
 // Client Auth
 import SignIn from "./pages/auth/SignIn";
@@ -29,6 +37,7 @@ import ClientDashboard from "./pages/client/ClientDashboard";
 import CertificationApplication from "./pages/client/CertificationApplication";
 import DocumentVault from "./pages/client/DocumentVault";
 import ComplianceCenter from "./pages/client/ComplianceCenter";
+import ClientInspections from "./pages/client/ClientInspections";
 import CertificateVault from "./pages/client/CertificateVault";
 import VerifyPublic from "./pages/VerifyPublic";
 import MyApplications from "./pages/client/MyApplications";
@@ -70,6 +79,7 @@ import RolesPermissions from "./admin/pages/RolesPermissions";
 import RoleEditor from "./admin/pages/RoleEditor";
 import AdminBilling from "./admin/pages/AdminBilling";
 import IngredientTracker from "./admin/pages/IngredientTracker";
+import AdminSupervisorReportDetail from "./admin/pages/AdminSupervisorReportDetail";
 
 // Supervisor Portal
 import { SupervisorProtectedRoute } from "./components/auth/SupervisorProtectedRoute";
@@ -80,6 +90,7 @@ import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import SupervisorReports from "./pages/supervisor/SupervisorReports";
 import SupervisorReportForm from "./pages/supervisor/SupervisorReportForm";
 import SupervisorReportDetail from "./pages/supervisor/SupervisorReportDetail";
+import SupervisorPerformance from "./pages/supervisor/SupervisorPerformance";
 import SupervisorNCRs from "./pages/supervisor/SupervisorNCRs";
 import SupervisorNCRDetail from "./pages/supervisor/SupervisorNCRDetail";
 import SupervisorIncidents from "./pages/supervisor/SupervisorIncidents";
@@ -141,7 +152,15 @@ const App = () => (
             <Route path="/directory" element={<Directory />} />
             <Route path="/verify" element={<Verify />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/blog" element={<BlogIndex />} />
             <Route path="/blog/:slug" element={<BlogDetail />} />
+            <Route path="/halal-certification-zambia" element={<HalalCertificationZambia />} />
+            <Route path="/halal-certification-lusaka" element={<HalalCertificationLusaka />} />
+            <Route path="/halal-certification/:city" element={<CityLanding />} />
+            <Route path="/verify-halal-certificate" element={<VerifyHalalCertificate />} />
+            <Route path="/directory/:category" element={<DirectoryCategory />} />
+            <Route path="/payment/success" element={<PaymentSuccess />} />
+            <Route path="/payment/failed" element={<PaymentFailed />} />
 
             {/* Client Auth Routes */}
             <Route path="/auth/signin" element={<SignIn />} />
@@ -157,7 +176,8 @@ const App = () => (
             <Route path="/client/applications" element={<ProtectedRoute><MyApplications /></ProtectedRoute>} />
             <Route path="/client/applications/:id" element={<ProtectedRoute><ClientApplicationDetail /></ProtectedRoute>} />
             <Route path="/client/documents" element={<ProtectedRoute><DocumentVault /></ProtectedRoute>} />
-            <Route path="/client/inspections" element={<ProtectedRoute><ComplianceCenter /></ProtectedRoute>} />
+            <Route path="/client/inspections" element={<ProtectedRoute><ClientInspections /></ProtectedRoute>} />
+            <Route path="/client/compliance" element={<ProtectedRoute><ComplianceCenter /></ProtectedRoute>} />
             <Route path="/client/certificates" element={<ProtectedRoute><CertificateVault /></ProtectedRoute>} />
             <Route path="/client/support" element={<ProtectedRoute><SupportCenter /></ProtectedRoute>} />
             <Route path="/client/support/tickets" element={<ProtectedRoute><SupportTickets /></ProtectedRoute>} />
@@ -196,6 +216,7 @@ const App = () => (
               <Route path="roles/:id" element={<RoleEditor />} />
               <Route path="billing" element={<AdminBilling />} />
               <Route path="ingredients" element={<IngredientTracker />} />
+              <Route path="supervisor-reports/:id" element={<AdminSupervisorReportDetail />} />
             </Route>
 
             {/* Inspector Auth Routes (public) */}
@@ -226,6 +247,7 @@ const App = () => (
             <Route path="/supervisor/reports" element={<SupervisorProtectedRoute><SupervisorReports /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/reports/new" element={<SupervisorProtectedRoute><SupervisorReportForm /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/reports/:id" element={<SupervisorProtectedRoute><SupervisorReportDetail /></SupervisorProtectedRoute>} />
+            <Route path="/supervisor/performance" element={<SupervisorProtectedRoute><SupervisorPerformance /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/ncrs" element={<SupervisorProtectedRoute><SupervisorNCRs /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/ncrs/:id" element={<SupervisorProtectedRoute><SupervisorNCRDetail /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/incidents" element={<SupervisorProtectedRoute><SupervisorIncidents /></SupervisorProtectedRoute>} />

@@ -1,0 +1,1 @@
+ALTER TABLE public.supervisor_reports ADD COLUMN IF NOT EXISTS report_content jsonb DEFAULT '{}'::jsonb;
