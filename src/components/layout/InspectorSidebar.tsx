@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 const navigation = [
   { name: "Dashboard", href: "/inspector/dashboard", icon: LayoutDashboard },

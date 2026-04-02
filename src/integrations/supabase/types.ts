@@ -1046,6 +1046,7 @@ export type Database = {
           id: string
           inspector_number: string
           is_active: boolean
+          is_manager: boolean
           qualifications: string[] | null
           regions: string[] | null
           specializations: string[] | null
@@ -1057,6 +1058,7 @@ export type Database = {
           id?: string
           inspector_number: string
           is_active?: boolean
+          is_manager?: boolean
           qualifications?: string[] | null
           regions?: string[] | null
           specializations?: string[] | null
@@ -1068,6 +1070,7 @@ export type Database = {
           id?: string
           inspector_number?: string
           is_active?: boolean
+          is_manager?: boolean
           qualifications?: string[] | null
           regions?: string[] | null
           specializations?: string[] | null
