@@ -119,6 +119,16 @@ import InspectorSupportTickets from "./pages/inspector/InspectorSupportTickets";
 import InspectorSupportTicketNew from "./pages/inspector/InspectorSupportTicketNew";
 import InspectorSupportTicketDetail from "./pages/inspector/InspectorSupportTicketDetail";
 import InspectorSupportChat from "./pages/inspector/InspectorSupportChat";
+import InspectorReports from "./pages/inspector/InspectorReports";
+import InspectorReportForm from "./pages/inspector/InspectorReportForm";
+import InspectorReportDetail from "./pages/inspector/InspectorReportDetail";
+import InspectorIncidents from "./pages/inspector/InspectorIncidents";
+import InspectorIncidentForm from "./pages/inspector/InspectorIncidentForm";
+import InspectorNCRs from "./pages/inspector/InspectorNCRs";
+import InspectorNCRDetail from "./pages/inspector/InspectorNCRDetail";
+import InspectorObservations from "./pages/inspector/InspectorObservations";
+import InspectorManagerSupervisors from "./pages/inspector/InspectorManagerSupervisors";
+import InspectorManagerInspections from "./pages/inspector/InspectorManagerInspections";
 
 // Admin Inspection Detail
 import AdminInspectionDetail from "./admin/pages/InspectionDetail";
@@ -234,6 +244,18 @@ const App = () => (
             <Route path="/inspector/support/tickets/new" element={<InspectorProtectedRoute><InspectorSupportTicketNew /></InspectorProtectedRoute>} />
             <Route path="/inspector/support/tickets/:id" element={<InspectorProtectedRoute><InspectorSupportTicketDetail /></InspectorProtectedRoute>} />
             <Route path="/inspector/support/chat" element={<InspectorProtectedRoute><InspectorSupportChat /></InspectorProtectedRoute>} />
+            
+            <Route path="/inspector/reports" element={<InspectorProtectedRoute><InspectorReports /></InspectorProtectedRoute>} />
+            <Route path="/inspector/reports/new" element={<InspectorProtectedRoute><InspectorReportForm /></InspectorProtectedRoute>} />
+            <Route path="/inspector/reports/:id" element={<InspectorProtectedRoute><InspectorReportDetail /></InspectorProtectedRoute>} />
+            <Route path="/inspector/incidents" element={<InspectorProtectedRoute><InspectorIncidents /></InspectorProtectedRoute>} />
+            <Route path="/inspector/incidents/new" element={<InspectorProtectedRoute><InspectorIncidentForm /></InspectorProtectedRoute>} />
+            <Route path="/inspector/ncrs" element={<InspectorProtectedRoute><InspectorNCRs /></InspectorProtectedRoute>} />
+            <Route path="/inspector/ncrs/:id" element={<InspectorProtectedRoute><InspectorNCRDetail /></InspectorProtectedRoute>} />
+            <Route path="/inspector/observations" element={<InspectorProtectedRoute><InspectorObservations /></InspectorProtectedRoute>} />
+
+            <Route path="/inspector/manager/supervisors" element={<InspectorProtectedRoute><InspectorManagerSupervisors /></InspectorProtectedRoute>} />
+            <Route path="/inspector/manager/inspections" element={<InspectorProtectedRoute><InspectorManagerInspections /></InspectorProtectedRoute>} />
 
             <Route path="/supervisor/signin" element={<SupervisorSignIn />} />
             <Route path="/supervisor/register" element={<SupervisorRegister />} />

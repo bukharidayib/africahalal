@@ -3,12 +3,17 @@ import {
   LayoutDashboard,
   ClipboardList,
   FileText,
+  AlertOctagon,
+  AlertTriangle,
+  BookOpen,
   Bell,
   TicketCheck,
   MessageSquare,
   LogOut,
   ChevronRight,
   Search as SearchIcon,
+  Users,
+  ListTodo
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +23,10 @@ import { useState } from "react";
 const navigation = [
   { name: "Dashboard", href: "/inspector/dashboard", icon: LayoutDashboard },
   { name: "My Inspections", href: "/inspector/inspections", icon: ClipboardList },
+  { name: "Reports", href: "/inspector/reports", icon: FileText },
+  { name: "Incidents", href: "/inspector/incidents", icon: AlertTriangle },
+  { name: "NCR Management", href: "/inspector/ncrs", icon: AlertOctagon },
+  { name: "Observations", href: "/inspector/observations", icon: BookOpen },
   { name: "Notifications", href: "/inspector/notifications", icon: Bell },
   { name: "Support Tickets", href: "/inspector/support/tickets", icon: TicketCheck },
   { name: "Live Chat", href: "/inspector/support/chat", icon: MessageSquare },
@@ -28,6 +37,19 @@ export function InspectorSidebar() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isManager, setIsManager] = useState(false);
+
+  useEffect(() => {
+    async function checkManagerStatus() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data } = await supabase.from('inspectors').select('is_manager').eq('user_id', session.user.id).maybeSingle();
+      if (data?.is_manager) {
+        setIsManager(true);
+      }
+    }
+    checkManagerStatus();
+  }, []);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -80,6 +102,46 @@ export function InspectorSidebar() {
             </Link>
           );
         })}
+
+        {isManager && (
+          <>
+            <div className="pt-4 pb-2 px-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Manager</p>
+            </div>
+            <Link
+              to="/inspector/manager/supervisors"
+              className={cn(
+                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
+                location.pathname.startsWith("/inspector/manager/supervisors")
+                  ? "bg-primary text-primary-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              )}
+            >
+              <Users className={cn(
+                "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
+                location.pathname.startsWith("/inspector/manager/supervisors") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-sidebar-foreground"
+              )} />
+              Supervisors
+              {location.pathname.startsWith("/inspector/manager/supervisors") && <ChevronRight className="ml-auto h-4 w-4" />}
+            </Link>
+            <Link
+              to="/inspector/manager/inspections"
+              className={cn(
+                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
+                location.pathname.startsWith("/inspector/manager/inspections")
+                  ? "bg-primary text-primary-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              )}
+            >
+              <ListTodo className={cn(
+                "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
+                location.pathname.startsWith("/inspector/manager/inspections") ? "text-primary-foreground" : "text-muted-foreground group-hover:text-sidebar-foreground"
+              )} />
+              All Inspections
+              {location.pathname.startsWith("/inspector/manager/inspections") && <ChevronRight className="ml-auto h-4 w-4" />}
+            </Link>
+          </>
+        )}
       </nav>
 
       <div className="p-4 border-t border-sidebar-border">
