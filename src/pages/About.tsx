@@ -24,7 +24,7 @@ import { HeroSection } from "@/components/sections/HeroSection";
 import { SectionHeader } from "@/components/sections/SectionHeader";
 
 const stats = [
-  { value: "500+", label: "Certified Businesses" },
+  { value: "Africa", label: "Continental Reach" },
   { value: "Africa", label: "Continental Reach" },
   { value: "10+", label: "Years of Excellence" },
   { value: "50+", label: "Expert Auditors" },
