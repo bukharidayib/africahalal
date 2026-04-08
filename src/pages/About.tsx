@@ -7,7 +7,6 @@ import {
   Globe,
   Target,
   Lightbulb,
-  Users,
   Utensils,
   Factory,
   Hotel,
@@ -16,6 +15,7 @@ import {
   Heart,
   Handshake
 } from "lucide-react";
+import aboutHeroImg from "@/assets/about-hero.jpg";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layout } from "@/components/layout/Layout";
@@ -95,8 +95,14 @@ export default function About() {
               </div>
             </div>
             <div className="relative">
-              <div className="aspect-square bg-gradient-to-br from-primary/20 to-secondary/20 rounded-2xl flex items-center justify-center">
-                <Globe className="h-32 w-32 text-primary/50" />
+              <div className="aspect-square rounded-2xl overflow-hidden shadow-xl">
+                <img
+                  src={aboutHeroImg}
+                  alt="AHI team reviewing halal certification documents"
+                  className="w-full h-full object-cover"
+                  width={960}
+                  height={960}
+                />
               </div>
               <div className="absolute -bottom-6 -left-6 bg-secondary rounded-lg p-4 shadow-lg">
                 <p className="text-2xl font-bold text-secondary-foreground">Africa</p>
