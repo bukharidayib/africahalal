@@ -12,22 +12,6 @@ import {
   Heart,
   Handshake
 } from "lucide-react";
-import aboutHeroImg from "@/assets/about-hero.jpg";
-  Shield,
-  Award,
-  Eye,
-  Globe,
-  Target,
-  Lightbulb,
-  Users,
-  Utensils,
-  Factory,
-  Hotel,
-  ArrowRight,
-  CheckCircle,
-  Heart,
-  Handshake
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layout } from "@/components/layout/Layout";
