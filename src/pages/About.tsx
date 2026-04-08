@@ -7,6 +7,18 @@ import {
   Globe,
   Target,
   Lightbulb,
+  ArrowRight,
+  CheckCircle,
+  Heart,
+  Handshake
+} from "lucide-react";
+import aboutHeroImg from "@/assets/about-hero.jpg";
+  Shield,
+  Award,
+  Eye,
+  Globe,
+  Target,
+  Lightbulb,
   Users,
   Utensils,
   Factory,
