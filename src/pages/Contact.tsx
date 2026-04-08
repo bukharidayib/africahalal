@@ -5,7 +5,6 @@ import {
   MapPin,
   Clock,
   Send,
-  Globe,
   CheckCircle2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -42,12 +41,6 @@ const subjects = [
   "Media Inquiry",
 ];
 
-const regionalOffices = [
-  { region: "Main Headquarters", city: "Lusaka", email: "info@africanhalaal.com" },
-  { region: "East Africa", city: "Nairobi, Kenya", email: "eastafrica@ahis.africa" },
-  { region: "West Africa", city: "Lagos, Nigeria", email: "westafrica@ahis.africa" },
-  { region: "North Africa", city: "Cairo, Egypt", email: "northafrica@ahis.africa" },
-];
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -245,33 +238,6 @@ export default function Contact() {
         </div>
       </section>
 
-      {/* Regional Offices */}
-      <section className="section-padding bg-muted">
-        <div className="container">
-          <SectionHeader
-            subtitle="Our Presence"
-            title="Global Network"
-            description="Regional offices across Africa to serve you better."
-          />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {regionalOffices.map((office) => (
-              <Card key={office.region} className="text-center hover:shadow-lg transition-shadow">
-                <CardContent className="pt-6">
-                  <Globe className="h-8 w-8 text-primary mx-auto mb-3" />
-                  <h3 className="font-semibold mb-1">{office.region}</h3>
-                  <p className="text-sm text-muted-foreground mb-2">{office.city}</p>
-                  <a
-                    href={`mailto:${office.email}`}
-                    className="text-sm text-primary hover:underline"
-                  >
-                    {office.email}
-                  </a>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* Map Placeholder */}
       <section className="h-96 bg-muted border-t">
