@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import Index from "./pages/Index";
 import About from "./pages/About";
-import Governance from "./pages/Governance";
+
 import Standards from "./pages/Standards";
 import CertificationJourney from "./pages/CertificationJourney";
 import Industries from "./pages/Industries";
@@ -154,7 +154,7 @@ const App = () => (
             {/* Public Routes */}
             <Route path="/" element={<Index />} />
             <Route path="/about" element={<About />} />
-            <Route path="/governance" element={<Governance />} />
+            
             <Route path="/standards" element={<Standards />} />
             <Route path="/certification-journey" element={<CertificationJourney />} />
             <Route path="/industries" element={<Industries />} />

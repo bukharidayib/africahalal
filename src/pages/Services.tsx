@@ -19,6 +19,11 @@ import { Layout } from "@/components/layout/Layout";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { SectionHeader } from "@/components/sections/SectionHeader";
 
+import halalCertImg from "@/assets/services/halal-certification.jpg";
+import auditingImg from "@/assets/services/auditing-inspection.jpg";
+import trainingImg from "@/assets/services/training-advisory.jpg";
+import digitalImg from "@/assets/services/digital-certification.jpg";
+
 const services = [
   {
     icon: BadgeCheck,
@@ -31,7 +36,7 @@ const services = [
       "Export documentation",
       "International recognition"
     ],
-    image: "bg-gradient-to-br from-primary/20 to-primary/5"
+    image: halalCertImg
   },
   {
     icon: ClipboardCheck,
@@ -44,7 +49,7 @@ const services = [
       "Supplier audits",
       "Compliance verification"
     ],
-    image: "bg-gradient-to-br from-secondary/20 to-secondary/5"
+    image: auditingImg
   },
   {
     icon: Users,
@@ -57,7 +62,7 @@ const services = [
       "Gap analysis consulting",
       "Continuous improvement support"
     ],
-    image: "bg-gradient-to-br from-primary/20 to-secondary/10"
+    image: trainingImg
   },
   {
     icon: Laptop,
@@ -70,7 +75,7 @@ const services = [
       "Compliance dashboard",
       "Document management"
     ],
-    image: "bg-gradient-to-br from-secondary/15 to-primary/10"
+    image: digitalImg
   },
 ];
 
@@ -126,8 +131,15 @@ export default function Services() {
                     </Link>
                   </Button>
                 </div>
-                <div className={`${service.image} aspect-video rounded-2xl flex items-center justify-center ${index % 2 === 1 ? "lg:order-1" : ""}`}>
-                  <service.icon className="h-24 w-24 text-primary/30" />
+                <div className={`aspect-video rounded-2xl overflow-hidden ${index % 2 === 1 ? "lg:order-1" : ""}`}>
+                  <img
+                    src={service.image}
+                    alt={service.title}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    width={960}
+                    height={640}
+                  />
                 </div>
               </div>
             ))}
@@ -156,8 +168,6 @@ export default function Services() {
           </div>
         </div>
       </section>
-
-
 
       {/* CTA */}
       <section className="py-16 bg-primary text-primary-foreground">
