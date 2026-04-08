@@ -7,11 +7,15 @@ import {
   Globe,
   Target,
   Lightbulb,
+  Utensils,
+  Factory,
+  Hotel,
   ArrowRight,
   CheckCircle,
   Heart,
   Handshake
 } from "lucide-react";
+import aboutHeroImg from "@/assets/about-hero.jpg";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layout } from "@/components/layout/Layout";
