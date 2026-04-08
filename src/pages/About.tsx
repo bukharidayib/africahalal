@@ -25,7 +25,6 @@ import { SectionHeader } from "@/components/sections/SectionHeader";
 
 const stats = [
   { value: "Africa", label: "Continental Reach" },
-  { value: "Africa", label: "Continental Reach" },
   { value: "10+", label: "Years of Excellence" },
   { value: "50+", label: "Expert Auditors" },
 ];
