@@ -102,7 +102,7 @@ const faqs = [
   },
   {
     question: "How long does the certification process take?",
-    answer: "The certification timeline varies based on the complexity of your operation. Typically, it ranges from 4-12 weeks, including documentation review, on-site inspection, and Shariah board evaluation.",
+    answer: "The certification process typically takes 5 to 7 days, depending on the completeness of your documentation and the nature of your operation.",
   },
   {
     question: "Is AHI certification internationally recognized?",
