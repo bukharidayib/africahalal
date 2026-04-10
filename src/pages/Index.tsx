@@ -177,7 +177,7 @@ export default function Index() {
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-[1.1] tracking-tight">
               Your Partner for{" "}
               <span className="text-primary">Halal Certification</span>{" "}
-              in <span className="text-primary">Africa</span>
+              in <span className="text-primary">Zambia</span>
             </h1>
 
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
