@@ -83,9 +83,6 @@ const whoWeServe = [
   { icon: Utensils, name: "Food Manufacturers" },
   { icon: Factory, name: "Meat Processors" },
   { icon: Hotel, name: "Hotels & Restaurants" },
-  { icon: Pill, name: "Pharmaceutical Companies" },
-  { icon: Shirt, name: "Cosmetics Brands" },
-  { icon: Building2, name: "Logistics Providers" },
 ];
 
 export default function Services() {
