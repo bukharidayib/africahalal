@@ -31,14 +31,12 @@ const standardsCoverage = [
 ];
 
 const scopeLimitations = [
-  { included: true, item: "Food and beverage products" },
-  { included: true, item: "Meat slaughter and processing" },
-  { included: true, item: "Pharmaceutical products" },
-  { included: true, item: "Cosmetics and personal care" },
-  { included: true, item: "Food service establishments" },
-  { included: false, item: "Financial services (Islamic finance)" },
-  { included: false, item: "Media and entertainment" },
-  { included: false, item: "Real estate certification" },
+  { included: true, item: "Restaurants" },
+  { included: true, item: "Cafés" },
+  { included: true, item: "Abattoirs" },
+  { included: true, item: "Meat Processing" },
+  { included: true, item: "Hospitality" },
+  { included: true, item: "Manufacturing" },
 ];
 
 const lifecycle = [
