@@ -152,7 +152,7 @@ export default function Services() {
             title="Who We Serve"
             description="Providing specialized services across diverse industries."
           />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
+          <div className="flex flex-wrap justify-center gap-6">
             {whoWeServe.map((client) => (
               <div
                 key={client.name}
