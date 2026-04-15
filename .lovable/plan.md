@@ -1,54 +1,46 @@
 
 
-## Plan: Fix Payment Status, Document Viewing, and Admin Screenshot Access
+## Plan: Add SEO to All Public Pages
 
-### Problem Summary
-1. **Online payment success doesn't set application to "Submitted"** — invoice becomes `paid` but `certification_applications.status` stays unchanged.
-2. **Document viewing is broken** — Eye and Download buttons in Document Vault have no click handlers.
-3. **Admin can't view offline payment screenshots** — storage SELECT policy only allows file owners to view documents; no admin policy exists.
+### Approach
+Create a reusable `<SEO>` component using `react-helmet-async` to inject per-page `<title>`, `<meta>` descriptions, Open Graph tags, canonical URLs, and JSON-LD structured data. Add `sitemap.xml` and `robots.txt` for crawler discovery.
 
-### Changes
+**Note:** Pre-rendering (`vite-plugin-prerender`) requires Puppeteer which is heavy in CI — we skip it for now. `react-helmet-async` alone ensures correct metadata for social sharing and crawlers that execute JS (Google does).
 
-#### 1. Update Application Status on Payment Completion
+### Files
 
-**Edge functions** (`process-momo-payment`, `zynlepay-momo-callback`, `check-payment-status`):
-After marking invoice as `paid`, also update the linked application status to `submitted`:
-```sql
-UPDATE certification_applications SET status = 'submitted', submitted_at = now()
-WHERE id = invoice.application_id AND status = 'draft';
-```
-
-**Admin offline approval** (`AdminBilling.tsx`):
-After approving offline payment and marking invoice paid, also update the application status to `submitted` using the invoice's `application_id`.
-
-#### 2. Fix Document Viewing in Client Portal
-
-**`DocumentVault.tsx`**:
-- Add `handleView(doc)` — calls `supabase.storage.from('application-documents').createSignedUrl(doc.file_path, 300)` and opens in new tab.
-- Add `handleDownload(doc)` — calls `createSignedUrl` with `download: true` option and triggers download.
-- Wire the Eye and Download buttons to these handlers.
-
-#### 3. Add Admin Storage SELECT Policy (Migration)
-
-Add a storage policy allowing admins to view files in the `application-documents` bucket:
-```sql
-CREATE POLICY "Admins can view all application documents"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'application-documents'
-  AND is_admin_user(auth.uid())
-);
-```
-
-### Files to Edit
-
-| File | Change |
+| File | Action |
 |------|--------|
-| `supabase/functions/process-momo-payment/index.ts` | After invoice paid, update app status to submitted |
-| `supabase/functions/zynlepay-momo-callback/index.ts` | Same — update app status on completed payment |
-| `supabase/functions/check-payment-status/index.ts` | Same — update app status on completed payment |
-| `src/admin/pages/AdminBilling.tsx` | After offline approval, update app status to submitted |
-| `src/pages/client/DocumentVault.tsx` | Add view/download handlers with signed URLs |
-| Migration SQL | Add admin SELECT policy on `storage.objects` for `application-documents` |
+| `src/components/SEO.tsx` | **Create** — reusable Helmet component with title, description, OG, canonical, JSON-LD |
+| `src/main.tsx` | Wrap `<App>` in `<HelmetProvider>` |
+| `public/sitemap.xml` | **Create** — all public routes |
+| `public/robots.txt` | **Create** — allow all, point to sitemap |
+| ~15 page files | Add `<SEO>` with unique metadata |
+
+### Per-Page Metadata
+
+| Route | Title | Keywords |
+|-------|-------|----------|
+| `/` | Halal Certification Zambia \| African Halal Institute | halal certification zambia, halal food zambia |
+| `/about` | About Us \| African Halal Institute | halal certification authority, zambia |
+| `/services` | Halal Certification Services \| AHI | halal auditing, training, consulting |
+| `/standards` | Halal Standards & Methodology \| AHI | halal standards, ISO compliance |
+| `/certification-journey` | Certification Process \| AHI | how to get halal certified |
+| `/industries` | Industries We Certify \| AHI | food, hospitality, cosmetics |
+| `/directory` | Halal Certified Directory \| AHI | halal businesses zambia |
+| `/verify` | Verify Certificate \| AHI | verify halal certificate |
+| `/contact` | Contact Us \| AHI | halal certification contact |
+| `/blog` | Blog \| AHI | halal news, insights |
+| `/blog/:slug` | Dynamic from post title | article schema |
+| `/halal-certification-zambia` | Halal Certification Zambia \| AHI | geo SEO |
+| `/halal-certification-lusaka` | Halal Certification Lusaka \| AHI | city SEO |
+| `/verify-halal-certificate` | Verify Halal Certificate Online \| AHI | verification |
+
+### Structured Data
+- **Home**: Enhanced `Organization` schema
+- **Blog posts**: `Article` schema with dynamic title/date
+- **Directory**: `ItemList` schema
+
+### Dependencies
+- `react-helmet-async`
 
