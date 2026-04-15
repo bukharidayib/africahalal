@@ -133,6 +133,22 @@ Deno.serve(async (req) => {
           .from("invoices")
           .update({ status: "paid", paid_at: new Date().toISOString() })
           .eq("id", transaction.invoice_id);
+
+        // Update application status to submitted
+        if (transaction.invoice_id) {
+          const { data: inv } = await adminClient
+            .from("invoices")
+            .select("application_id")
+            .eq("id", transaction.invoice_id)
+            .single();
+          if (inv?.application_id) {
+            await adminClient
+              .from("certification_applications")
+              .update({ status: "submitted", submitted_at: new Date().toISOString() })
+              .eq("id", inv.application_id)
+              .in("status", ["draft"]);
+          }
+        }
       }
     }
 
