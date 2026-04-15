@@ -178,7 +178,7 @@ export default function AdminBilling() {
   const [isReviewing, setIsReviewing] = useState(false);
   const [viewingScreenshot, setViewingScreenshot] = useState<string | null>(null);
 
-  useEffect(() => { fetchData(); fetchTransactions(); }, []);
+  useEffect(() => { fetchData(); fetchTransactions(); fetchOfflinePayments(); }, []);
 
   useEffect(() => {
     let result = invoices;
