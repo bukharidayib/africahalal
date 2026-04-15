@@ -127,7 +127,7 @@ export function MoMoPaymentDialog({
       if (!user) throw new Error("You must be logged in.");
 
       const fileExt = offlineFile.name.split('.').pop();
-      const filePath = `offline-payments/${user.id}/${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/offline-payments/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("application-documents")
