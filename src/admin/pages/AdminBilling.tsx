@@ -299,13 +299,27 @@ export default function AdminBilling() {
         .eq('id', reviewingPayment.id);
       if (updateError) throw updateError;
 
-      // If approved, mark invoice as paid
+      // If approved, mark invoice as paid and update application status
       if (reviewAction === 'approve') {
         const { error: invError } = await supabase
           .from('invoices')
           .update({ status: 'paid', paid_at: new Date().toISOString() })
           .eq('id', reviewingPayment.invoice_id);
         if (invError) throw invError;
+
+        // Update linked application to submitted
+        const { data: invoiceData } = await supabase
+          .from('invoices')
+          .select('application_id')
+          .eq('id', reviewingPayment.invoice_id)
+          .single();
+        if (invoiceData?.application_id) {
+          await supabase
+            .from('certification_applications')
+            .update({ status: 'submitted', submitted_at: new Date().toISOString() })
+            .eq('id', invoiceData.application_id)
+            .in('status', ['draft']);
+        }
 
         // Log to activity
         await supabase.from('invoice_activity_log').insert({
