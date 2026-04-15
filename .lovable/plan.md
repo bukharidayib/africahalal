@@ -1,70 +1,69 @@
 
 
-# Supervisor Reports Overhaul + Admin Visibility
+## Plan: Offline/Manual Payment Module for Client and Admin Portals
 
-## Summary of Changes
+### Overview
+Add an "Offline Payment" option alongside the existing Online (MoMo/Card) payment flow. Clients can choose between Online or Offline payment. For offline, they see the merchant account details, fill in transaction details, and upload a screenshot. Admins get a new tab to review and approve/reject these offline payments.
 
-### 1. Weekly Report → Long-Form Document Style
-Currently all report types use the same checklist format. The weekly report should behave like a Word document — rich text sections instead of checklist items.
+### Database Changes (Migration)
 
-**Approach**: When `report_type === "weekly_summary"` in the form, hide the checklist UI and show a structured long-form editor with these sections:
-- Executive Summary
-- Key Achievements This Week
-- Compliance Issues Identified
-- Corrective Actions Taken
-- Recommendations for Next Week
-- Supporting Evidence (file uploads)
+**New table: `offline_payments`**
+- `id` (uuid, PK)
+- `invoice_id` (uuid, NOT NULL) — references invoices
+- `sender_name` (text, NOT NULL)
+- `sender_phone` (text, NOT NULL)
+- `amount` (numeric, NOT NULL)
+- `transaction_reference` (text) — client-provided ref number
+- `screenshot_path` (text, NOT NULL) — storage path in `application-documents` bucket
+- `notes` (text)
+- `status` (text, default `'pending_review'`) — `pending_review`, `approved`, `rejected`
+- `submitted_by` (uuid, NOT NULL)
+- `reviewed_by` (uuid)
+- `reviewed_at` (timestamptz)
+- `review_notes` (text)
+- `created_at` (timestamptz, default now())
 
-Store the content in the existing `notes` field as structured JSON (or add a `report_content` JSONB column to `supervisor_reports`). No checklist items are created for weekly reports.
+**RLS Policies:**
+- Clients can INSERT where `submitted_by = auth.uid()`
+- Clients can SELECT their own (via invoice -> organization -> profile chain)
+- Admins can SELECT all, UPDATE (approve/reject) via `is_admin_user()`
 
-### 2. Monthly Performance → KPI Dashboard Report
-When `report_type === "monthly_performance"`, replace the checklist with a performance data entry form:
-- Overall compliance % (manual entry or auto-calculated from that month's daily reports)
-- KPI fields: Inspections conducted, NCRs raised, NCRs resolved, Incidents reported, Staff training sessions
-- Category breakdown scores
-- Trend notes / commentary
+### Client Portal Changes
 
-On the detail view (`SupervisorReportDetail`), render this data with:
-- KPI summary cards (large number + label)
-- Bar chart for category scores (using existing Recharts via `chart.tsx`)
-- Pie chart for compliance distribution
-- Trend line if historical data exists
+**1. Update `MoMoPaymentDialog.tsx`**
+- Add a third payment method tab: "Offline / Manual"
+- When selected, show:
+  - Merchant account info card: Account Number `1092045`, Name: `African Halal`
+  - Form fields: Sender Name, Phone Number, Amount (disabled, pre-filled), Transaction Reference (optional), Notes
+  - File upload for transaction screenshot (uploads to `application-documents` bucket)
+- On submit: insert into `offline_payments` table with status `pending_review`
+- Show success state: "Your payment proof has been submitted for review"
 
-### 3. Database Migration
-Add a `report_content` JSONB column to `supervisor_reports` to store the structured weekly and monthly data separately from checklist items.
+**2. Update `BillingDashboard.tsx`**
+- Show offline payment status badges on invoices that have pending offline payments
 
-```sql
-ALTER TABLE public.supervisor_reports 
-ADD COLUMN report_content jsonb DEFAULT '{}'::jsonb;
-```
+### Admin Portal Changes
 
-### 4. Admin Portal — View All Reports with Detail
-Currently the admin Supervisors page shows a basic reports table. Enhance it:
-- Make report rows clickable → navigate to a new `AdminSupervisorReportDetail` page
-- Show supervisor name, company name in the reports table
-- For weekly reports: render the long-form content
-- For monthly reports: render charts and KPIs
-- Add route `/admin/supervisor-reports/:id`
+**3. Update `AdminBilling.tsx`**
+- Add a third tab: "Offline Payments"
+- Table showing all offline payments with: Invoice #, Client Name, Sender Name, Phone, Amount, Screenshot (view link), Status, Date
+- Each row has Approve/Reject actions
+- On Approve: update `offline_payments.status = 'approved'`, update linked `invoices.status = 'paid'`, set `invoices.paid_at`, log to `invoice_activity_log`
+- On Reject: update `offline_payments.status = 'rejected'` with review notes
+- View screenshot via signed URL
 
-### 5. Supervisor Multi-Company Support
-Supervisors can already belong to multiple companies via `organization_supervisors` (one row per assignment). The current form already handles this with a dropdown when `sites.length > 1`. No schema change needed — this already works like inspectors.
+### Technical Details
 
-## Files Changed
+- Screenshot upload uses existing `application-documents` bucket with path `offline-payments/{user_id}/{filename}`
+- Storage SELECT policy already allows owner access; no new storage policies needed for upload (existing INSERT policy covers `uploaded_by = auth.uid()` pattern, but we'll use the bucket directly)
+- Add a storage policy for the `application-documents` bucket to allow admin signed URL access for offline payment screenshots
+- The build error about `npm:openai@^4.52.5` is unrelated to this feature — it's a Deno type resolution issue in the edge functions SDK and does not affect runtime
 
-| Action | File |
-|--------|------|
-| Migration | Add `report_content` JSONB column to `supervisor_reports` |
-| Edit | `src/pages/supervisor/SupervisorReportForm.tsx` — conditional UI for weekly (long-form) and monthly (KPI entry) |
-| Edit | `src/pages/supervisor/SupervisorReportDetail.tsx` — conditional rendering: checklist for daily, document for weekly, charts/KPIs for monthly |
-| Create | `src/admin/pages/AdminSupervisorReportDetail.tsx` — admin view of any supervisor report with charts |
-| Edit | `src/admin/pages/Supervisors.tsx` — make report rows clickable, add supervisor/company columns |
-| Edit | `src/App.tsx` — add admin route for supervisor report detail |
+### Files to Create/Edit
 
-## Implementation Order
-1. Database migration (add `report_content` column)
-2. Update `SupervisorReportForm.tsx` — three distinct form modes
-3. Update `SupervisorReportDetail.tsx` — three distinct display modes with charts
-4. Create `AdminSupervisorReportDetail.tsx` — admin view with full charts
-5. Update `Supervisors.tsx` — clickable rows, enriched table
-6. Update `App.tsx` — add route
+| File | Action |
+|------|--------|
+| `supabase/migrations/xxx.sql` | Create `offline_payments` table + RLS |
+| `src/components/billing/MoMoPaymentDialog.tsx` | Add offline payment tab + form |
+| `src/admin/pages/AdminBilling.tsx` | Add "Offline Payments" tab with approve/reject |
 
