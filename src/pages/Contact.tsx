@@ -80,8 +80,8 @@ export default function Contact() {
   return (
     <Layout>
       <SEO
-        title="Contact Us | African Halal Institute"
-        description="Get in touch with the African Halal Institute in Lusaka, Zambia. Apply for Halal certification or ask about our services."
+        title="Contact African Halal Institute — Halal Certification Enquiries Zambia"
+        description="Contact AHI in Lusaka, Zambia for Halal certification enquiries, applications, and support. Phone: +260 972 044 414. Email: info@africanhalaal.com."
         keywords="contact AHI, halal certification contact zambia, african halal institute phone"
         canonicalPath="/contact"
       />

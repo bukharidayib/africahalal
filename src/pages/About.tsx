@@ -51,8 +51,8 @@ export default function About() {
   return (
     <Layout>
       <SEO
-        title="About Us | African Halal Institute"
-        description="Learn about the African Halal Institute — Zambia's leading Halal certification authority committed to integrity, Shariah compliance, and excellence."
+        title="About African Halal Institute — Zambia's Halal Certification Authority"
+        description="Learn about AHI, Zambia's leading ISO-accredited Halal certification authority with 10+ years of excellence and 50+ expert auditors across Africa."
         keywords="african halal institute, halal certification authority zambia, about AHI"
         canonicalPath="/about"
       />

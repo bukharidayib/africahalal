@@ -111,8 +111,8 @@ export default function CertificationJourney() {
   return (
     <Layout>
       <SEO
-        title="Halal Certification Process | African Halal Institute"
-        description="Follow the step-by-step Halal certification process at AHI — from application to certification and ongoing surveillance."
+        title="How to Get Halal Certified in Zambia — Step-by-Step Process | AHI"
+        description="7-step Halal certification process in Zambia. From application to certificate in 5-7 days. Start your certification journey with AHI today."
         keywords="how to get halal certified, halal certification process zambia, halal certification steps"
         canonicalPath="/certification-journey"
       />

@@ -161,18 +161,35 @@ export default function Index() {
   return (
     <Layout>
       <SEO
-        title="Halal Certification Zambia | African Halal Institute"
-        description="Get internationally recognized Halal certification in Zambia. AHI certifies food, meat processing, hospitality, and more with integrity and Shariah compliance."
-        keywords="halal certification zambia, halal food zambia, halal certificate, african halal institute, AHI zambia"
+        title="Halal Certification Zambia — African Halal Institute | AHI"
+        description="Africa's trusted Halal certification body in Zambia. ISO-accredited, Shariah-compliant certification for food, meat, hospitality & exports. Apply online today."
+        keywords="halal certification zambia, halal food zambia, halal certificate zambia, african halal institute, AHI zambia, halal certification authority zambia, halal certified products zambia"
         canonicalPath="/"
-        structuredData={{
-          "@context": "https://schema.org",
-          "@type": "Organization",
-          name: "African Halal Institute",
-          url: "https://africahalal.lovable.app",
-          description: "Zambia's trusted Halal certification authority for food, meat processing, hospitality and more.",
-          address: { "@type": "PostalAddress", addressLocality: "Lusaka", addressCountry: "ZM" },
-        }}
+        structuredData={[
+          {
+            "@context": "https://schema.org",
+            "@type": "ProfessionalService",
+            name: "African Halal Institute",
+            url: "https://africanhalaal.com",
+            logo: "https://africanhalaal.com/favicon.png",
+            description: "Zambia's leading ISO-accredited Halal certification authority. We certify food, meat processing, hospitality, cosmetics and exports.",
+            telephone: "+260972044414",
+            email: "info@africanhalaal.com",
+            address: { "@type": "PostalAddress", streetAddress: "Matero", addressLocality: "Lusaka", addressCountry: "ZM" },
+            areaServed: { "@type": "Country", name: "Zambia" },
+            serviceType: "Halal Certification",
+            priceRange: "ZMW 2,500+",
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faqs.map(faq => ({
+              "@type": "Question",
+              name: faq.question,
+              acceptedAnswer: { "@type": "Answer", text: faq.answer },
+            })),
+          },
+        ]}
       />
       {/* Hero Section */}
       <section className="relative bg-background overflow-hidden">

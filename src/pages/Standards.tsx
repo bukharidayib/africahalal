@@ -67,8 +67,8 @@ export default function Standards() {
   return (
     <Layout>
       <SEO
-        title="Halal Standards & Methodology | African Halal Institute"
-        description="Understand AHI's Halal certification standards and methodology. ISO-aligned processes ensuring Shariah compliance and food safety."
+        title="Halal Certification Standards Zambia — ISO & Shariah Compliance | AHI"
+        description="AHI's Halal certification standards and methodology. ISO-aligned, Shariah-compliant processes ensuring food safety and ethical sourcing in Zambia."
         keywords="halal standards zambia, halal methodology, ISO halal compliance, shariah certification standards"
         canonicalPath="/standards"
       />
