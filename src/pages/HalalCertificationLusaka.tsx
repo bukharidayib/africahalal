@@ -17,10 +17,19 @@ export default function HalalCertificationLusaka() {
   return (
     <Layout>
       <SEO
-        title="Halal Certification Lusaka | African Halal Institute"
-        description="Get Halal certified in Lusaka, Zambia. AHI's headquarters offers fast certification for restaurants, hotels, and food businesses in the capital."
-        keywords="halal certification lusaka, halal lusaka zambia, halal food lusaka"
+        title="Halal Certification Lusaka 2026 — Restaurants, Hotels & Food | AHI"
+        description="Get Halal certified in Lusaka, Zambia. AHI headquarters offers fast, affordable certification for restaurants, hotels, and food businesses. Apply now."
+        keywords="halal certification lusaka, halal lusaka zambia, halal food lusaka, halal restaurants lusaka, halal certified lusaka"
         canonicalPath="/halal-certification-lusaka"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: lusakaFaqs.map(faq => ({
+            "@type": "Question",
+            name: faq.question,
+            acceptedAnswer: { "@type": "Answer", text: faq.answer },
+          })),
+        }}
       />
 
       {/* Hero */}

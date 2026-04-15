@@ -55,10 +55,19 @@ export default function HalalCertificationZambia() {
   return (
     <Layout>
       <SEO
-        title="Halal Certification Zambia | African Halal Institute"
-        description="Get Halal certification in Zambia from AHI. We certify food, meat processing, hospitality, cosmetics and more. Fast, affordable, internationally recognized."
-        keywords="halal certification zambia, halal certificate zambia, halal food certification zambia, AHI zambia"
+        title="Halal Certification in Zambia 2026 — Cost, Process & Requirements | AHI"
+        description="Complete guide to Halal certification in Zambia. Learn costs from ZMW 2,500, the 6-step process, requirements & how to apply with AHI. Internationally recognized."
+        keywords="halal certification zambia, halal certificate zambia, halal food certification zambia, halal certification cost zambia, halal certification requirements zambia, AHI zambia, how to get halal certified zambia"
         canonicalPath="/halal-certification-zambia"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: faqs.map(faq => ({
+            "@type": "Question",
+            name: faq.question,
+            acceptedAnswer: { "@type": "Answer", text: faq.answer },
+          })),
+        }}
       />
 
       {/* Hero */}

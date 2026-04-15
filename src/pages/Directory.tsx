@@ -143,8 +143,8 @@ export default function Directory() {
   return (
     <Layout>
       <SEO
-        title="Halal Certified Directory | African Halal Institute"
-        description="Browse AHI's directory of Halal-certified businesses in Zambia. Find verified restaurants, manufacturers, and service providers."
+        title="Halal Certified Businesses Zambia — Official AHI Directory"
+        description="Browse AHI's official directory of Halal-certified businesses in Zambia. Find verified restaurants, manufacturers, hotels and service providers."
         keywords="halal certified businesses zambia, halal directory, halal restaurants zambia"
         canonicalPath="/directory"
         structuredData={{

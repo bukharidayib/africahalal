@@ -90,8 +90,8 @@ export default function Services() {
   return (
     <Layout>
       <SEO
-        title="Halal Certification Services | African Halal Institute"
-        description="Explore AHI's Halal certification services — auditing, inspection, training, advisory, and verification for businesses in Zambia."
+        title="Halal Certification Services Zambia — Auditing, Training & Consulting | AHI"
+        description="Professional Halal certification, auditing, inspection & training services in Zambia. Internationally recognized by OIC member countries. Apply now."
         keywords="halal certification services, halal auditing zambia, halal training, halal consulting"
         canonicalPath="/services"
       />

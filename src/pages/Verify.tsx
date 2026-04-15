@@ -152,8 +152,8 @@ export default function Verify() {
   return (
     <Layout>
       <SEO
-        title="Verify Halal Certificate | African Halal Institute"
-        description="Instantly verify the authenticity of any AHI Halal certificate. Enter the certificate number or scan the QR code."
+        title="Verify Halal Certificate Zambia — Check Authenticity Online | AHI"
+        description="Instantly verify any AHI Halal certificate in Zambia. Enter the certificate number or scan the QR code to confirm authenticity."
         keywords="verify halal certificate, halal certificate check, AHI certificate verification"
         canonicalPath="/verify"
       />
