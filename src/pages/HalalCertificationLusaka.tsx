@@ -16,6 +16,12 @@ const lusakaFaqs = [
 export default function HalalCertificationLusaka() {
   return (
     <Layout>
+      <SEO
+        title="Halal Certification Lusaka | African Halal Institute"
+        description="Get Halal certified in Lusaka, Zambia. AHI's headquarters offers fast certification for restaurants, hotels, and food businesses in the capital."
+        keywords="halal certification lusaka, halal lusaka zambia, halal food lusaka"
+        canonicalPath="/halal-certification-lusaka"
+      />
 
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-24">

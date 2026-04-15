@@ -66,6 +66,12 @@ const lifecycle = [
 export default function Standards() {
   return (
     <Layout>
+      <SEO
+        title="Halal Standards & Methodology | African Halal Institute"
+        description="Understand AHI's Halal certification standards and methodology. ISO-aligned processes ensuring Shariah compliance and food safety."
+        keywords="halal standards zambia, halal methodology, ISO halal compliance, shariah certification standards"
+        canonicalPath="/standards"
+      />
       {/* Hero */}
       <HeroSection
         subtitle="Standards & Methodology"

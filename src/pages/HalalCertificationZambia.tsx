@@ -54,6 +54,12 @@ const benefits = [
 export default function HalalCertificationZambia() {
   return (
     <Layout>
+      <SEO
+        title="Halal Certification Zambia | African Halal Institute"
+        description="Get Halal certification in Zambia from AHI. We certify food, meat processing, hospitality, cosmetics and more. Fast, affordable, internationally recognized."
+        keywords="halal certification zambia, halal certificate zambia, halal food certification zambia, AHI zambia"
+        canonicalPath="/halal-certification-zambia"
+      />
 
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-24">

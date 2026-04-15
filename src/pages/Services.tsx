@@ -89,6 +89,12 @@ const whoWeServe = [
 export default function Services() {
   return (
     <Layout>
+      <SEO
+        title="Halal Certification Services | African Halal Institute"
+        description="Explore AHI's Halal certification services — auditing, inspection, training, advisory, and verification for businesses in Zambia."
+        keywords="halal certification services, halal auditing zambia, halal training, halal consulting"
+        canonicalPath="/services"
+      />
       {/* Hero */}
       <HeroSection
         subtitle="Our Services"

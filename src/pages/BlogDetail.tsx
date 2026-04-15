@@ -61,6 +61,20 @@ export default function BlogDetail() {
 
     return (
         <Layout>
+            <SEO
+              title={`${blog.title} | African Halal Institute`}
+              description={blog.title}
+              canonicalPath={`/blog/${slug}`}
+              ogType="article"
+              ogImage={blog.image_url}
+              structuredData={{
+                "@context": "https://schema.org",
+                "@type": "Article",
+                headline: blog.title,
+                datePublished: blog.published_at,
+                publisher: { "@type": "Organization", name: "African Halal Institute" },
+              }}
+            />
             <article className="min-h-screen pb-20">
                 {blog.image_url ? (
                     <div className="w-full h-[400px] relative overflow-hidden">

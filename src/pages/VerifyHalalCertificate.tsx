@@ -13,6 +13,12 @@ const faqs = [
 export default function VerifyHalalCertificate() {
   return (
     <Layout>
+      <SEO
+        title="Verify Halal Certificate Online | African Halal Institute"
+        description="Verify the authenticity of any Halal certificate issued by AHI. Scan the QR code or enter the certificate number for instant verification."
+        keywords="verify halal certificate online, halal certificate verification zambia, check halal certificate"
+        canonicalPath="/verify-halal-certificate"
+      />
 
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-24">

@@ -142,6 +142,18 @@ export default function Directory() {
 
   return (
     <Layout>
+      <SEO
+        title="Halal Certified Directory | African Halal Institute"
+        description="Browse AHI's directory of Halal-certified businesses in Zambia. Find verified restaurants, manufacturers, and service providers."
+        keywords="halal certified businesses zambia, halal directory, halal restaurants zambia"
+        canonicalPath="/directory"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          name: "Halal Certified Businesses in Zambia",
+          description: "Directory of AHI-certified Halal businesses in Zambia",
+        }}
+      />
       <HeroSection
         subtitle="Certified Directory"
         title="Halal Certified Business Registry"

@@ -110,6 +110,12 @@ const quickFacts = [
 export default function CertificationJourney() {
   return (
     <Layout>
+      <SEO
+        title="Halal Certification Process | African Halal Institute"
+        description="Follow the step-by-step Halal certification process at AHI — from application to certification and ongoing surveillance."
+        keywords="how to get halal certified, halal certification process zambia, halal certification steps"
+        canonicalPath="/certification-journey"
+      />
       {/* Hero */}
       <HeroSection
         subtitle="Certification Journey"

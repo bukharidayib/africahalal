@@ -116,6 +116,12 @@ export default function Industries() {
 
   return (
     <Layout>
+      <SEO
+        title="Industries We Certify | African Halal Institute"
+        description="AHI certifies restaurants, abattoirs, meat processors, hotels, cosmetics, and more across Zambia. Discover your industry's certification path."
+        keywords="halal certified industries zambia, halal food certification, halal hospitality, halal cosmetics"
+        canonicalPath="/industries"
+      />
       {/* Hero */}
       <HeroSection
         subtitle="Industries We Certify"

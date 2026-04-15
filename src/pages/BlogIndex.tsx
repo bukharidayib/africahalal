@@ -34,6 +34,12 @@ export default function BlogIndex() {
 
   return (
     <Layout>
+      <SEO
+        title="Blog | African Halal Institute"
+        description="Read the latest news, insights, and articles about Halal certification, compliance, and industry updates from AHI."
+        keywords="halal blog, halal certification news, halal industry insights zambia"
+        canonicalPath="/blog"
+      />
       <section className="bg-primary text-primary-foreground py-16 md:py-20">
         <div className="container max-w-4xl text-center space-y-4">
           <h1 className="text-4xl md:text-5xl font-bold">AHI Blog</h1>
