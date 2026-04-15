@@ -1,3 +1,4 @@
+import { SEO } from "@/components/SEO";
 import {
   FileCheck,
   Search,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { SEO } from "@/components/SEO";
 import {
   Search,
   QrCode,
