@@ -149,6 +149,35 @@ export default function AdminBilling() {
   const [txStatusFilter, setTxStatusFilter] = useState('all');
   const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
 
+  // Offline payments state
+  interface OfflinePayment {
+    id: string;
+    invoice_id: string;
+    sender_name: string;
+    sender_phone: string;
+    amount: number;
+    transaction_reference: string | null;
+    screenshot_path: string;
+    notes: string | null;
+    status: string;
+    submitted_by: string;
+    reviewed_by: string | null;
+    reviewed_at: string | null;
+    review_notes: string | null;
+    created_at: string;
+    invoices?: { invoice_number: string; organizations?: { name: string } | null } | null;
+  }
+  const [offlinePayments, setOfflinePayments] = useState<OfflinePayment[]>([]);
+  const [offlineLoading, setOfflineLoading] = useState(true);
+  const [offlineSearch, setOfflineSearch] = useState('');
+  const [offlineStatusFilter, setOfflineStatusFilter] = useState('all');
+  const [filteredOffline, setFilteredOffline] = useState<OfflinePayment[]>([]);
+  const [reviewingPayment, setReviewingPayment] = useState<OfflinePayment | null>(null);
+  const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | null>(null);
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [viewingScreenshot, setViewingScreenshot] = useState<string | null>(null);
+
   useEffect(() => { fetchData(); fetchTransactions(); }, []);
 
   useEffect(() => {
