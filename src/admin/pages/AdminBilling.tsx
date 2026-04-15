@@ -775,9 +775,141 @@ export default function AdminBilling() {
               </CardContent>
             </Card>
           </TabsContent>
+          {/* Offline Payments Tab */}
+          <TabsContent value="offline">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search offline payments..." value={offlineSearch} onChange={(e) => setOfflineSearch(e.target.value)} className="pl-9" />
+                  </div>
+                  <Select value={offlineStatusFilter} onValueChange={setOfflineStatusFilter}>
+                    <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filter status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="pending_review">Pending Review</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="sm" onClick={fetchOfflinePayments} disabled={offlineLoading}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${offlineLoading ? 'animate-spin' : ''}`} /> Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {offlineLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                ) : filteredOffline.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Banknote className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">No offline payments found.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Invoice #</TableHead>
+                          <TableHead>Client</TableHead>
+                          <TableHead>Sender Name</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Ref</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredOffline.map((op) => (
+                          <TableRow key={op.id}>
+                            <TableCell className="font-mono text-sm">{op.invoices?.invoice_number || '—'}</TableCell>
+                            <TableCell>{op.invoices?.organizations?.name || '—'}</TableCell>
+                            <TableCell>{op.sender_name}</TableCell>
+                            <TableCell className="font-mono text-sm">{op.sender_phone}</TableCell>
+                            <TableCell className="font-semibold">ZMW {Number(op.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
+                            <TableCell className="font-mono text-xs">{op.transaction_reference || '—'}</TableCell>
+                            <TableCell>
+                              <Badge variant={op.status === 'approved' ? 'default' : op.status === 'rejected' ? 'destructive' : 'secondary'}>
+                                {op.status === 'pending_review' ? 'Pending Review' : op.status.charAt(0).toUpperCase() + op.status.slice(1)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">{format(new Date(op.created_at), 'dd MMM yyyy HH:mm')}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-end gap-1">
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewScreenshot(op.screenshot_path)} title="View Screenshot">
+                                  <Image className="h-4 w-4" />
+                                </Button>
+                                {op.status === 'pending_review' && (
+                                  <>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => { setReviewingPayment(op); setReviewAction('approve'); }} title="Approve">
+                                      <CheckCircle className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => { setReviewingPayment(op); setReviewAction('reject'); }} title="Reject">
+                                      <XCircle className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
-        {/* View Invoice Dialog */}
+        {/* Offline Payment Review Dialog */}
+        <Dialog open={!!reviewingPayment} onOpenChange={(open) => { if (!open) { setReviewingPayment(null); setReviewAction(null); setReviewNotes(''); } }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{reviewAction === 'approve' ? 'Approve' : 'Reject'} Offline Payment</DialogTitle>
+            </DialogHeader>
+            {reviewingPayment && (
+              <div className="space-y-4 py-2">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-muted-foreground">Invoice</span><p className="font-mono font-semibold">{reviewingPayment.invoices?.invoice_number}</p></div>
+                  <div><span className="text-muted-foreground">Amount</span><p className="font-bold">ZMW {Number(reviewingPayment.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
+                  <div><span className="text-muted-foreground">Sender</span><p>{reviewingPayment.sender_name}</p></div>
+                  <div><span className="text-muted-foreground">Phone</span><p className="font-mono">{reviewingPayment.sender_phone}</p></div>
+                  {reviewingPayment.transaction_reference && <div><span className="text-muted-foreground">Reference</span><p className="font-mono">{reviewingPayment.transaction_reference}</p></div>}
+                  {reviewingPayment.notes && <div className="col-span-2"><span className="text-muted-foreground">Client Notes</span><p>{reviewingPayment.notes}</p></div>}
+                </div>
+                <Button variant="outline" size="sm" onClick={() => handleViewScreenshot(reviewingPayment.screenshot_path)}>
+                  <Image className="h-4 w-4 mr-2" /> View Payment Screenshot
+                </Button>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>Review Notes {reviewAction === 'reject' ? '*' : '(optional)'}</Label>
+                  <Textarea
+                    placeholder={reviewAction === 'reject' ? 'Reason for rejection...' : 'Optional notes...'}
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setReviewingPayment(null); setReviewAction(null); setReviewNotes(''); }}>Cancel</Button>
+              <Button
+                onClick={handleReviewOfflinePayment}
+                disabled={isReviewing || (reviewAction === 'reject' && !reviewNotes.trim())}
+                variant={reviewAction === 'approve' ? 'default' : 'destructive'}
+              >
+                {isReviewing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {reviewAction === 'approve' ? 'Approve Payment' : 'Reject Payment'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+
         <Dialog open={!!viewInvoice} onOpenChange={(open) => !open && setViewInvoice(null)}>
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>Invoice Details</DialogTitle></DialogHeader>
