@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SEO } from "@/components/SEO";
 import {
   Mail,
   Phone,
@@ -78,6 +79,12 @@ export default function Contact() {
 
   return (
     <Layout>
+      <SEO
+        title="Contact Us | African Halal Institute"
+        description="Get in touch with the African Halal Institute in Lusaka, Zambia. Apply for Halal certification or ask about our services."
+        keywords="contact AHI, halal certification contact zambia, african halal institute phone"
+        canonicalPath="/contact"
+      />
       {/* Hero */}
       <HeroSection
         subtitle="Get in Touch"

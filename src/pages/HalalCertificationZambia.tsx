@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, CheckCircle, Shield, Award, Clock, FileCheck, Users, Building2 } from "lucide-react";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -53,6 +54,12 @@ const benefits = [
 export default function HalalCertificationZambia() {
   return (
     <Layout>
+      <SEO
+        title="Halal Certification Zambia | African Halal Institute"
+        description="Get Halal certification in Zambia from AHI. We certify food, meat processing, hospitality, cosmetics and more. Fast, affordable, internationally recognized."
+        keywords="halal certification zambia, halal certificate zambia, halal food certification zambia, AHI zambia"
+        canonicalPath="/halal-certification-zambia"
+      />
 
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-24">

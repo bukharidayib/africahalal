@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { SEO } from "@/components/SEO";
 import {
   Search,
   QrCode,
@@ -150,6 +151,12 @@ export default function Verify() {
 
   return (
     <Layout>
+      <SEO
+        title="Verify Halal Certificate | African Halal Institute"
+        description="Instantly verify the authenticity of any AHI Halal certificate. Enter the certificate number or scan the QR code."
+        keywords="verify halal certificate, halal certificate check, AHI certificate verification"
+        canonicalPath="/verify"
+      />
       <HeroSection
         subtitle="Certificate Verification"
         title="Verify Halal Certificate Authenticity"

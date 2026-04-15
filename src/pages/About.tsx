@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { SEO } from "@/components/SEO";
 import {
   Shield,
   Award,
@@ -49,6 +50,12 @@ const coreValues = [
 export default function About() {
   return (
     <Layout>
+      <SEO
+        title="About Us | African Halal Institute"
+        description="Learn about the African Halal Institute — Zambia's leading Halal certification authority committed to integrity, Shariah compliance, and excellence."
+        keywords="african halal institute, halal certification authority zambia, about AHI"
+        canonicalPath="/about"
+      />
       <HeroSection
         subtitle="About AHI"
         title="Building a Standard of Trust"

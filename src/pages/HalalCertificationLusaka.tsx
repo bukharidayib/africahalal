@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, CheckCircle, MapPin, Building2, Phone, Mail } from "lucide-react";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -15,6 +16,12 @@ const lusakaFaqs = [
 export default function HalalCertificationLusaka() {
   return (
     <Layout>
+      <SEO
+        title="Halal Certification Lusaka | African Halal Institute"
+        description="Get Halal certified in Lusaka, Zambia. AHI's headquarters offers fast certification for restaurants, hotels, and food businesses in the capital."
+        keywords="halal certification lusaka, halal lusaka zambia, halal food lusaka"
+        canonicalPath="/halal-certification-lusaka"
+      />
 
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-24">

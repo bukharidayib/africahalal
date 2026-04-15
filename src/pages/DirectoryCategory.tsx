@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { ArrowRight, Building2 } from "lucide-react";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
 
@@ -36,6 +37,11 @@ export default function DirectoryCategory() {
 
   return (
     <Layout>
+      <SEO
+        title={info.title}
+        description={info.description}
+        canonicalPath={`/directory/${category}`}
+      />
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-20">
         <div className="container max-w-4xl text-center space-y-4">

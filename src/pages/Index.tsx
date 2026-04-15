@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Layout } from "@/components/layout/Layout";
 import { SectionHeader } from "@/components/sections/SectionHeader";
+import { SEO } from "@/components/SEO";
 
 interface BlogPost {
   id: string;
@@ -159,6 +160,20 @@ export default function Index() {
 
   return (
     <Layout>
+      <SEO
+        title="Halal Certification Zambia | African Halal Institute"
+        description="Get internationally recognized Halal certification in Zambia. AHI certifies food, meat processing, hospitality, and more with integrity and Shariah compliance."
+        keywords="halal certification zambia, halal food zambia, halal certificate, african halal institute, AHI zambia"
+        canonicalPath="/"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "African Halal Institute",
+          url: "https://africahalal.lovable.app",
+          description: "Zambia's trusted Halal certification authority for food, meat processing, hospitality and more.",
+          address: { "@type": "PostalAddress", addressLocality: "Lusaka", addressCountry: "ZM" },
+        }}
+      />
       {/* Hero Section */}
       <section className="relative bg-background overflow-hidden">
         {/* Subtle decorative elements */}
