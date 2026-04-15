@@ -40,7 +40,7 @@ export default function DirectoryCategory() {
       <SEO
         title={info.title}
         description={info.description}
-        canonicalPath={`/directory/${slug}`}
+        canonicalPath={`/directory/${category}`}
       />
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-20">
