@@ -341,7 +341,7 @@ export default function AdminBilling() {
     }
   };
 
-
+  const handleCheckStatus = async (tx: PaymentTransaction) => {
     setCheckingStatusId(tx.id);
     try {
       const { data, error } = await supabase.functions.invoke('check-payment-status', {
