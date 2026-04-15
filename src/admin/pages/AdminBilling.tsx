@@ -265,7 +265,83 @@ export default function AdminBilling() {
     }
   };
 
-  const handleCheckStatus = async (tx: PaymentTransaction) => {
+  const fetchOfflinePayments = async () => {
+    setOfflineLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('offline_payments')
+        .select('*, invoices(invoice_number, organizations(name))')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setOfflinePayments((data || []) as OfflinePayment[]);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+      setOfflineLoading(false);
+    }
+  };
+
+  const handleReviewOfflinePayment = async () => {
+    if (!reviewingPayment || !reviewAction) return;
+    setIsReviewing(true);
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      
+      // Update offline payment status
+      const { error: updateError } = await supabase
+        .from('offline_payments')
+        .update({
+          status: reviewAction === 'approve' ? 'approved' : 'rejected',
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+          review_notes: reviewNotes || null,
+        })
+        .eq('id', reviewingPayment.id);
+      if (updateError) throw updateError;
+
+      // If approved, mark invoice as paid
+      if (reviewAction === 'approve') {
+        const { error: invError } = await supabase
+          .from('invoices')
+          .update({ status: 'paid', paid_at: new Date().toISOString() })
+          .eq('id', reviewingPayment.invoice_id);
+        if (invError) throw invError;
+
+        // Log to activity
+        await supabase.from('invoice_activity_log').insert({
+          invoice_id: reviewingPayment.invoice_id,
+          action: 'offline_payment_approved',
+          performed_by: user?.id,
+          metadata: { offline_payment_id: reviewingPayment.id, sender_name: reviewingPayment.sender_name },
+        });
+      }
+
+      toast({ title: reviewAction === 'approve' ? 'Payment Approved' : 'Payment Rejected', description: `Offline payment has been ${reviewAction === 'approve' ? 'approved' : 'rejected'}.` });
+      setReviewingPayment(null);
+      setReviewAction(null);
+      setReviewNotes('');
+      fetchOfflinePayments();
+      fetchData();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+      setIsReviewing(false);
+    }
+  };
+
+  const handleViewScreenshot = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('application-documents')
+        .createSignedUrl(path, 60);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank');
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not load screenshot.' });
+    }
+  };
+
+
     setCheckingStatusId(tx.id);
     try {
       const { data, error } = await supabase.functions.invoke('check-payment-status', {
