@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Phone, CheckCircle2, AlertTriangle, CreditCard, Smartphone, Lock } from "lucide-react";
+import { Loader2, Phone, CheckCircle2, AlertTriangle, CreditCard, Smartphone, Lock, Upload, Banknote, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,7 +36,7 @@ export function MoMoPaymentDialog({
   currency,
   onPaymentComplete,
 }: MoMoPaymentDialogProps) {
-  const [paymentMethod, setPaymentMethod] = useState<"momo" | "card">("momo");
+  const [paymentMethod, setPaymentMethod] = useState<"momo" | "card" | "offline">("momo");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [channel, setChannel] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -46,15 +47,35 @@ export function MoMoPaymentDialog({
   const [message, setMessage] = useState("");
   const [reference, setReference] = useState("");
   const [transactionId, setTransactionId] = useState<string | null>(null);
+
+  // Offline payment state
+  const [offlineSenderName, setOfflineSenderName] = useState("");
+  const [offlineSenderPhone, setOfflineSenderPhone] = useState("");
+  const [offlineTxRef, setOfflineTxRef] = useState("");
+  const [offlineNotes, setOfflineNotes] = useState("");
+  const [offlineFile, setOfflineFile] = useState<File | null>(null);
+  const [isSubmittingOffline, setIsSubmittingOffline] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { toast } = useToast();
 
   const phoneRegex = /^0[79]\d{8}$/;
   const isPhoneValid = phoneRegex.test(phoneNumber);
   const isCardValid = cardNumber.replace(/\s/g, "").length >= 13 && cardExpiryMonth.length === 2 && cardExpiryYear.length >= 2 && cardCvv.length >= 3;
-  const isFormValid = paymentMethod === "momo" ? (isPhoneValid && channel !== "") : isCardValid;
+  const isOfflineValid = offlineSenderName.trim().length >= 2 && offlineSenderPhone.trim().length >= 5 && !!offlineFile;
+  const isFormValid = paymentMethod === "momo"
+    ? (isPhoneValid && channel !== "")
+    : paymentMethod === "card"
+      ? isCardValid
+      : isOfflineValid;
 
   const handlePayment = async () => {
     if (!isFormValid) return;
+
+    if (paymentMethod === "offline") {
+      await handleOfflineSubmit();
+      return;
+    }
 
     setPaymentState("processing");
     setMessage("");
@@ -96,6 +117,50 @@ export function MoMoPaymentDialog({
     }
   };
 
+  const handleOfflineSubmit = async () => {
+    if (!offlineFile) return;
+    setIsSubmittingOffline(true);
+    setPaymentState("processing");
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("You must be logged in.");
+
+      const fileExt = offlineFile.name.split('.').pop();
+      const filePath = `offline-payments/${user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("application-documents")
+        .upload(filePath, offlineFile, { upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { error: insertError } = await supabase
+        .from("offline_payments")
+        .insert({
+          invoice_id: invoiceId,
+          sender_name: offlineSenderName.trim(),
+          sender_phone: offlineSenderPhone.trim(),
+          amount,
+          transaction_reference: offlineTxRef.trim() || null,
+          screenshot_path: filePath,
+          notes: offlineNotes.trim() || null,
+          submitted_by: user.id,
+        });
+
+      if (insertError) throw insertError;
+
+      setPaymentState("success");
+      setMessage("Your payment proof has been submitted for review. You will be notified once it's approved.");
+    } catch (err: any) {
+      setPaymentState("error");
+      setMessage(err.message || "Failed to submit payment proof.");
+      toast({ variant: "destructive", title: "Submission Error", description: err.message });
+    } finally {
+      setIsSubmittingOffline(false);
+    }
+  };
+
   const handleCheckStatus = async () => {
     if (!transactionId) return;
 
@@ -131,8 +196,18 @@ export function MoMoPaymentDialog({
       setMessage("");
       setReference("");
       setTransactionId(null);
+      setOfflineSenderName("");
+      setOfflineSenderPhone("");
+      setOfflineTxRef("");
+      setOfflineNotes("");
+      setOfflineFile(null);
       onOpenChange(false);
     }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copied", description: `${text} copied to clipboard.` });
   };
 
   return (
@@ -148,11 +223,11 @@ export function MoMoPaymentDialog({
         {paymentState === "idle" && (
           <div className="space-y-4 py-2">
             {/* Payment Method Tabs */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setPaymentMethod("momo")}
-                className={`flex items-center justify-center gap-2 rounded-lg border-2 p-3 text-sm font-semibold transition-all ${
+                className={`flex items-center justify-center gap-1.5 rounded-lg border-2 p-3 text-xs font-semibold transition-all ${
                   paymentMethod === "momo"
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-border bg-background text-muted-foreground hover:border-primary/50"
@@ -164,7 +239,7 @@ export function MoMoPaymentDialog({
               <button
                 type="button"
                 onClick={() => setPaymentMethod("card")}
-                className={`flex items-center justify-center gap-2 rounded-lg border-2 p-3 text-sm font-semibold transition-all ${
+                className={`flex items-center justify-center gap-1.5 rounded-lg border-2 p-3 text-xs font-semibold transition-all ${
                   paymentMethod === "card"
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-border bg-background text-muted-foreground hover:border-primary/50"
@@ -172,6 +247,18 @@ export function MoMoPaymentDialog({
               >
                 <CreditCard className="h-4 w-4" />
                 Bank Card
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod("offline")}
+                className={`flex items-center justify-center gap-1.5 rounded-lg border-2 p-3 text-xs font-semibold transition-all ${
+                  paymentMethod === "offline"
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                }`}
+              >
+                <Banknote className="h-4 w-4" />
+                Offline
               </button>
             </div>
 
@@ -278,23 +365,132 @@ export function MoMoPaymentDialog({
               </>
             )}
 
-            <div className="rounded-lg bg-muted/50 p-3 text-sm space-y-1">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Amount</span>
-                <span className="font-semibold">{currency} {Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+            {/* Offline / Manual Payment Form */}
+            {paymentMethod === "offline" && (
+              <div className="space-y-4">
+                {/* Merchant Account Info */}
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
+                  <p className="text-sm font-semibold text-primary">Send payment to:</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Account Number</p>
+                      <p className="font-mono font-bold text-lg">1092045</p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyToClipboard("1092045")}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Account Name</p>
+                    <p className="font-semibold">African Halal</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Sender Name *</Label>
+                  <Input
+                    placeholder="Full name used for payment"
+                    value={offlineSenderName}
+                    onChange={(e) => setOfflineSenderName(e.target.value.slice(0, 100))}
+                    maxLength={100}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Sender Phone Number *</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Phone number used for payment"
+                      value={offlineSenderPhone}
+                      onChange={(e) => setOfflineSenderPhone(e.target.value.replace(/[^0-9+\-\s]/g, "").slice(0, 20))}
+                      className="pl-10"
+                      maxLength={20}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Amount</Label>
+                  <Input
+                    value={`${currency} ${Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Transaction Reference (optional)</Label>
+                  <Input
+                    placeholder="e.g. MoMo confirmation code"
+                    value={offlineTxRef}
+                    onChange={(e) => setOfflineTxRef(e.target.value.slice(0, 100))}
+                    maxLength={100}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Notes (optional)</Label>
+                  <Textarea
+                    placeholder="Any additional details..."
+                    value={offlineNotes}
+                    onChange={(e) => setOfflineNotes(e.target.value.slice(0, 500))}
+                    maxLength={500}
+                    rows={2}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Payment Screenshot *</Label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file && file.size <= 5 * 1024 * 1024) {
+                        setOfflineFile(file);
+                      } else if (file) {
+                        toast({ variant: "destructive", title: "File too large", description: "Max 5MB." });
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {offlineFile ? offlineFile.name : "Upload screenshot or receipt"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">Accepted: images or PDF, max 5MB</p>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Invoice</span>
-                <span className="font-mono text-xs">{invoiceNumber}</span>
+            )}
+
+            {paymentMethod !== "offline" && (
+              <div className="rounded-lg bg-muted/50 p-3 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="font-semibold">{currency} {Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Invoice</span>
+                  <span className="font-mono text-xs">{invoiceNumber}</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
         {paymentState === "processing" && (
           <div className="flex flex-col items-center py-8 gap-3">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Processing payment...</p>
+            <p className="text-sm text-muted-foreground">
+              {paymentMethod === "offline" ? "Submitting payment proof..." : "Processing payment..."}
+            </p>
           </div>
         )}
 
@@ -314,7 +510,9 @@ export function MoMoPaymentDialog({
             <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/30">
               <CheckCircle2 className="h-6 w-6 text-green-600" />
             </div>
-            <p className="font-medium">Payment Successful!</p>
+            <p className="font-medium">
+              {paymentMethod === "offline" ? "Payment Proof Submitted!" : "Payment Successful!"}
+            </p>
             <p className="text-sm text-muted-foreground">{message}</p>
             {reference && <p className="text-xs text-muted-foreground font-mono">Ref: {reference}</p>}
           </div>
@@ -325,16 +523,23 @@ export function MoMoPaymentDialog({
             <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/30">
               <AlertTriangle className="h-6 w-6 text-red-600" />
             </div>
-            <p className="font-medium">Payment Failed</p>
+            <p className="font-medium">
+              {paymentMethod === "offline" ? "Submission Failed" : "Payment Failed"}
+            </p>
             <p className="text-sm text-muted-foreground">{message}</p>
           </div>
         )}
 
         <DialogFooter>
           {paymentState === "idle" && (
-            <Button onClick={handlePayment} disabled={!isFormValid} className="w-full">
-              {paymentMethod === "card" ? <CreditCard className="mr-2 h-4 w-4" /> : <Phone className="mr-2 h-4 w-4" />}
-              Pay {currency} {Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            <Button onClick={handlePayment} disabled={!isFormValid || isSubmittingOffline} className="w-full">
+              {paymentMethod === "offline" ? (
+                <><Upload className="mr-2 h-4 w-4" /> Submit Payment Proof</>
+              ) : paymentMethod === "card" ? (
+                <><CreditCard className="mr-2 h-4 w-4" /> Pay {currency} {Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</>
+              ) : (
+                <><Phone className="mr-2 h-4 w-4" /> Pay {currency} {Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</>
+              )}
             </Button>
           )}
           {paymentState === "pending" && (
