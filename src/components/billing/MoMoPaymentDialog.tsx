@@ -367,81 +367,75 @@ export function MoMoPaymentDialog({
 
             {/* Offline / Manual Payment Form */}
             {paymentMethod === "offline" && (
-              <div className="space-y-4">
-                {/* Merchant Account Info */}
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
-                  <p className="text-sm font-semibold text-primary">Send payment to:</p>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Account Number</p>
-                      <p className="font-mono font-bold text-lg">1092045</p>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyToClipboard("1092045")}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Account Name</p>
-                    <p className="font-semibold">African Halal</p>
-                  </div>
+              <div className="space-y-3">
+                {/* Compact merchant info */}
+                <div className="flex items-center gap-3 rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+                  <Banknote className="h-4 w-4 text-primary shrink-0" />
+                  <p className="text-xs text-foreground">
+                    Send to: <span className="font-semibold">African Halal</span> — Acc: <span className="font-mono font-bold">1092045</span>
+                  </p>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto shrink-0" onClick={() => copyToClipboard("1092045")}>
+                    <Copy className="h-3 w-3" />
+                  </Button>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Sender Name *</Label>
-                  <Input
-                    placeholder="Full name used for payment"
-                    value={offlineSenderName}
-                    onChange={(e) => setOfflineSenderName(e.target.value.slice(0, 100))}
-                    maxLength={100}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Sender Phone Number *</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                {/* Two-column layout for name & phone */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Sender Name *</Label>
                     <Input
-                      placeholder="Phone number used for payment"
+                      placeholder="Full name"
+                      value={offlineSenderName}
+                      onChange={(e) => setOfflineSenderName(e.target.value.slice(0, 100))}
+                      maxLength={100}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Phone Number *</Label>
+                    <Input
+                      placeholder="Phone number"
                       value={offlineSenderPhone}
                       onChange={(e) => setOfflineSenderPhone(e.target.value.replace(/[^0-9+\-\s]/g, "").slice(0, 20))}
-                      className="pl-10"
                       maxLength={20}
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Amount</Label>
-                  <Input
-                    value={`${currency} ${Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
-                    disabled
-                    className="bg-muted"
-                  />
+                {/* Two-column: amount & reference */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Amount</Label>
+                    <Input
+                      value={`${currency} ${Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Reference (optional)</Label>
+                    <Input
+                      placeholder="Confirmation code"
+                      value={offlineTxRef}
+                      onChange={(e) => setOfflineTxRef(e.target.value.slice(0, 100))}
+                      maxLength={100}
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Transaction Reference (optional)</Label>
+                {/* Notes - single row */}
+                <div className="space-y-1">
+                  <Label className="text-xs">Notes (optional)</Label>
                   <Input
-                    placeholder="e.g. MoMo confirmation code"
-                    value={offlineTxRef}
-                    onChange={(e) => setOfflineTxRef(e.target.value.slice(0, 100))}
-                    maxLength={100}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Notes (optional)</Label>
-                  <Textarea
-                    placeholder="Any additional details..."
+                    placeholder="Any additional details"
                     value={offlineNotes}
                     onChange={(e) => setOfflineNotes(e.target.value.slice(0, 500))}
                     maxLength={500}
-                    rows={2}
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Payment Screenshot *</Label>
+                {/* File upload - compact */}
+                <div className="space-y-1">
+                  <Label className="text-xs">Payment Screenshot *</Label>
                   <input
                     ref={fileInputRef}
                     type="file"
