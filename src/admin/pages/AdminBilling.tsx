@@ -611,6 +611,7 @@ export default function AdminBilling() {
           <TabsList>
             <TabsTrigger value="invoices" className="gap-2"><Receipt className="h-4 w-4" /> Invoices</TabsTrigger>
             <TabsTrigger value="transactions" className="gap-2"><CreditCard className="h-4 w-4" /> Payment Transactions</TabsTrigger>
+            <TabsTrigger value="offline" className="gap-2"><Banknote className="h-4 w-4" /> Offline Payments</TabsTrigger>
           </TabsList>
 
           {/* Invoices Tab */}
