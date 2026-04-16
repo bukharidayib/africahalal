@@ -246,14 +246,16 @@ export default function Contact() {
       </section>
 
 
-      {/* Map Placeholder */}
+      {/* Google Map */}
       <section className="h-96 bg-muted border-t">
-        <div className="h-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5">
-          <div className="text-center">
-            <MapPin className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-muted-foreground">Interactive map would be displayed here</p>
-          </div>
-        </div>
+        <iframe
+          title="African Halal Institute — Lusaka, Zambia"
+          src="https://www.google.com/maps?q=Lusaka,Zambia&output=embed"
+          className="w-full h-full border-0"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          allowFullScreen
+        />
       </section>
     </Layout>
   );
