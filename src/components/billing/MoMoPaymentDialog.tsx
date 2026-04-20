@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Phone, CheckCircle2, AlertTriangle, CreditCard, Smartphone, Lock, Upload, Banknote, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface MoMoPaymentDialogProps {
   open: boolean;
@@ -47,6 +48,7 @@ export function MoMoPaymentDialog({
   const [message, setMessage] = useState("");
   const [reference, setReference] = useState("");
   const [transactionId, setTransactionId] = useState<string | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   // Offline payment state
   const [offlineSenderName, setOfflineSenderName] = useState("");
@@ -161,9 +163,10 @@ export function MoMoPaymentDialog({
     }
   };
 
-  const handleCheckStatus = async () => {
-    if (!transactionId) return;
+  const handleCheckStatus = async (silent = false) => {
+    if (!transactionId || isCheckingStatus) return;
 
+    setIsCheckingStatus(true);
     try {
       const { data, error } = await supabase.functions.invoke("check-payment-status", {
         body: { transaction_id: transactionId },
@@ -179,12 +182,30 @@ export function MoMoPaymentDialog({
         setPaymentState("error");
       }
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message });
+      if (!silent) {
+        toast({ variant: "destructive", title: "Error", description: err.message });
+      }
+    } finally {
+      setIsCheckingStatus(false);
     }
   };
 
+  useEffect(() => {
+    let intervalId: any;
+
+    if (paymentState === "pending" && transactionId) {
+      intervalId = setInterval(() => {
+        handleCheckStatus(true);
+      }, 5000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [paymentState, transactionId]);
+
   const handleClose = () => {
-    if (paymentState !== "processing") {
+    if (paymentState !== "processing" && paymentState !== "pending") {
       setPaymentState("idle");
       setPaymentMethod("momo");
       setPhoneNumber("");
@@ -212,7 +233,22 @@ export function MoMoPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent 
+        className={cn(
+          "sm:max-w-md",
+          (paymentState === "processing" || paymentState === "pending") && "[&>button:last-child]:hidden"
+        )}
+        onPointerDownOutside={(e) => {
+          if (paymentState === "processing" || paymentState === "pending") {
+            e.preventDefault();
+          }
+        }}
+        onEscapeKeyDown={(e) => {
+          if (paymentState === "processing" || paymentState === "pending") {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="font-serif">Make Payment</DialogTitle>
           <DialogDescription>
@@ -491,11 +527,18 @@ export function MoMoPaymentDialog({
         {paymentState === "pending" && (
           <div className="flex flex-col items-center py-6 gap-3 text-center">
             <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900/30">
-              <Phone className="h-6 w-6 text-amber-600" />
+              <Phone className={cn("h-6 w-6 text-amber-600", isCheckingStatus && "animate-pulse")} />
             </div>
             <p className="font-medium">Check Your Phone</p>
             <p className="text-sm text-muted-foreground">{message}</p>
             {reference && <p className="text-xs text-muted-foreground font-mono">Ref: {reference}</p>}
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Automatic verification in progress...
+              </div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Do not close this window</p>
+            </div>
           </div>
         )}
 
@@ -538,8 +581,11 @@ export function MoMoPaymentDialog({
           )}
           {paymentState === "pending" && (
             <div className="flex gap-2 w-full">
-              <Button variant="outline" onClick={handleClose} className="flex-1">Close</Button>
-              <Button onClick={handleCheckStatus} className="flex-1">Check Status</Button>
+              <Button variant="outline" onClick={handleClose} disabled className="flex-1">Close</Button>
+              <Button onClick={() => handleCheckStatus()} disabled={isCheckingStatus} className="flex-1">
+                {isCheckingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Check Now
+              </Button>
             </div>
           )}
           {(paymentState === "success" || paymentState === "error") && (
