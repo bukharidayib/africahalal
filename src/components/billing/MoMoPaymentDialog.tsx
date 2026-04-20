@@ -104,11 +104,8 @@ export function MoMoPaymentDialog({
       setReference(data.reference || "");
       setTransactionId(data.transaction_id);
 
-      if (data.status === "pending") {
+      if (data.status === "pending" || data.status === "completed") {
         setPaymentState("pending");
-      } else if (data.status === "completed") {
-        setPaymentState("success");
-        onPaymentComplete?.();
       } else {
         setPaymentState("error");
       }

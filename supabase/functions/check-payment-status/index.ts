@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
     };
 
     const zynleResponse = await fetch(
-      "https://payments.zynlepay.com/zynlepay/jsonapi/",
+      "https://africanhalaal.com/zynlepayProxy.php",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
