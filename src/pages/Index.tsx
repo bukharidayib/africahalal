@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Layout } from "@/components/layout/Layout";
 import { SectionHeader } from "@/components/sections/SectionHeader";
+import { SEO } from "@/components/SEO";
 
 interface BlogPost {
   id: string;
@@ -102,7 +103,7 @@ const faqs = [
   },
   {
     question: "How long does the certification process take?",
-    answer: "The certification timeline varies based on the complexity of your operation. Typically, it ranges from 4-12 weeks, including documentation review, on-site inspection, and Shariah board evaluation.",
+    answer: "The certification process typically takes 5 to 7 days, depending on the completeness of your documentation and the nature of your operation.",
   },
   {
     question: "Is AHI certification internationally recognized?",
@@ -159,6 +160,37 @@ export default function Index() {
 
   return (
     <Layout>
+      <SEO
+        title="Halal Certification Zambia — African Halal Institute | AHI"
+        description="Africa's trusted Halal certification body in Zambia. ISO-accredited, Shariah-compliant certification for food, meat, hospitality & exports. Apply online today."
+        keywords="halal certification zambia, halal food zambia, halal certificate zambia, african halal institute, AHI zambia, halal certification authority zambia, halal certified products zambia"
+        canonicalPath="/"
+        structuredData={[
+          {
+            "@context": "https://schema.org",
+            "@type": "ProfessionalService",
+            name: "African Halal Institute",
+            url: "https://africanhalaal.com",
+            logo: "https://africanhalaal.com/favicon.png",
+            description: "Zambia's leading ISO-accredited Halal certification authority. We certify food, meat processing, hospitality, cosmetics and exports.",
+            telephone: "+260972044414",
+            email: "info@africanhalaal.com",
+            address: { "@type": "PostalAddress", streetAddress: "Matero", addressLocality: "Lusaka", addressCountry: "ZM" },
+            areaServed: { "@type": "Country", name: "Zambia" },
+            serviceType: "Halal Certification",
+            priceRange: "ZMW 2,500+",
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faqs.map(faq => ({
+              "@type": "Question",
+              name: faq.question,
+              acceptedAnswer: { "@type": "Answer", text: faq.answer },
+            })),
+          },
+        ]}
+      />
       {/* Hero Section */}
       <section className="relative bg-background overflow-hidden">
         {/* Subtle decorative elements */}
@@ -177,7 +209,7 @@ export default function Index() {
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-[1.1] tracking-tight">
               Your Partner for{" "}
               <span className="text-primary">Halal Certification</span>{" "}
-              in <span className="text-primary">Africa</span>
+              in <span className="text-primary">Zambia</span>
             </h1>
 
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -204,10 +236,6 @@ export default function Index() {
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border shadow-sm">
                 <Shield className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">Shariah Compliant</span>
-              </div>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border shadow-sm">
-                <Award className="h-4 w-4 text-secondary" />
-                <span className="text-sm font-medium">500+ Certified Businesses</span>
               </div>
             </div>
           </div>

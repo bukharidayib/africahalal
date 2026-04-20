@@ -1,70 +1,36 @@
 
 
-# Supervisor Reports Overhaul + Admin Visibility
+## Plan: Fix Google Search Logo/Favicon for African Halal Institute
 
-## Summary of Changes
+### Problem
+Google is showing Lovable's logo instead of AHI's logo in search results. This is likely because:
+1. The published Lovable URL (`africahalal.lovable.app`) may serve Lovable's default favicon
+2. Missing `apple-touch-icon` and standard favicon meta tags that Google prefers
+3. The Organization schema `logo` points to `/favicon.png` — Google prefers a higher-resolution logo image
 
-### 1. Weekly Report → Long-Form Document Style
-Currently all report types use the same checklist format. The weekly report should behave like a Word document — rich text sections instead of checklist items.
+### Steps
 
-**Approach**: When `report_type === "weekly_summary"` in the form, hide the checklist UI and show a structured long-form editor with these sections:
-- Executive Summary
-- Key Achievements This Week
-- Compliance Issues Identified
-- Corrective Actions Taken
-- Recommendations for Next Week
-- Supporting Evidence (file uploads)
+**1. Update `index.html` favicon tags**
+Add proper favicon markup that Google prioritizes:
+- Add `apple-touch-icon` (192x192) pointing to the AHI logo
+- Add `rel="icon"` with multiple sizes
+- Add a `link rel="manifest"` with site icons
 
-Store the content in the existing `notes` field as structured JSON (or add a `report_content` JSONB column to `supervisor_reports`). No checklist items are created for weekly reports.
+**2. Update Organization schema logo**
+Change the `logo` field in the JSON-LD from `favicon.png` to the full AHI logo URL (use the existing `/logo.png` or a hosted high-res version).
 
-### 2. Monthly Performance → KPI Dashboard Report
-When `report_type === "monthly_performance"`, replace the checklist with a performance data entry form:
-- Overall compliance % (manual entry or auto-calculated from that month's daily reports)
-- KPI fields: Inspections conducted, NCRs raised, NCRs resolved, Incidents reported, Staff training sessions
-- Category breakdown scores
-- Trend notes / commentary
+**3. Add `web.manifest` file**
+Create a `public/site.webmanifest` with icon entries pointing to AHI's logo — Google uses this to identify the site's icon.
 
-On the detail view (`SupervisorReportDetail`), render this data with:
-- KPI summary cards (large number + label)
-- Bar chart for category scores (using existing Recharts via `chart.tsx`)
-- Pie chart for compliance distribution
-- Trend line if historical data exists
+**4. Verify `favicon.png` is correct**
+Confirm the existing `public/favicon.png` is actually AHI's logo (not Lovable's). If it's wrong, the user will need to upload the correct one.
 
-### 3. Database Migration
-Add a `report_content` JSONB column to `supervisor_reports` to store the structured weekly and monthly data separately from checklist items.
+### Files Changed
+| File | Change |
+|------|--------|
+| `index.html` | Add apple-touch-icon, manifest link, update schema logo |
+| `public/site.webmanifest` | New file with icon definitions |
 
-```sql
-ALTER TABLE public.supervisor_reports 
-ADD COLUMN report_content jsonb DEFAULT '{}'::jsonb;
-```
-
-### 4. Admin Portal — View All Reports with Detail
-Currently the admin Supervisors page shows a basic reports table. Enhance it:
-- Make report rows clickable → navigate to a new `AdminSupervisorReportDetail` page
-- Show supervisor name, company name in the reports table
-- For weekly reports: render the long-form content
-- For monthly reports: render charts and KPIs
-- Add route `/admin/supervisor-reports/:id`
-
-### 5. Supervisor Multi-Company Support
-Supervisors can already belong to multiple companies via `organization_supervisors` (one row per assignment). The current form already handles this with a dropdown when `sites.length > 1`. No schema change needed — this already works like inspectors.
-
-## Files Changed
-
-| Action | File |
-|--------|------|
-| Migration | Add `report_content` JSONB column to `supervisor_reports` |
-| Edit | `src/pages/supervisor/SupervisorReportForm.tsx` — conditional UI for weekly (long-form) and monthly (KPI entry) |
-| Edit | `src/pages/supervisor/SupervisorReportDetail.tsx` — conditional rendering: checklist for daily, document for weekly, charts/KPIs for monthly |
-| Create | `src/admin/pages/AdminSupervisorReportDetail.tsx` — admin view of any supervisor report with charts |
-| Edit | `src/admin/pages/Supervisors.tsx` — make report rows clickable, add supervisor/company columns |
-| Edit | `src/App.tsx` — add admin route for supervisor report detail |
-
-## Implementation Order
-1. Database migration (add `report_content` column)
-2. Update `SupervisorReportForm.tsx` — three distinct form modes
-3. Update `SupervisorReportDetail.tsx` — three distinct display modes with charts
-4. Create `AdminSupervisorReportDetail.tsx` — admin view with full charts
-5. Update `Supervisors.tsx` — clickable rows, enriched table
-6. Update `App.tsx` — add route
+### Important Note
+After deployment, you'll need to **wait for Google to re-crawl** (can take a few days). You can speed this up by going to Google Search Console → URL Inspection → enter `https://africanhalaal.com` → click **Request Indexing**.
 
