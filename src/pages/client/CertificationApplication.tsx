@@ -132,7 +132,7 @@ export default function CertificationApplication() {
         country: "",
         categories: [] as string[],
         validity_period: "1_year", // Default to 1 Year
-        application_fee: 3000,
+        application_fee: 1,
         products: [] as ProductItem[],
         uploadedFiles: [] as UploadedFile[],
         declaration_confirmed: false,
@@ -971,22 +971,22 @@ export default function CertificationApplication() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div
                                             className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.validity_period === '6_months' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
-                                            onClick={() => { updateFormData('validity_period', '6_months'); updateFormData('application_fee', 1500); }}
+                                            onClick={() => { updateFormData('validity_period', '6_months'); updateFormData('application_fee', 1); }}
                                         >
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="font-bold text-foreground">6 Months</span>
-                                                <Badge variant="outline" className="bg-background">ZMW 1,500</Badge>
+                                                <Badge variant="outline" className="bg-background">ZMW 1</Badge>
                                             </div>
                                             <p className="text-sm text-muted-foreground">Short-term certification valid for six months from issuance.</p>
                                         </div>
 
                                         <div
                                             className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.validity_period === '1_year' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
-                                            onClick={() => { updateFormData('validity_period', '1_year'); updateFormData('application_fee', 3000); }}
+                                            onClick={() => { updateFormData('validity_period', '1_year'); updateFormData('application_fee', 1); }}
                                         >
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="font-bold text-foreground">1 Year</span>
-                                                <Badge variant="outline" className="bg-background">ZMW 3,000</Badge>
+                                                <Badge variant="outline" className="bg-background">ZMW 1</Badge>
                                             </div>
                                             <p className="text-sm text-muted-foreground">Standard certification valid for one year from issuance.</p>
                                         </div>

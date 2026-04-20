@@ -307,7 +307,7 @@ export default function AdminBilling() {
       const { error } = await supabase.from('invoices').update(updateData).eq('id', editInvoice.id);
       if (error) throw error;
       if (editInvoice.application_id && editForm.validity_period) {
-        const appFee = editForm.validity_period === '6_months' ? 1500 : editForm.validity_period === '1_year' ? 3000 : null;
+        const appFee = editForm.validity_period === '6_months' ? 1 : editForm.validity_period === '1_year' ? 1 : null;
         await supabase.from('certification_applications').update({
           validity_period: editForm.validity_period,
           ...(appFee ? { application_fee: appFee } : {}),
@@ -424,8 +424,8 @@ export default function AdminBilling() {
                   }}>
                     <SelectTrigger><SelectValue placeholder="Select validity period (optional)" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="6_months">6 Months (ZMW 1,500)</SelectItem>
-                      <SelectItem value="1_year">1 Year (ZMW 3,000)</SelectItem>
+                      <SelectItem value="6_months">6 Months (ZMW 1)</SelectItem>
+                      <SelectItem value="1_year">1 Year (ZMW 1)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -728,13 +728,13 @@ export default function AdminBilling() {
               <div>
                 <Label>Certification Validity Period</Label>
                 <Select value={editForm.validity_period} onValueChange={(v) => {
-                  const amount = v === '6_months' ? '1500' : v === '1_year' ? '3000' : editForm.amount;
+                  const amount = v === '6_months' ? '1' : v === '1_year' ? '1' : editForm.amount;
                   setEditForm(p => ({ ...p, validity_period: v, amount }));
                 }}>
                   <SelectTrigger><SelectValue placeholder="Select validity period (optional)" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="6_months">6 Months (ZMW 1,500)</SelectItem>
-                    <SelectItem value="1_year">1 Year (ZMW 3,000)</SelectItem>
+                    <SelectItem value="6_months">6 Months (ZMW 1)</SelectItem>
+                    <SelectItem value="1_year">1 Year (ZMW 1)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
