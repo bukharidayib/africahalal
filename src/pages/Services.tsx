@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { SEO } from "@/components/SEO";
 import {
   BadgeCheck,
   ClipboardCheck,
@@ -20,11 +19,6 @@ import { Layout } from "@/components/layout/Layout";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { SectionHeader } from "@/components/sections/SectionHeader";
 
-import halalCertImg from "@/assets/services/halal-certification.jpg";
-import auditingImg from "@/assets/services/auditing-inspection.jpg";
-import trainingImg from "@/assets/services/training-advisory.jpg";
-import digitalImg from "@/assets/services/digital-certification.jpg";
-
 const services = [
   {
     icon: BadgeCheck,
@@ -37,7 +31,7 @@ const services = [
       "Export documentation",
       "International recognition"
     ],
-    image: halalCertImg
+    image: "bg-gradient-to-br from-primary/20 to-primary/5"
   },
   {
     icon: ClipboardCheck,
@@ -50,7 +44,7 @@ const services = [
       "Supplier audits",
       "Compliance verification"
     ],
-    image: auditingImg
+    image: "bg-gradient-to-br from-secondary/20 to-secondary/5"
   },
   {
     icon: Users,
@@ -63,7 +57,7 @@ const services = [
       "Gap analysis consulting",
       "Continuous improvement support"
     ],
-    image: trainingImg
+    image: "bg-gradient-to-br from-primary/20 to-secondary/10"
   },
   {
     icon: Laptop,
@@ -76,7 +70,7 @@ const services = [
       "Compliance dashboard",
       "Document management"
     ],
-    image: digitalImg
+    image: "bg-gradient-to-br from-secondary/15 to-primary/10"
   },
 ];
 
@@ -84,17 +78,14 @@ const whoWeServe = [
   { icon: Utensils, name: "Food Manufacturers" },
   { icon: Factory, name: "Meat Processors" },
   { icon: Hotel, name: "Hotels & Restaurants" },
+  { icon: Pill, name: "Pharmaceutical Companies" },
+  { icon: Shirt, name: "Cosmetics Brands" },
+  { icon: Building2, name: "Logistics Providers" },
 ];
 
 export default function Services() {
   return (
     <Layout>
-      <SEO
-        title="Halal Certification Services Zambia — Auditing, Training & Consulting | AHI"
-        description="Professional Halal certification, auditing, inspection & training services in Zambia. Internationally recognized by OIC member countries. Apply now."
-        keywords="halal certification services, halal auditing zambia, halal training, halal consulting"
-        canonicalPath="/services"
-      />
       {/* Hero */}
       <HeroSection
         subtitle="Our Services"
@@ -135,15 +126,8 @@ export default function Services() {
                     </Link>
                   </Button>
                 </div>
-                <div className={`aspect-video rounded-2xl overflow-hidden ${index % 2 === 1 ? "lg:order-1" : ""}`}>
-                  <img
-                    src={service.image}
-                    alt={service.title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    width={960}
-                    height={640}
-                  />
+                <div className={`${service.image} aspect-video rounded-2xl flex items-center justify-center ${index % 2 === 1 ? "lg:order-1" : ""}`}>
+                  <service.icon className="h-24 w-24 text-primary/30" />
                 </div>
               </div>
             ))}
@@ -159,7 +143,7 @@ export default function Services() {
             title="Who We Serve"
             description="Providing specialized services across diverse industries."
           />
-          <div className="flex flex-wrap justify-center gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
             {whoWeServe.map((client) => (
               <div
                 key={client.name}
@@ -172,6 +156,8 @@ export default function Services() {
           </div>
         </div>
       </section>
+
+
 
       {/* CTA */}
       <section className="py-16 bg-primary text-primary-foreground">

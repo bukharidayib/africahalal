@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, CheckCircle, MapPin, Building2, Phone, Mail } from "lucide-react";
-import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -16,21 +15,6 @@ const lusakaFaqs = [
 export default function HalalCertificationLusaka() {
   return (
     <Layout>
-      <SEO
-        title="Halal Certification Lusaka 2026 — Restaurants, Hotels & Food | AHI"
-        description="Get Halal certified in Lusaka, Zambia. AHI headquarters offers fast, affordable certification for restaurants, hotels, and food businesses. Apply now."
-        keywords="halal certification lusaka, halal lusaka zambia, halal food lusaka, halal restaurants lusaka, halal certified lusaka"
-        canonicalPath="/halal-certification-lusaka"
-        structuredData={{
-          "@context": "https://schema.org",
-          "@type": "FAQPage",
-          mainEntity: lusakaFaqs.map(faq => ({
-            "@type": "Question",
-            name: faq.question,
-            acceptedAnswer: { "@type": "Answer", text: faq.answer },
-          })),
-        }}
-      />
 
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-24">

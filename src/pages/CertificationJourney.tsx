@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { SEO } from "@/components/SEO";
 import {
   FileText,
   FolderOpen,
@@ -110,12 +109,6 @@ const quickFacts = [
 export default function CertificationJourney() {
   return (
     <Layout>
-      <SEO
-        title="How to Get Halal Certified in Zambia — Step-by-Step Process | AHI"
-        description="7-step Halal certification process in Zambia. From application to certificate in 5-7 days. Start your certification journey with AHI today."
-        keywords="how to get halal certified, halal certification process zambia, halal certification steps"
-        canonicalPath="/certification-journey"
-      />
       {/* Hero */}
       <HeroSection
         subtitle="Certification Journey"

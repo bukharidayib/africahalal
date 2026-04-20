@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
         service_id: "1002",
       },
       data: {
-        method: transaction.payment_method === "mobile_money" ? "getBillStatus" : "getTranStatus",
+        method: "checkPaymentStatus",
         reference_no: transaction.zynlepay_reference,
         request_id: requestId,
       },
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
     };
 
     const zynleResponse = await fetch(
-      "https://africanhalaal.com/zynlepayProxy.php",
+      "https://payments.zynlepay.com/zynlepay/jsonapi/",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -113,19 +113,13 @@ Deno.serve(async (req) => {
 
     let newStatus = "pending";
     let message = "Payment is still being processed.";
-    
-    // Get description from response if available
-    const zynleDescription = zynleResult?.response?.response_description || zynleResult?.response_description || "";
 
     if (responseCode === "100") {
       newStatus = "completed";
       message = "Payment successful!";
-    } else if (["120", "990"].includes(responseCode)) {
-      newStatus = "pending";
-      message = zynleDescription || "Payment is still being processed. Please approve the prompt on your phone.";
-    } else if (responseCode) {
+    } else if (responseCode === "995") {
       newStatus = "failed";
-      message = zynleDescription || "Payment failed or was cancelled.";
+      message = "Payment failed.";
     }
 
     if (newStatus !== "pending") {
@@ -139,22 +133,6 @@ Deno.serve(async (req) => {
           .from("invoices")
           .update({ status: "paid", paid_at: new Date().toISOString() })
           .eq("id", transaction.invoice_id);
-
-        // Update application status to submitted
-        if (transaction.invoice_id) {
-          const { data: inv } = await adminClient
-            .from("invoices")
-            .select("application_id")
-            .eq("id", transaction.invoice_id)
-            .single();
-          if (inv?.application_id) {
-            await adminClient
-              .from("certification_applications")
-              .update({ status: "submitted", submitted_at: new Date().toISOString() })
-              .eq("id", inv.application_id)
-              .in("status", ["draft"]);
-          }
-        }
       }
     }
 

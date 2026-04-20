@@ -13,7 +13,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 const navItems = [
   { name: "Home", path: "/" },
   { name: "About", path: "/about" },
-  
+  { name: "Governance", path: "/governance" },
   {
     name: "Certification",
     children: [

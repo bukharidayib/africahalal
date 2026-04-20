@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { SEO } from "@/components/SEO";
 import {
   Utensils,
   Factory,
@@ -116,12 +115,6 @@ export default function Industries() {
 
   return (
     <Layout>
-      <SEO
-        title="Industries We Halal Certify in Zambia — Food, Hospitality & More | AHI"
-        description="AHI certifies restaurants, abattoirs, meat processors, hotels, cosmetics, pharmaceuticals and exporters across Zambia. Find your industry."
-        keywords="halal certified industries zambia, halal food certification, halal hospitality, halal cosmetics"
-        canonicalPath="/industries"
-      />
       {/* Hero */}
       <HeroSection
         subtitle="Industries We Certify"

@@ -314,29 +314,10 @@ export default function DocumentVault() {
                                     <div className="pt-4 flex items-center justify-between border-t border-border/50">
                                         <span className="text-[10px] font-mono text-muted-foreground">{doc.id.split('-')[0]}</span>
                                         <div className="flex gap-1">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary transition-colors" onClick={async () => {
-                                                try {
-                                                    const { data, error } = await supabase.storage.from('application-documents').createSignedUrl(doc.file_path, 300);
-                                                    if (error) throw error;
-                                                    window.open(data.signedUrl, '_blank');
-                                                } catch (err: any) {
-                                                    toast({ variant: 'destructive', title: 'Error', description: err.message });
-                                                }
-                                            }}>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary transition-colors">
                                                 <Eye className="h-4 w-4" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary transition-colors" onClick={async () => {
-                                                try {
-                                                    const { data, error } = await supabase.storage.from('application-documents').createSignedUrl(doc.file_path, 300, { download: true });
-                                                    if (error) throw error;
-                                                    const a = document.createElement('a');
-                                                    a.href = data.signedUrl;
-                                                    a.download = doc.file_name;
-                                                    a.click();
-                                                } catch (err: any) {
-                                                    toast({ variant: 'destructive', title: 'Error', description: err.message });
-                                                }
-                                            }}>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5 hover:text-primary transition-colors">
                                                 <Download className="h-4 w-4" />
                                             </Button>
                                             <DropdownMenu>

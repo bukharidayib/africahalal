@@ -15,7 +15,7 @@ export default function InspectorManagerSupervisors() {
       // Load all supervisors
       const { data } = await supabase.from('profiles').select('*'); // A better way would be using a view or role check, assuming we pull all users with supervisor role or have a supervisors table.
       // Actually, Supervisor data is mainly in user_roles where role='supervisor'. However, we will just fetch all supervisors from the RPC or views if available. For now, assuming user_roles has 'supervisor' role.
-      const { data: roles } = await (supabase.from('user_roles' as any).select('user_id').eq('role', 'supervisor') as any);
+      const { data: roles } = await supabase.from('user_roles').select('user_id').eq('role', 'supervisor');
       if (roles) {
         const userIds = roles.map((r: any) => r.user_id);
         const { data: profiles } = await supabase.from('profiles').select('*').in('id', userIds);

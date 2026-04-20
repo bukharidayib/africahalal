@@ -190,20 +190,20 @@ export default function InspectorReportForm() {
       // Resolve organization_id to organizations id (find or create)
       const selectedOrg = sites.find((s: any) => s.organization_id === selectedSite);
       const orgName = selectedOrg?.organizations?.name || "Site";
-      let { data: existingSite } = await (supabase
-        .from("supervisor_sites" as any)
+      let { data: existingSite } = await supabase
+        .from("organizations")
         .select("id")
-        .eq("supervisor_id", session.user.id)
+        .eq("inspector_id", session.user.id)
         .eq("organization_id", selectedSite)
         .eq("is_active", true)
-        .maybeSingle() as any);
+        .maybeSingle();
 
       if (!existingSite) {
-        const { data: newSite, error: siteErr } = await (supabase.from("supervisor_sites" as any).insert({
-          supervisor_id: session.user.id,
+        const { data: newSite, error: siteErr } = await supabase.from("organizations").insert({
+          inspector_id: session.user.id,
           organization_id: selectedSite,
           site_name: orgName,
-        } as any).select("id").single() as any);
+        }).select("id").single();
         if (siteErr) throw siteErr;
         existingSite = newSite;
       }
