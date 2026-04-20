@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
         service_id: "1002",
       },
       data: {
-        method: "checkPaymentStatus",
+        method: transaction.payment_method === "mobile_money" ? "getBillStatus" : "getTranStatus",
         reference_no: transaction.zynlepay_reference,
         request_id: requestId,
       },
@@ -113,13 +113,19 @@ Deno.serve(async (req) => {
 
     let newStatus = "pending";
     let message = "Payment is still being processed.";
+    
+    // Get description from response if available
+    const zynleDescription = zynleResult?.response?.response_description || zynleResult?.response_description || "";
 
     if (responseCode === "100") {
       newStatus = "completed";
       message = "Payment successful!";
-    } else if (responseCode === "995") {
+    } else if (["120", "990"].includes(responseCode)) {
+      newStatus = "pending";
+      message = zynleDescription || "Payment is still being processed. Please approve the prompt on your phone.";
+    } else if (responseCode) {
       newStatus = "failed";
-      message = "Payment failed.";
+      message = zynleDescription || "Payment failed or was cancelled.";
     }
 
     if (newStatus !== "pending") {
