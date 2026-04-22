@@ -49,6 +49,10 @@ export function MoMoPaymentDialog({
   const [reference, setReference] = useState("");
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [pollSeconds, setPollSeconds] = useState(0);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollStartRef = useRef<number | null>(null);
+  const POLL_TIMEOUT_MS = 120_000;
 
   // Offline payment state
   const [offlineSenderName, setOfflineSenderName] = useState("");
@@ -184,6 +188,37 @@ export function MoMoPaymentDialog({
       setIsCheckingStatus(false);
     }
   };
+
+  // Auto-poll status every 5s while pending, with 2-min timeout
+  useEffect(() => {
+    if (paymentState !== "pending" || !transactionId) return;
+
+    pollStartRef.current = Date.now();
+    setPollSeconds(0);
+
+    pollIntervalRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - (pollStartRef.current ?? Date.now())) / 1000);
+      setPollSeconds(elapsed);
+
+      if (elapsed * 1000 >= POLL_TIMEOUT_MS) {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+        setPaymentState("error");
+        setMessage("Payment status check timed out. Please verify the payment manually or contact support.");
+        return;
+      }
+
+      handleCheckStatus();
+    }, 5000);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentState, transactionId]);
 
   const handleClose = () => {
     if (paymentState !== "processing") {
@@ -539,12 +574,18 @@ export function MoMoPaymentDialog({
             </Button>
           )}
           {paymentState === "pending" && (
-            <div className="flex gap-2 w-full">
-              <Button variant="outline" onClick={handleClose} className="flex-1">Close</Button>
-              <Button onClick={() => handleCheckStatus()} disabled={isCheckingStatus} className="flex-1">
-                {isCheckingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Check Status
-              </Button>
+            <div className="flex flex-col gap-2 w-full">
+              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>Auto-checking… ({pollSeconds}s / 120s)</span>
+              </div>
+              <div className="flex gap-2 w-full">
+                <Button variant="outline" onClick={handleClose} className="flex-1">Close</Button>
+                <Button onClick={() => handleCheckStatus()} disabled={isCheckingStatus} className="flex-1">
+                  {isCheckingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Check Status
+                </Button>
+              </div>
             </div>
           )}
           {(paymentState === "success" || paymentState === "error") && (

@@ -6,20 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function extractResponseCode(result: any): string {
-  if (!result) return "";
-  if (typeof result.response === "string" || typeof result.response === "number") {
-    return String(result.response);
-  }
-  if (typeof result.response === "object" && result.response !== null) {
-    if (result.response.code !== undefined) return String(result.response.code);
-    if (result.response.response_code !== undefined) return String(result.response.response_code);
-  }
-  if (result.code !== undefined) return String(result.code);
-  if (result.response_code !== undefined) return String(result.response_code);
-  return "";
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -73,40 +59,34 @@ Deno.serve(async (req) => {
       );
     }
 
-    const merchantId = Deno.env.get("ZYNLEPAY_MERCHANT_ID")!;
     const apiId = Deno.env.get("ZYNLEPAY_API_ID")!;
     const apiKey = Deno.env.get("ZYNLEPAY_API_KEY")!;
 
+    // CORRECTED PAYLOAD as per ZynlePay docs
     const statusPayload = {
       api_id: apiId,
       api_key: apiKey,
-      reference_no: transaction.zynlepay_reference,
+      reference_no: transaction.zynlepay_reference
     };
 
-    console.log("Sending ZynlePay status check for reference:", transaction.zynlepay_reference);
+    console.log("Checking status for reference:", transaction.zynlepay_reference);
+    console.log("Status payload:", JSON.stringify(statusPayload));
 
     const zynleResponse = await fetch(
-      "https://payments.zynlepay.com/zynlepay/paymentstatus",
+      "https://africanhalaal.com/zynlepayStatusProxy.php",
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "*/*",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(statusPayload),
       }
     );
 
     const zynleResult = await zynleResponse.json();
-    console.log("ZynlePay status raw response:", JSON.stringify(zynleResult));
+    console.log("ZynlePay status response:", JSON.stringify(zynleResult));
 
-    const responseCode = extractResponseCode(zynleResult);
-    console.log("Extracted status response code:", responseCode);
-
-    const zynleDescription =
-      zynleResult?.response?.response_description ||
-      zynleResult?.response_description ||
-      "";
+    // Get response code directly from the response
+    const responseCode = zynleResult.response_code || zynleResult.code || "";
+    console.log("Status response code:", responseCode);
 
     let newStatus = "pending";
     let message = "Payment is still being processed.";
@@ -114,33 +94,24 @@ Deno.serve(async (req) => {
     if (responseCode === "100") {
       newStatus = "completed";
       message = "Payment successful!";
-    } else if (["120", "990"].includes(responseCode)) {
-      // 990 = "Transaction not found" (usually still being processed by operator)
-      // 120 = still initiating
-      newStatus = "pending";
-      message =
-        zynleDescription ||
-        "Payment is still being processed. Please approve the prompt on your phone.";
     } else if (responseCode === "995") {
       newStatus = "failed";
-      message = zynleDescription || "Transaction failed.";
+      message = "Payment failed.";
+    } else if (responseCode === "990") {
+      newStatus = "pending";
+      message = "Transaction not found or still processing.";
     } else if (responseCode === "9902") {
-      console.error("ZynlePay credential error (9902): wrong API credentials");
       newStatus = "failed";
-      message = "Payment gateway misconfigured. Please contact support.";
-    } else if (responseCode === "9901") {
-      console.error("ZynlePay invalid method (9901): status method name not accepted");
-      newStatus = "failed";
-      message = "Payment gateway error. Please contact support.";
-    } else if (responseCode) {
-      newStatus = "failed";
-      message = zynleDescription || "Payment failed or was cancelled.";
+      message = "Wrong API credentials. Please contact support.";
     }
 
     if (newStatus !== "pending") {
       await adminClient
         .from("payment_transactions")
-        .update({ status: newStatus, gateway_response: zynleResult })
+        .update({
+          status: newStatus,
+          gateway_response: zynleResult,
+        })
         .eq("id", transaction_id);
 
       if (newStatus === "completed") {
@@ -148,33 +119,22 @@ Deno.serve(async (req) => {
           .from("invoices")
           .update({ status: "paid", paid_at: new Date().toISOString() })
           .eq("id", transaction.invoice_id);
-
-        // Update application status to submitted
-        if (transaction.invoice_id) {
-          const { data: inv } = await adminClient
-            .from("invoices")
-            .select("application_id")
-            .eq("id", transaction.invoice_id)
-            .single();
-          if (inv?.application_id) {
-            await adminClient
-              .from("certification_applications")
-              .update({ status: "submitted", submitted_at: new Date().toISOString() })
-              .eq("id", inv.application_id)
-              .in("status", ["draft"]);
-          }
-        }
       }
     }
 
     return new Response(
-      JSON.stringify({ status: newStatus, message, response_code: responseCode, response_description: zynleDescription }),
+      JSON.stringify({
+        status: newStatus,
+        message,
+        response_code: responseCode,
+        reference_no: transaction.zynlepay_reference
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Check payment status error:", error);
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
+      JSON.stringify({ error: "Internal server error", details: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
