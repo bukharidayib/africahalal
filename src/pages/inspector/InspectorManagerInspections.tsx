@@ -21,18 +21,65 @@ export default function InspectorManagerInspections() {
 
   useEffect(() => {
     async function load() {
-      // Load all inspections with details
-      const { data } = await supabase
-        .from('inspections')
-        .select(`
-          *,
-          inspectors ( inspector_number, profiles (full_name) ),
-          certification_applications ( application_number, organizations (name) )
-        `)
-        .order("created_at", { ascending: false });
-        
-      setInspections((data as any[]) || []);
-      setIsLoading(false);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setIsLoading(false); return; }
+
+        // Find this user's inspector record (must be a manager)
+        const { data: me } = await supabase
+          .from('inspectors')
+          .select('id, is_manager')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (!me?.is_manager) {
+          setInspections([]);
+          setIsLoading(false);
+          return;
+        }
+
+        // Inspectors this manager oversees
+        const { data: mgrLinks } = await (supabase as any)
+          .from('inspector_manager_inspectors')
+          .select('inspector_id')
+          .eq('manager_id', me.id);
+        const managedInspectorIds = (mgrLinks || []).map((r: any) => r.inspector_id);
+
+        // Businesses assigned to this manager
+        const { data: orgLinks } = await (supabase as any)
+          .from('inspector_organizations')
+          .select('organization_id')
+          .eq('inspector_id', me.id);
+        const orgIds = (orgLinks || []).map((r: any) => r.organization_id);
+
+        if (managedInspectorIds.length === 0 && orgIds.length === 0) {
+          setInspections([]);
+          setIsLoading(false);
+          return;
+        }
+
+        let query = supabase
+          .from('inspections')
+          .select(`
+            *,
+            inspectors ( inspector_number, profiles (full_name) ),
+            certification_applications!inner ( application_number, organization_id, organizations (name) )
+          `)
+          .order("created_at", { ascending: false });
+
+        // Scope: inspections assigned to managed inspectors OR for managed organizations
+        const filters: string[] = [];
+        if (managedInspectorIds.length) filters.push(`inspector_id.in.(${managedInspectorIds.join(',')})`);
+        if (orgIds.length) filters.push(`certification_applications.organization_id.in.(${orgIds.join(',')})`);
+        if (filters.length) query = query.or(filters.join(',')) as any;
+
+        const { data } = await query;
+        setInspections((data as any[]) || []);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLoading(false);
+      }
     }
     load();
   }, []);

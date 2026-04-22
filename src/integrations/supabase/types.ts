@@ -1073,13 +1073,157 @@ export type Database = {
           },
         ]
       }
+      inspector_invitations: {
+        Row: {
+          accepted_at: string | null
+          address: string | null
+          cancelled_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          full_name: string | null
+          id: string
+          invited_by: string
+          is_manager: boolean
+          managed_inspector_ids: string[] | null
+          nrc_number: string | null
+          organization_ids: string[] | null
+          regions: string[] | null
+          specializations: string[] | null
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          address?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          full_name?: string | null
+          id?: string
+          invited_by: string
+          is_manager?: boolean
+          managed_inspector_ids?: string[] | null
+          nrc_number?: string | null
+          organization_ids?: string[] | null
+          regions?: string[] | null
+          specializations?: string[] | null
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          address?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          full_name?: string | null
+          id?: string
+          invited_by?: string
+          is_manager?: boolean
+          managed_inspector_ids?: string[] | null
+          nrc_number?: string | null
+          organization_ids?: string[] | null
+          regions?: string[] | null
+          specializations?: string[] | null
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inspector_manager_inspectors: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          id: string
+          inspector_id: string
+          manager_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          inspector_id: string
+          manager_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          inspector_id?: string
+          manager_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspector_manager_inspectors_inspector_id_fkey"
+            columns: ["inspector_id"]
+            isOneToOne: false
+            referencedRelation: "inspectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspector_manager_inspectors_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "inspectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspector_organizations: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          id: string
+          inspector_id: string
+          organization_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          inspector_id: string
+          organization_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          inspector_id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspector_organizations_inspector_id_fkey"
+            columns: ["inspector_id"]
+            isOneToOne: false
+            referencedRelation: "inspectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspector_organizations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inspectors: {
         Row: {
+          address: string | null
           created_at: string
+          full_name: string | null
           id: string
           inspector_number: string
           is_active: boolean
           is_manager: boolean
+          nrc_number: string | null
           qualifications: string[] | null
           regions: string[] | null
           specializations: string[] | null
@@ -1087,11 +1231,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          address?: string | null
           created_at?: string
+          full_name?: string | null
           id?: string
           inspector_number: string
           is_active?: boolean
           is_manager?: boolean
+          nrc_number?: string | null
           qualifications?: string[] | null
           regions?: string[] | null
           specializations?: string[] | null
@@ -1099,11 +1246,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          address?: string | null
           created_at?: string
+          full_name?: string | null
           id?: string
           inspector_number?: string
           is_active?: boolean
           is_manager?: boolean
+          nrc_number?: string | null
           qualifications?: string[] | null
           regions?: string[] | null
           specializations?: string[] | null

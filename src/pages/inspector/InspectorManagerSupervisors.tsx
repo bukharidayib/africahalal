@@ -12,16 +12,43 @@ export default function InspectorManagerSupervisors() {
 
   useEffect(() => {
     async function load() {
-      // Load all supervisors
-      const { data } = await supabase.from('profiles').select('*'); // A better way would be using a view or role check, assuming we pull all users with supervisor role or have a supervisors table.
-      // Actually, Supervisor data is mainly in user_roles where role='supervisor'. However, we will just fetch all supervisors from the RPC or views if available. For now, assuming user_roles has 'supervisor' role.
-      const { data: roles } = await (supabase.from('user_roles' as any).select('user_id').eq('role', 'supervisor') as any);
-      if (roles) {
-        const userIds = roles.map((r: any) => r.user_id);
-        const { data: profiles } = await supabase.from('profiles').select('*').in('id', userIds);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setIsLoading(false); return; }
+
+        const { data: me } = await supabase
+          .from('inspectors')
+          .select('id, is_manager')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (!me?.is_manager) { setSupervisors([]); setIsLoading(false); return; }
+
+        // Get the businesses this manager covers
+        const { data: orgLinks } = await (supabase as any)
+          .from('inspector_organizations')
+          .select('organization_id')
+          .eq('inspector_id', me.id);
+        const orgIds = (orgLinks || []).map((r: any) => r.organization_id);
+
+        if (orgIds.length === 0) { setSupervisors([]); setIsLoading(false); return; }
+
+        // Supervisors assigned to those businesses
+        const { data: supLinks } = await supabase
+          .from('organization_supervisors')
+          .select('supervisor_id')
+          .in('organization_id', orgIds);
+        const supIds = Array.from(new Set((supLinks || []).map((r: any) => r.supervisor_id).filter(Boolean)));
+
+        if (supIds.length === 0) { setSupervisors([]); setIsLoading(false); return; }
+
+        const { data: profiles } = await supabase.from('profiles').select('*').in('id', supIds);
         setSupervisors(profiles || []);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
     load();
   }, []);
