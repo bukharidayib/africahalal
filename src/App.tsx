@@ -130,6 +130,7 @@ import InspectorNCRDetail from "./pages/inspector/InspectorNCRDetail";
 import InspectorObservations from "./pages/inspector/InspectorObservations";
 import InspectorManagerSupervisors from "./pages/inspector/InspectorManagerSupervisors";
 import InspectorManagerInspections from "./pages/inspector/InspectorManagerInspections";
+import InspectorRegister from "./pages/inspector/InspectorRegister";
 
 // Admin Inspection Detail
 import AdminInspectionDetail from "./admin/pages/InspectionDetail";
@@ -233,6 +234,7 @@ const App = () => (
 
             {/* Inspector Auth Routes (public) */}
             <Route path="/inspector/signin" element={<InspectorSignIn />} />
+            <Route path="/inspector/register" element={<InspectorRegister />} />
             <Route path="/inspector/forgot-password" element={<InspectorForgotPassword />} />
             <Route path="/inspector/reset-password" element={<InspectorResetPassword />} />
 
