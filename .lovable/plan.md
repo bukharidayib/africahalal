@@ -1,100 +1,40 @@
 
 
-## Plan: Fix Directory data, Replace Services image, Update Contact form + email notifications
+## Fix `check-payment-status` Edge Function
 
-### 1. Directory page — "No Certified Businesses Found"
+### Problem
+ZynlePay returns response code **9901 "Invalid method"** when the status check runs. The function sends `getBillStatus` (for MoMo) or `getTranStatus` (for cards), but ZynlePay's status API does not recognize these method names — so we never get back the real status codes (100/990/995/9902).
 
-**Root cause:** The `certificates` and `organizations` tables have RLS policies only for admins, clients, inspectors and supervisors. The public Directory page is fetched anonymously, so the anon role can't read any rows — the query returns empty even though 2 active certificates exist in the database.
+### Root cause
+The method names used in `check-payment-status/index.ts` are incorrect. The original payment in `process-momo-payment` successfully uses `runBillPayment`, but the status check needs ZynlePay's documented status-check method name.
 
-**Fix:** Add public-read RLS policies that expose **only the minimal fields needed for the directory** — and only for `active` certificates.
+### Plan
 
-Migration:
-```sql
--- Allow anyone to view ACTIVE certificates (public directory)
-CREATE POLICY "Public can view active certificates"
-ON public.certificates FOR SELECT
-TO anon, authenticated
-USING (status = 'active');
+1. **Fix the method name in `supabase/functions/check-payment-status/index.ts`**
+   - Replace the conditional `getBillStatus`/`getTranStatus` with the correct ZynlePay status method (most likely `getTransactionStatus` for both MoMo and card, since ZynlePay uses a single status endpoint).
+   - Keep `service_id: "1002"` and the same auth/payload structure that already works in `process-momo-payment`.
 
--- Allow anyone to view organizations that have an active certificate
-CREATE POLICY "Public can view orgs with active certificates"
-ON public.organizations FOR SELECT
-TO anon, authenticated
-USING (
-  id IN (SELECT organization_id FROM public.certificates WHERE status = 'active')
-);
-```
+2. **Expand response code handling** to match ZynlePay's documented codes:
+   - `100` → completed (success)
+   - `120` / `990` (when "still processing") → pending
+   - `995` → failed (transaction failed)
+   - `9902` → failed + log credential error (wrong API credentials — surface a clear admin message)
+   - `9901` → failed + log "invalid method" (so we catch this regression in the future)
+   - Any other non-empty code → failed with the description from ZynlePay
 
-This keeps non-active certs and unrelated orgs private. Sensitive PII columns (contact_email, contact_phone) on the orgs of certified businesses are already shown in the Directory by design — that's the purpose of the public registry.
+3. **Always return a structured response to the client** so the MoMo Payment Dialog can display the actual ZynlePay `response_code` and `response_description` (instead of a silent "still pending"). Include:
+   ```json
+   { "status": "...", "message": "...", "response_code": "...", "response_description": "..." }
+   ```
 
-After migration, the existing 2 active certificates ("Bukhari Restaurents") will appear in the Directory automatically.
+4. **Add clearer logging** of the outgoing payload (method + reference_no) so future debugging shows exactly what was sent to ZynlePay.
 
-### 2. Services page — replace Halal Certification image
+5. **Redeploy** `check-payment-status` and test by clicking "Check Status" in the MoMo Payment Dialog on `/client/billing`. Verify the edge function logs now show a valid response code (100/120/990/995) instead of 9901.
 
-Steps:
-1. Copy the uploaded photo to `src/assets/services/halal-certification.jpg` (overwrites the current image).
-2. No code change needed — `Services.tsx` already imports from this path.
+### Files touched
+- `supabase/functions/check-payment-status/index.ts` (method name + response code mapping + richer client response)
 
-### 3. Contact page — Subject as text field + email notifications
-
-**A. Convert Subject from dropdown to text input**
-- Remove the `Select`/`SelectContent` block (lines ~200–215 in `Contact.tsx`)
-- Replace with a standard `<Input name="subject" />` matching the other fields
-- Remove unused `Select` imports and the `subjects` array
-
-**B. Send email notifications to `info@africanhalaal.com` and `support@africanhalaal.com`**
-
-Approach: use Lovable's built-in email infrastructure (transactional emails) — recommended default, no third-party API key needed.
-
-Steps the implementation phase will perform automatically:
-1. Set up the email domain (one-time dialog appears on first run if not configured)
-2. Set up email infrastructure (queues, tables, cron)
-3. Scaffold the transactional email function
-4. Create a React Email template `contact-form-notification.tsx` that renders the visitor's name, email, phone, company, subject and message in a clean branded layout
-5. Register the template in `registry.ts`
-6. In `Contact.tsx` `handleSubmit`, after validation:
-   - Insert a row into a new `contact_submissions` table (so messages are also stored, not lost)
-   - Invoke `send-transactional-email` **twice** — once per recipient (`info@africanhalaal.com` and `support@africanhalaal.com`) — with idempotency keys derived from the submission UUID
-   - Show the existing success toast and reset the form
-
-New table:
-```sql
-CREATE TABLE public.contact_submissions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  email text NOT NULL,
-  phone text,
-  company text,
-  subject text NOT NULL,
-  message text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.contact_submissions ENABLE ROW LEVEL SECURITY;
-
--- Anyone (including anonymous visitors) can submit
-CREATE POLICY "Anyone can submit contact form"
-ON public.contact_submissions FOR INSERT
-TO anon, authenticated WITH CHECK (true);
-
--- Only admins can read submissions
-CREATE POLICY "Admins can view submissions"
-ON public.contact_submissions FOR SELECT
-TO authenticated USING (public.is_admin_user(auth.uid()));
-```
-
-### Files changed / created
-
-| File | Change |
-|---|---|
-| `supabase/migrations/<new>.sql` | RLS for public directory + `contact_submissions` table |
-| `src/assets/services/halal-certification.jpg` | Replaced with uploaded photo |
-| `src/pages/Contact.tsx` | Subject → Input, real submit → DB insert + 2 email sends |
-| `supabase/functions/_shared/transactional-email-templates/contact-form-notification.tsx` | New React Email template |
-| `supabase/functions/_shared/transactional-email-templates/registry.ts` | Register new template |
-| (Auto) email infra + send-transactional-email function | Scaffolded by tooling |
-
-### Notes
-- Build error mentioning `npm:openai@^4.52.5` is unrelated to these changes — no edge function in this repo imports `openai`. It looks like a stale deploy bundler artifact and should clear on next successful deploy. If it persists after this work, I'll investigate separately.
-- Directory currently has 2 active certificates in DB — both will appear immediately after the RLS migration.
-- Both notification emails are sent server-side via the queue, so retries and rate-limits are handled automatically.
+### What stays the same
+- Auth flow, transaction lookup, RLS, invoice/application status updates on success — all unchanged.
+- `process-momo-payment` is working correctly per logs (returns code 120 "Transaction is initiated"), so it is NOT modified.
 
