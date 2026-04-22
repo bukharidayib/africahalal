@@ -1,28 +1,61 @@
 
 
-## Auto-Polling Payment Status + Updated Edge Function
+## Add Transaction History to Invoice Details + Expand Status Codes
 
-### What changes
-1. **Replace `supabase/functions/check-payment-status/index.ts`** with the user-provided code (uses `https://africanhalaal.com/zynlepayStatusProxy.php` proxy with the documented flat payload `{ api_id, api_key, reference_no }`, and maps codes 100/990/995/9902 directly).
+### 1. Expand response code mapping in `supabase/functions/check-payment-status/index.ts`
+Map all callback + transaction codes from the docs (not just 100/990/995/9902):
 
-2. **Add automatic polling in `src/components/billing/MoMoPaymentDialog.tsx`:**
-   - When `paymentState` becomes `"pending"` and a `transactionId` exists, start a `setInterval` that calls the existing `handleCheckStatus()` every **5 seconds**.
-   - Track elapsed time; stop polling and show a timeout message after **2 minutes (120s)** if still pending.
-   - Stop polling immediately when status becomes `"success"` or `"error"`, or when the dialog closes / unmounts.
-   - Show a small "Auto-checking… (Xs)" indicator next to the existing manual "Check Status" button so the user knows polling is active. The manual button stays available as a fallback.
-   - On timeout: set state to `"error"` with message "Payment status check timed out. Please verify the payment manually or contact support."
+- `100` → completed ("Transaction successful")
+- `120` → pending ("Transaction initiated")
+- `990` → pending ("Transaction pending")
+- `995` → failed ("Transaction failed")
+- `2000` → failed ("No active simulator for this phone number")
+- `9901` → failed ("Merchant not found")
+- `9902` → failed ("Requesting device IP not whitelisted / wrong API credentials")
+- `9903` → failed ("Invalid merchant API credentials or setup not complete")
+- `9904` → failed ("Duplicate reference number detected")
+- `9905` → failed ("Invalid sender ID / mobile number")
+- `9906` → failed ("Duplicate reference number")
+- `9907` → failed ("Mobile number blacklisted")
+- `9908`–`9910` → failed (merchant setup incomplete)
+- `9911` → failed ("Insufficient merchant balance")
+- `9912` → failed ("Amount exceeds disbursement limit")
+- `9913` → failed ("Invalid bank name")
+- `9914` → pending ("Cannot determine status now, try again later")
+- Any other code → failed with the gateway's `response_description`
 
-### Technical details
-- Use a `useEffect` keyed on `paymentState === "pending" && transactionId`.
-- Use `useRef` for the interval id and a start timestamp to compute elapsed seconds.
-- Cleanup: `clearInterval` in the effect's return + when `handleClose` runs.
-- Reuse existing `handleCheckStatus` logic (no duplication) — just call it from the interval.
-- Add a small `pollSeconds` state to show the elapsed countdown in the UI.
+The function will continue to return `{ status, message, response_code, response_description, reference_no }` and update `payment_transactions` + flip the invoice to `paid` on success — no schema changes.
+
+### 2. Add a "Transaction History" section in `src/pages/client/BillingInvoiceDetail.tsx`
+Below the existing **Invoice Details** card (or as a new full-width card under the grid), add a card titled **"Payment Attempts"** that shows every row from `payment_transactions` for this invoice belonging to the current user.
+
+Columns shown per attempt:
+- Date & time (`created_at`, formatted `dd MMM yyyy, HH:mm`)
+- Reference (`zynlepay_reference` or `transaction_reference`)
+- Method (`payment_method`, e.g. "MTN MoMo", "Airtel Money")
+- Amount (with currency)
+- Status badge: `completed` (green/default), `pending` (secondary), `failed` (destructive)
+- Gateway message: extracted from `gateway_response.response_description` when present
+
+Empty state: "No payment attempts yet."
+
+Fetch alongside the existing invoice + activity log query in `fetchInvoice()`:
+```ts
+supabase
+  .from('payment_transactions')
+  .select('id, created_at, zynlepay_reference, transaction_reference, payment_method, amount, currency, status, gateway_response')
+  .eq('invoice_id', id!)
+  .order('created_at', { ascending: false })
+```
+
+Use the existing `Table` UI component (from `@/components/ui/table`) so it matches the institutional look already used elsewhere.
 
 ### Files touched
-- `supabase/functions/check-payment-status/index.ts` (replace with provided code)
-- `src/components/billing/MoMoPaymentDialog.tsx` (add polling effect + UI indicator)
+- `supabase/functions/check-payment-status/index.ts` — expanded code mapping only
+- `src/pages/client/BillingInvoiceDetail.tsx` — new "Payment Attempts" table card + extra fetch
 
 ### Out of scope
-- No DB changes. No changes to `process-momo-payment`. No changes to other portals.
+- No DB schema changes (existing `payment_transactions` columns are sufficient)
+- No changes to `process-momo-payment`, polling logic, or the MoMo dialog (already implemented last loop)
+- No admin-side history view (this plan is client-portal only, per the request)
 
