@@ -148,6 +148,26 @@ Deno.serve(async (req) => {
           .from("invoices")
           .update({ status: "paid", paid_at: new Date().toISOString() })
           .eq("id", transaction.invoice_id);
+
+        // Auto-submit the linked application if it is still a draft
+        const { data: inv } = await adminClient
+          .from("invoices")
+          .select("application_id")
+          .eq("id", transaction.invoice_id)
+          .single();
+
+        if (inv?.application_id) {
+          const { error: appErr } = await adminClient
+            .from("certification_applications")
+            .update({ status: "submitted", submitted_at: new Date().toISOString() })
+            .eq("id", inv.application_id)
+            .in("status", ["draft"]);
+          if (appErr) {
+            console.error("Failed to auto-submit application:", appErr);
+          } else {
+            console.log("Application auto-submitted for invoice:", transaction.invoice_id);
+          }
+        }
       }
     }
 
