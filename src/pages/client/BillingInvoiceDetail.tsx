@@ -10,6 +10,7 @@ import { Loader2, ArrowLeft, Receipt, Clock, Download, Smartphone } from "lucide
 import { format } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 import { MoMoPaymentDialog } from "@/components/billing/MoMoPaymentDialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface InvoiceDetail {
   id: string;
@@ -34,10 +35,23 @@ interface ActivityLog {
   metadata: any;
 }
 
+interface PaymentAttempt {
+  id: string;
+  created_at: string;
+  zynlepay_reference: string | null;
+  transaction_reference: string | null;
+  payment_method: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  gateway_response: any;
+}
+
 export default function BillingInvoiceDetail() {
   const { id } = useParams<{ id: string }>();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [activity, setActivity] = useState<ActivityLog[]>([]);
+  const [attempts, setAttempts] = useState<PaymentAttempt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const { toast } = useToast();
@@ -48,7 +62,7 @@ export default function BillingInvoiceDetail() {
 
   const fetchInvoice = async () => {
     try {
-      const [invRes, actRes] = await Promise.all([
+      const [invRes, actRes, txRes] = await Promise.all([
         supabase
           .from('invoices')
           .select('*, organizations(name, contact_email, address, city, country), certification_applications(application_number), certificates(certificate_number)')
@@ -59,16 +73,42 @@ export default function BillingInvoiceDetail() {
           .select('*')
           .eq('invoice_id', id!)
           .order('created_at', { ascending: true }),
+        supabase
+          .from('payment_transactions')
+          .select('id, created_at, zynlepay_reference, transaction_reference, payment_method, amount, currency, status, gateway_response')
+          .eq('invoice_id', id!)
+          .order('created_at', { ascending: false }),
       ]);
 
       if (invRes.error) throw invRes.error;
       setInvoice(invRes.data as any);
       setActivity(actRes.data || []);
+      setAttempts((txRes.data as any) || []);
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const attemptStatusBadge = (status: string) => {
+    const map: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+      completed: { variant: "default", label: "Completed" },
+      pending: { variant: "secondary", label: "Pending" },
+      failed: { variant: "destructive", label: "Failed" },
+    };
+    const c = map[status] || { variant: "outline" as const, label: status };
+    return <Badge variant={c.variant}>{c.label}</Badge>;
+  };
+
+  const methodLabel = (m: string | null) => {
+    if (!m) return "—";
+    const map: Record<string, string> = {
+      mtn_momo: "MTN MoMo",
+      airtel_money: "Airtel Money",
+      zamtel_kwacha: "Zamtel Kwacha",
+    };
+    return map[m] || m;
   };
 
   const statusBadge = (status: string) => {
