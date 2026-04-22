@@ -312,6 +312,53 @@ export default function BillingInvoiceDetail() {
           </div>
         </div>
 
+        {/* Payment Attempts */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-serif">Payment Attempts</CardTitle>
+            <CardDescription>History of mobile money transactions for this invoice.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {attempts.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No payment attempts yet.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date &amp; Time</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Gateway Message</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {attempts.map((a) => {
+                    const ref = a.zynlepay_reference || a.transaction_reference || "—";
+                    const gw = a.gateway_response || {};
+                    const gwMsg = gw.response_description || gw.message || gw.response_code || "—";
+                    return (
+                      <TableRow key={a.id}>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {format(new Date(a.created_at), 'dd MMM yyyy, HH:mm')}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono break-all max-w-[160px]">{ref}</TableCell>
+                        <TableCell className="text-sm">{methodLabel(a.payment_method)}</TableCell>
+                        <TableCell className="text-sm font-medium whitespace-nowrap">
+                          {a.currency} {Number(a.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell>{attemptStatusBadge(a.status)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[260px]">{gwMsg}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Governance Statement */}
         <div className="text-xs text-muted-foreground text-center border-t pt-4">
           <p>
