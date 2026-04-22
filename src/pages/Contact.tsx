@@ -12,17 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Layout } from "@/components/layout/Layout";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { SectionHeader } from "@/components/sections/SectionHeader";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const contactInfo = [
   { icon: Mail, label: "Email", value: "info@africanhalaal.com", link: "mailto:info@africanhalaal.com" },
@@ -31,16 +25,6 @@ const contactInfo = [
   { icon: Clock, label: "Hours", value: "Mon-Fri: 8:00 AM - 5:00 PM (CAT)" },
 ];
 
-const subjects = [
-  "New Certification Inquiry",
-  "Renewal Request",
-  "Scope Extension",
-  "Training Programs",
-  "Verification Issue",
-  "General Question",
-  "Partnership Opportunity",
-  "Media Inquiry",
-];
 
 
 export default function Contact() {
@@ -62,19 +46,50 @@ export default function Contact() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      const submissionId = crypto.randomUUID();
+      const { error } = await supabase.from("contact_submissions").insert({
+        id: submissionId,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone || null,
+        company: formData.company || null,
+        subject: formData.subject,
+        message: formData.message,
+      });
 
-    toast.success("Message sent successfully! We'll get back to you soon.");
-    setFormData({
-      name: "",
-      email: "",
-      phone: "",
-      company: "",
-      subject: "",
-      message: "",
-    });
-    setIsSubmitting(false);
+      if (error) throw error;
+
+      // Send email notifications to both recipients
+      const recipients = ["info@africanhalaal.com", "support@africanhalaal.com"];
+      await Promise.all(
+        recipients.map((to) =>
+          supabase.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "contact-form-notification",
+              recipientEmail: to,
+              idempotencyKey: `contact-${submissionId}-${to}`,
+              templateData: {
+                name: formData.name,
+                email: formData.email,
+                phone: formData.phone,
+                company: formData.company,
+                subject: formData.subject,
+                message: formData.message,
+              },
+            },
+          }).catch((err) => console.error(`Email to ${to} failed:`, err))
+        )
+      );
+
+      toast.success("Message sent successfully! We'll get back to you soon.");
+      setFormData({ name: "", email: "", phone: "", company: "", subject: "", message: "" });
+    } catch (err) {
+      console.error("Contact submission failed:", err);
+      toast.error("Could not send your message. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -199,19 +214,13 @@ export default function Contact() {
 
                     <div>
                       <label className="text-sm font-medium mb-2 block">Subject *</label>
-                      <Select
+                      <Input
+                        name="subject"
                         value={formData.subject}
-                        onValueChange={(value) => setFormData({ ...formData, subject: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a subject" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {subjects.map((subject) => (
-                            <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={handleChange}
+                        placeholder="What is your message about?"
+                        required
+                      />
                     </div>
                     <div>
                       <label className="text-sm font-medium mb-2 block">Message *</label>
