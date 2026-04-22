@@ -60,27 +60,18 @@ export default function Contact() {
 
       if (error) throw error;
 
-      // Send email notifications to both recipients
-      const recipients = ["info@africanhalaal.com", "support@africanhalaal.com"];
-      await Promise.all(
-        recipients.map((to) =>
-          supabase.functions.invoke("send-transactional-email", {
-            body: {
-              templateName: "contact-form-notification",
-              recipientEmail: to,
-              idempotencyKey: `contact-${submissionId}-${to}`,
-              templateData: {
-                name: formData.name,
-                email: formData.email,
-                phone: formData.phone,
-                company: formData.company,
-                subject: formData.subject,
-                message: formData.message,
-              },
-            },
-          }).catch((err) => console.error(`Email to ${to} failed:`, err))
-        )
-      );
+      // Send beautiful HTML email via Resend (to info@ + support@)
+      const { error: emailError } = await supabase.functions.invoke("send-contact-email", {
+        body: {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          company: formData.company,
+          subject: formData.subject,
+          message: formData.message,
+        },
+      });
+      if (emailError) console.error("Email send failed:", emailError);
 
       toast.success("Message sent successfully! We'll get back to you soon.");
       setFormData({ name: "", email: "", phone: "", company: "", subject: "", message: "" });
