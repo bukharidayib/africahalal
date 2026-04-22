@@ -237,7 +237,7 @@ export default function Enforcement() {
       const { data: ncnNumber, error: genError } = await supabase.rpc('generate_ncn_number');
       if (genError) throw genError;
 
-      const { error } = await supabase
+      const { data: insertedNcn, error } = await supabase
         .from('non_conformance_notices')
         .insert({
           ncn_number: ncnNumber,
@@ -248,9 +248,18 @@ export default function Enforcement() {
           due_date: format(ncnForm.due_date, 'yyyy-MM-dd'),
           issued_by: user.id,
           status: 'open',
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
+
+      // Fire-and-forget email notification (do not block UI on failures)
+      if (insertedNcn?.id) {
+        supabase.functions
+          .invoke('send-ncn-notification', { body: { ncn_id: insertedNcn.id } })
+          .catch((e) => console.warn('NCN email notification failed:', e));
+      }
 
       // Log audit
       await supabase.rpc('log_audit', {
