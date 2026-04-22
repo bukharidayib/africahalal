@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
         'X-Connection-Api-Key': RESEND_API_KEY,
       },
       body: JSON.stringify({
-        from: 'AHI Website <onboarding@resend.dev>',
+        from: 'AHI Website <noreply@africanhalaal.com>',
         to: recipients,
         reply_to: body.email,
         subject: `[Contact] ${body.subject}`,
