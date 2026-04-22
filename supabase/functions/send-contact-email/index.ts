@@ -4,7 +4,9 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/resend';
+import { Resend } from "npm:resend@2.0.0";
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY") ?? Deno.env.get("RESEND_API_KEY_1"));
 
 interface ContactPayload {
   name: string;
@@ -90,9 +92,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY_1') ?? Deno.env.get('RESEND_API_KEY');
-    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured');
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? Deno.env.get('RESEND_API_KEY_1');
     if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY is not configured');
 
     const body = (await req.json()) as ContactPayload;
@@ -106,25 +106,16 @@ Deno.serve(async (req) => {
     const html = renderEmail(body);
     const recipients = ['info@africanhalaal.com', 'support@africanhalaal.com'];
 
-    const res = await fetch(`${GATEWAY_URL}/emails`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'X-Connection-Api-Key': RESEND_API_KEY,
-      },
-      body: JSON.stringify({
-        from: 'AHI Website <noreply@africanhalaal.com>',
-        to: recipients,
-        reply_to: body.email,
-        subject: `[Contact] ${body.subject}`,
-        html,
-      }),
+    const data = await resend.emails.send({
+      from: 'AHI Website <noreply@africanhalaal.com>',
+      to: recipients,
+      reply_to: body.email,
+      subject: `[Contact] ${body.subject}`,
+      html,
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      console.error('Resend error', res.status, data);
+    if ((data as { error?: unknown })?.error) {
+      console.error('Resend error', data);
       return new Response(JSON.stringify({ error: 'Email send failed', details: data }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
