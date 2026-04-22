@@ -574,12 +574,18 @@ export function MoMoPaymentDialog({
             </Button>
           )}
           {paymentState === "pending" && (
-            <div className="flex gap-2 w-full">
-              <Button variant="outline" onClick={handleClose} className="flex-1">Close</Button>
-              <Button onClick={() => handleCheckStatus()} disabled={isCheckingStatus} className="flex-1">
-                {isCheckingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Check Status
-              </Button>
+            <div className="flex flex-col gap-2 w-full">
+              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>Auto-checking… ({pollSeconds}s / 120s)</span>
+              </div>
+              <div className="flex gap-2 w-full">
+                <Button variant="outline" onClick={handleClose} className="flex-1">Close</Button>
+                <Button onClick={() => handleCheckStatus()} disabled={isCheckingStatus} className="flex-1">
+                  {isCheckingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Check Status
+                </Button>
+              </div>
             </div>
           )}
           {(paymentState === "success" || paymentState === "error") && (
