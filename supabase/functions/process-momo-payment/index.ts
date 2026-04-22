@@ -52,8 +52,10 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { invoice_id, payment_method } = body;
 
+    // Determine payment type: "mobile_money" (default) or "card"
     const isCard = payment_method === "card";
 
+    // Validate based on payment type
     if (!isCard) {
       const { phone_number, channel: clientChannel } = body;
       const phoneRegex = /^0[79]\d{8}$/;
@@ -123,6 +125,7 @@ Deno.serve(async (req) => {
     let zynlePayload: any;
 
     if (isCard) {
+      // Card payment via runTranAuthCapture
       const { card_number, expiry_month, expiry_year, cvv } = body;
       zynlePayload = {
         auth: {
@@ -151,6 +154,7 @@ Deno.serve(async (req) => {
         },
       };
     } else {
+      // MoMo payment via runBillPayment
       const { phone_number, channel: clientChannel } = body;
       const allowedChannels = ["airtel", "mtn", "zamtel", "momo"];
       const channel = (clientChannel && allowedChannels.includes(clientChannel.toLowerCase()))
@@ -185,6 +189,7 @@ Deno.serve(async (req) => {
     console.log("Calling ZynlePay API:", isCard ? "Card" : "MoMo", "invoice:", invoice.invoice_number);
 
     const zynleResponse = await fetch(
+      //  "https://payments.zynlepay.com/zynlepay/jsonapi/",
       "https://africanhalaal.com/zynlepayProxy.php",
       {
         method: "POST",
@@ -247,6 +252,15 @@ Deno.serve(async (req) => {
         .from("invoices")
         .update({ status: "paid", paid_at: new Date().toISOString() })
         .eq("id", invoice.id);
+
+      // Update application status to submitted
+      if (invoice.application_id) {
+        await adminClient
+          .from("certification_applications")
+          .update({ status: "submitted", submitted_at: new Date().toISOString() })
+          .eq("id", invoice.application_id)
+          .in("status", ["draft"]);
+      }
     }
 
     return new Response(

@@ -1,11 +1,11 @@
 import { useState } from "react";
+import { SEO } from "@/components/SEO";
 import {
   Mail,
   Phone,
   MapPin,
   Clock,
   Send,
-  Globe,
   CheckCircle2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -42,12 +42,6 @@ const subjects = [
   "Media Inquiry",
 ];
 
-const regionalOffices = [
-  { region: "Main Headquarters", city: "Lusaka", email: "info@africanhalaal.com" },
-  { region: "East Africa", city: "Nairobi, Kenya", email: "eastafrica@ahis.africa" },
-  { region: "West Africa", city: "Lagos, Nigeria", email: "westafrica@ahis.africa" },
-  { region: "North Africa", city: "Cairo, Egypt", email: "northafrica@ahis.africa" },
-];
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -85,6 +79,12 @@ export default function Contact() {
 
   return (
     <Layout>
+      <SEO
+        title="Contact African Halal Institute — Halal Certification Enquiries Zambia"
+        description="Contact AHI in Lusaka, Zambia for Halal certification enquiries, applications, and support. Phone: +260 972 044 414. Email: info@africanhalaal.com."
+        keywords="contact AHI, halal certification contact zambia, african halal institute phone"
+        canonicalPath="/contact"
+      />
       {/* Hero */}
       <HeroSection
         subtitle="Get in Touch"
@@ -245,42 +245,17 @@ export default function Contact() {
         </div>
       </section>
 
-      {/* Regional Offices */}
-      <section className="section-padding bg-muted">
-        <div className="container">
-          <SectionHeader
-            subtitle="Our Presence"
-            title="Global Network"
-            description="Regional offices across Africa to serve you better."
-          />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {regionalOffices.map((office) => (
-              <Card key={office.region} className="text-center hover:shadow-lg transition-shadow">
-                <CardContent className="pt-6">
-                  <Globe className="h-8 w-8 text-primary mx-auto mb-3" />
-                  <h3 className="font-semibold mb-1">{office.region}</h3>
-                  <p className="text-sm text-muted-foreground mb-2">{office.city}</p>
-                  <a
-                    href={`mailto:${office.email}`}
-                    className="text-sm text-primary hover:underline"
-                  >
-                    {office.email}
-                  </a>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* Map Placeholder */}
+      {/* Google Map */}
       <section className="h-96 bg-muted border-t">
-        <div className="h-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5">
-          <div className="text-center">
-            <MapPin className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-muted-foreground">Interactive map would be displayed here</p>
-          </div>
-        </div>
+        <iframe
+          title="African Halal Institute — Lusaka, Zambia"
+          src="https://www.google.com/maps?q=Lusaka,Zambia&output=embed"
+          className="w-full h-full border-0"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          allowFullScreen
+        />
       </section>
     </Layout>
   );

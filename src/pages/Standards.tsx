@@ -1,3 +1,4 @@
+import { SEO } from "@/components/SEO";
 import {
   FileCheck,
   Search,
@@ -31,14 +32,12 @@ const standardsCoverage = [
 ];
 
 const scopeLimitations = [
-  { included: true, item: "Food and beverage products" },
-  { included: true, item: "Meat slaughter and processing" },
-  { included: true, item: "Pharmaceutical products" },
-  { included: true, item: "Cosmetics and personal care" },
-  { included: true, item: "Food service establishments" },
-  { included: false, item: "Financial services (Islamic finance)" },
-  { included: false, item: "Media and entertainment" },
-  { included: false, item: "Real estate certification" },
+  { included: true, item: "Restaurants" },
+  { included: true, item: "Cafés" },
+  { included: true, item: "Abattoirs" },
+  { included: true, item: "Meat Processing" },
+  { included: true, item: "Hospitality" },
+  { included: true, item: "Manufacturing" },
 ];
 
 const lifecycle = [
@@ -67,6 +66,12 @@ const lifecycle = [
 export default function Standards() {
   return (
     <Layout>
+      <SEO
+        title="Halal Certification Standards Zambia — ISO & Shariah Compliance | AHI"
+        description="AHI's Halal certification standards and methodology. ISO-aligned, Shariah-compliant processes ensuring food safety and ethical sourcing in Zambia."
+        keywords="halal standards zambia, halal methodology, ISO halal compliance, shariah certification standards"
+        canonicalPath="/standards"
+      />
       {/* Hero */}
       <HeroSection
         subtitle="Standards & Methodology"

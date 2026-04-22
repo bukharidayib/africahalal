@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { ArrowRight, CheckCircle, MapPin } from "lucide-react";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout/Layout";
 
@@ -17,6 +18,12 @@ export default function CityLanding() {
 
   return (
     <Layout>
+      <SEO
+        title={`Halal Certification ${info.name} | African Halal Institute`}
+        description={info.description.slice(0, 155)}
+        keywords={`halal certification ${info.name.toLowerCase()}, halal ${info.name.toLowerCase()} zambia`}
+        canonicalPath={`/halal-certification/${city}`}
+      />
 
       {/* Hero */}
       <section className="bg-primary text-primary-foreground py-16 md:py-24">

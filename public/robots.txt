@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /client/
+Disallow: /admin/
+Disallow: /inspector/
+Disallow: /supervisor/
+
+Sitemap: https://africanhalaal.com/sitemap.xml
