@@ -1,40 +1,28 @@
 
 
-## Fix `check-payment-status` Edge Function
+## Auto-Polling Payment Status + Updated Edge Function
 
-### Problem
-ZynlePay returns response code **9901 "Invalid method"** when the status check runs. The function sends `getBillStatus` (for MoMo) or `getTranStatus` (for cards), but ZynlePay's status API does not recognize these method names — so we never get back the real status codes (100/990/995/9902).
+### What changes
+1. **Replace `supabase/functions/check-payment-status/index.ts`** with the user-provided code (uses `https://africanhalaal.com/zynlepayStatusProxy.php` proxy with the documented flat payload `{ api_id, api_key, reference_no }`, and maps codes 100/990/995/9902 directly).
 
-### Root cause
-The method names used in `check-payment-status/index.ts` are incorrect. The original payment in `process-momo-payment` successfully uses `runBillPayment`, but the status check needs ZynlePay's documented status-check method name.
+2. **Add automatic polling in `src/components/billing/MoMoPaymentDialog.tsx`:**
+   - When `paymentState` becomes `"pending"` and a `transactionId` exists, start a `setInterval` that calls the existing `handleCheckStatus()` every **5 seconds**.
+   - Track elapsed time; stop polling and show a timeout message after **2 minutes (120s)** if still pending.
+   - Stop polling immediately when status becomes `"success"` or `"error"`, or when the dialog closes / unmounts.
+   - Show a small "Auto-checking… (Xs)" indicator next to the existing manual "Check Status" button so the user knows polling is active. The manual button stays available as a fallback.
+   - On timeout: set state to `"error"` with message "Payment status check timed out. Please verify the payment manually or contact support."
 
-### Plan
-
-1. **Fix the method name in `supabase/functions/check-payment-status/index.ts`**
-   - Replace the conditional `getBillStatus`/`getTranStatus` with the correct ZynlePay status method (most likely `getTransactionStatus` for both MoMo and card, since ZynlePay uses a single status endpoint).
-   - Keep `service_id: "1002"` and the same auth/payload structure that already works in `process-momo-payment`.
-
-2. **Expand response code handling** to match ZynlePay's documented codes:
-   - `100` → completed (success)
-   - `120` / `990` (when "still processing") → pending
-   - `995` → failed (transaction failed)
-   - `9902` → failed + log credential error (wrong API credentials — surface a clear admin message)
-   - `9901` → failed + log "invalid method" (so we catch this regression in the future)
-   - Any other non-empty code → failed with the description from ZynlePay
-
-3. **Always return a structured response to the client** so the MoMo Payment Dialog can display the actual ZynlePay `response_code` and `response_description` (instead of a silent "still pending"). Include:
-   ```json
-   { "status": "...", "message": "...", "response_code": "...", "response_description": "..." }
-   ```
-
-4. **Add clearer logging** of the outgoing payload (method + reference_no) so future debugging shows exactly what was sent to ZynlePay.
-
-5. **Redeploy** `check-payment-status` and test by clicking "Check Status" in the MoMo Payment Dialog on `/client/billing`. Verify the edge function logs now show a valid response code (100/120/990/995) instead of 9901.
+### Technical details
+- Use a `useEffect` keyed on `paymentState === "pending" && transactionId`.
+- Use `useRef` for the interval id and a start timestamp to compute elapsed seconds.
+- Cleanup: `clearInterval` in the effect's return + when `handleClose` runs.
+- Reuse existing `handleCheckStatus` logic (no duplication) — just call it from the interval.
+- Add a small `pollSeconds` state to show the elapsed countdown in the UI.
 
 ### Files touched
-- `supabase/functions/check-payment-status/index.ts` (method name + response code mapping + richer client response)
+- `supabase/functions/check-payment-status/index.ts` (replace with provided code)
+- `src/components/billing/MoMoPaymentDialog.tsx` (add polling effect + UI indicator)
 
-### What stays the same
-- Auth flow, transaction lookup, RLS, invoice/application status updates on success — all unchanged.
-- `process-momo-payment` is working correctly per logs (returns code 120 "Transaction is initiated"), so it is NOT modified.
+### Out of scope
+- No DB changes. No changes to `process-momo-payment`. No changes to other portals.
 
