@@ -77,36 +77,22 @@ Deno.serve(async (req) => {
     const apiId = Deno.env.get("ZYNLEPAY_API_ID")!;
     const apiKey = Deno.env.get("ZYNLEPAY_API_KEY")!;
 
-    const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
     const statusPayload = {
-      auth: {
-        merchant_id: merchantId,
-        api_id: apiId,
-        api_key: apiKey,
-        service_id: "1002",
-      },
-      data: {
-        method: "getTransactionStatus",
-        reference_no: transaction.zynlepay_reference,
-        request_id: requestId,
-      },
-      userdata: {
-        udf1: "", udf2: "", udf3: "", udf4: "", udf5: "",
-      },
+      api_id: apiId,
+      api_key: apiKey,
+      reference_no: transaction.zynlepay_reference,
     };
 
-    console.log("Sending ZynlePay status check:", JSON.stringify({
-      method: statusPayload.data.method,
-      reference_no: statusPayload.data.reference_no,
-      request_id: requestId,
-    }));
+    console.log("Sending ZynlePay status check for reference:", transaction.zynlepay_reference);
 
     const zynleResponse = await fetch(
-      "https://africanhalaal.com/zynlepayProxy.php",
+      "https://payments.zynlepay.com/zynlepay/paymentstatus",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "*/*",
+        },
         body: JSON.stringify(statusPayload),
       }
     );
