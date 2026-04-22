@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
         service_id: "1002",
       },
       data: {
-        method: transaction.payment_method === "mobile_money" ? "getBillStatus" : "getTranStatus",
+        method: "getTransactionStatus",
         reference_no: transaction.zynlepay_reference,
         request_id: requestId,
       },
@@ -95,6 +95,12 @@ Deno.serve(async (req) => {
         udf1: "", udf2: "", udf3: "", udf4: "", udf5: "",
       },
     };
+
+    console.log("Sending ZynlePay status check:", JSON.stringify({
+      method: statusPayload.data.method,
+      reference_no: statusPayload.data.reference_no,
+      request_id: requestId,
+    }));
 
     const zynleResponse = await fetch(
       "https://africanhalaal.com/zynlepayProxy.php",
@@ -111,18 +117,35 @@ Deno.serve(async (req) => {
     const responseCode = extractResponseCode(zynleResult);
     console.log("Extracted status response code:", responseCode);
 
+    const zynleDescription =
+      zynleResult?.response?.response_description ||
+      zynleResult?.response_description ||
+      "";
+
     let newStatus = "pending";
     let message = "Payment is still being processed.";
-    
-    // Get description from response if available
-    const zynleDescription = zynleResult?.response?.response_description || zynleResult?.response_description || "";
 
     if (responseCode === "100") {
       newStatus = "completed";
       message = "Payment successful!";
     } else if (["120", "990"].includes(responseCode)) {
+      // 990 = "Transaction not found" (usually still being processed by operator)
+      // 120 = still initiating
       newStatus = "pending";
-      message = zynleDescription || "Payment is still being processed. Please approve the prompt on your phone.";
+      message =
+        zynleDescription ||
+        "Payment is still being processed. Please approve the prompt on your phone.";
+    } else if (responseCode === "995") {
+      newStatus = "failed";
+      message = zynleDescription || "Transaction failed.";
+    } else if (responseCode === "9902") {
+      console.error("ZynlePay credential error (9902): wrong API credentials");
+      newStatus = "failed";
+      message = "Payment gateway misconfigured. Please contact support.";
+    } else if (responseCode === "9901") {
+      console.error("ZynlePay invalid method (9901): status method name not accepted");
+      newStatus = "failed";
+      message = "Payment gateway error. Please contact support.";
     } else if (responseCode) {
       newStatus = "failed";
       message = zynleDescription || "Payment failed or was cancelled.";
@@ -159,7 +182,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ status: newStatus, message, response_code: responseCode }),
+      JSON.stringify({ status: newStatus, message, response_code: responseCode, response_description: zynleDescription }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
