@@ -49,6 +49,10 @@ export function MoMoPaymentDialog({
   const [reference, setReference] = useState("");
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [pollSeconds, setPollSeconds] = useState(0);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollStartRef = useRef<number | null>(null);
+  const POLL_TIMEOUT_MS = 120_000;
 
   // Offline payment state
   const [offlineSenderName, setOfflineSenderName] = useState("");
