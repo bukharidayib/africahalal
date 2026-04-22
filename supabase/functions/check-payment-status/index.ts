@@ -6,6 +6,52 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Map ZynlePay response codes to internal status + human-readable message.
+function mapResponseCode(code: string, fallbackDescription?: string): { status: "pending" | "completed" | "failed"; message: string } {
+  switch (code) {
+    case "100":
+      return { status: "completed", message: "Transaction successful" };
+    case "120":
+      return { status: "pending", message: "Transaction initiated" };
+    case "990":
+      return { status: "pending", message: "Transaction pending" };
+    case "9914":
+      return { status: "pending", message: "Cannot determine transaction status now, please try again later" };
+    case "995":
+      return { status: "failed", message: "Transaction failed" };
+    case "2000":
+      return { status: "failed", message: "No active simulator for the phone number provided" };
+    case "9901":
+      return { status: "failed", message: "Merchant not found" };
+    case "9902":
+      return { status: "failed", message: "Requesting device IP not whitelisted / wrong API credentials" };
+    case "9903":
+      return { status: "failed", message: "Invalid merchant API credentials or setup not complete" };
+    case "9904":
+      return { status: "failed", message: "Duplicate reference number detected" };
+    case "9905":
+      return { status: "failed", message: "Invalid sender ID (mobile number)" };
+    case "9906":
+      return { status: "failed", message: "Duplicate reference number detected" };
+    case "9907":
+      return { status: "failed", message: "Mobile number blacklisted" };
+    case "9908":
+    case "9909":
+    case "9910":
+      return { status: "failed", message: "Merchant setup not complete" };
+    case "9911":
+      return { status: "failed", message: "Merchant insufficient balance" };
+    case "9912":
+      return { status: "failed", message: "Request amount exceeds disbursement limit" };
+    case "9913":
+      return { status: "failed", message: "Invalid or wrong bank name provided" };
+    case "":
+      return { status: "pending", message: "No response code received yet" };
+    default:
+      return { status: "failed", message: fallbackDescription || `Unknown response code: ${code}` };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -62,15 +108,13 @@ Deno.serve(async (req) => {
     const apiId = Deno.env.get("ZYNLEPAY_API_ID")!;
     const apiKey = Deno.env.get("ZYNLEPAY_API_KEY")!;
 
-    // CORRECTED PAYLOAD as per ZynlePay docs
     const statusPayload = {
       api_id: apiId,
       api_key: apiKey,
-      reference_no: transaction.zynlepay_reference
+      reference_no: transaction.zynlepay_reference,
     };
 
     console.log("Checking status for reference:", transaction.zynlepay_reference);
-    console.log("Status payload:", JSON.stringify(statusPayload));
 
     const zynleResponse = await fetch(
       "https://africanhalaal.com/zynlepayStatusProxy.php",
@@ -84,26 +128,11 @@ Deno.serve(async (req) => {
     const zynleResult = await zynleResponse.json();
     console.log("ZynlePay status response:", JSON.stringify(zynleResult));
 
-    // Get response code directly from the response
-    const responseCode = zynleResult.response_code || zynleResult.code || "";
+    const responseCode = String(zynleResult.response_code || zynleResult.code || "");
+    const responseDescription = zynleResult.response_description || zynleResult.message || "";
     console.log("Status response code:", responseCode);
 
-    let newStatus = "pending";
-    let message = "Payment is still being processed.";
-
-    if (responseCode === "100") {
-      newStatus = "completed";
-      message = "Payment successful!";
-    } else if (responseCode === "995") {
-      newStatus = "failed";
-      message = "Payment failed.";
-    } else if (responseCode === "990") {
-      newStatus = "pending";
-      message = "Transaction not found or still processing.";
-    } else if (responseCode === "9902") {
-      newStatus = "failed";
-      message = "Wrong API credentials. Please contact support.";
-    }
+    const { status: newStatus, message } = mapResponseCode(responseCode, responseDescription);
 
     if (newStatus !== "pending") {
       await adminClient
@@ -127,7 +156,8 @@ Deno.serve(async (req) => {
         status: newStatus,
         message,
         response_code: responseCode,
-        reference_no: transaction.zynlepay_reference
+        response_description: responseDescription,
+        reference_no: transaction.zynlepay_reference,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
