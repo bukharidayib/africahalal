@@ -189,6 +189,37 @@ export function MoMoPaymentDialog({
     }
   };
 
+  // Auto-poll status every 5s while pending, with 2-min timeout
+  useEffect(() => {
+    if (paymentState !== "pending" || !transactionId) return;
+
+    pollStartRef.current = Date.now();
+    setPollSeconds(0);
+
+    pollIntervalRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - (pollStartRef.current ?? Date.now())) / 1000);
+      setPollSeconds(elapsed);
+
+      if (elapsed * 1000 >= POLL_TIMEOUT_MS) {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+        setPaymentState("error");
+        setMessage("Payment status check timed out. Please verify the payment manually or contact support.");
+        return;
+      }
+
+      handleCheckStatus();
+    }, 5000);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentState, transactionId]);
+
   const handleClose = () => {
     if (paymentState !== "processing") {
       setPaymentState("idle");
