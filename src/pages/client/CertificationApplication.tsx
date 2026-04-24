@@ -159,6 +159,9 @@ export default function CertificationApplication() {
             if (error || !app) return;
 
             const org = app.organizations as any;
+            if ((app as any).business_id) {
+                setSelectedBusinessId((app as any).business_id);
+            }
             setFormData(prev => ({
                 ...prev,
                 entity_name: org?.name || '',
@@ -215,9 +218,46 @@ export default function CertificationApplication() {
         }
     };
 
+    // Ensure the selected business has its own organization row, return its id.
+    const ensureBusinessOrganization = async (businessId: string): Promise<string> => {
+        const { data: biz, error: bizErr } = await supabase
+            .from('client_businesses')
+            .select('id, entity_name, pacra_number, organization_id')
+            .eq('id', businessId)
+            .single();
+        if (bizErr || !biz) throw new Error('Selected business not found.');
+
+        if (biz.organization_id) return biz.organization_id;
+
+        // Try to find an existing organization with the same registration number first
+        const { data: existingOrg } = await supabase
+            .from('organizations')
+            .select('id')
+            .eq('registration_number', biz.pacra_number)
+            .maybeSingle();
+
+        let orgId = existingOrg?.id as string | undefined;
+        if (!orgId) {
+            const newOrgId = crypto.randomUUID();
+            const { error: orgErr } = await supabase.from('organizations').insert({
+                id: newOrgId,
+                name: biz.entity_name,
+                registration_number: biz.pacra_number,
+                sector: formData.categories[0] || 'General',
+                address: formData.address,
+                country: formData.country,
+            });
+            if (orgErr) throw orgErr;
+            orgId = newOrgId;
+        }
+
+        await supabase.from('client_businesses').update({ organization_id: orgId }).eq('id', businessId);
+        return orgId!;
+    };
+
     const handleSaveDraft = async () => {
-        if (!formData.entity_name && !formData.registration_number) {
-            toast({ variant: "destructive", title: "Missing Info", description: "Please fill in at least the business details before saving." });
+        if (!selectedBusinessId) {
+            toast({ variant: "destructive", title: "Select a Business", description: "Please select the business you are applying for." });
             return;
         }
 
@@ -226,31 +266,19 @@ export default function CertificationApplication() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Not authenticated");
 
-            const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single();
-            let organization_id = profile?.organization_id;
+            const organization_id = await ensureBusinessOrganization(selectedBusinessId);
 
-            if (!organization_id) {
-                if (!formData.registration_number) throw new Error("Registration number required");
-                const { data: orgData, error: orgError } = await supabase.from('organizations').select('id').eq('registration_number', formData.registration_number).single();
-                if (orgError && orgError.code === 'PGRST116') {
-                    const newOrgId = crypto.randomUUID();
-                    await supabase.from('organizations').insert({ id: newOrgId, name: formData.entity_name, registration_number: formData.registration_number, sector: formData.categories[0] || "General", address: formData.address, country: formData.country });
-                    organization_id = newOrgId;
-                    await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
-                } else if (orgError) {
-                    throw orgError;
-                } else {
-                    organization_id = orgData.id;
-                }
-            }
+            // Keep profiles.organization_id pointed at the most recently used business org (best-effort; non-blocking)
+            await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
 
             if (draftId) {
                 // Update existing draft
                 await supabase.from('certification_applications').update({
                     scope: formData.categories.join(', '),
                     sector: formData.categories[0] || 'General',
+                    business_id: selectedBusinessId,
                     updated_at: new Date().toISOString(),
-                }).eq('id', draftId);
+                } as any).eq('id', draftId);
 
                 // Delete old products and re-insert
                 await supabase.from('application_products').delete().eq('application_id', draftId);
@@ -263,35 +291,18 @@ export default function CertificationApplication() {
 
                 toast({ title: "Draft Saved", description: "Your application draft has been updated." });
             } else {
-                // Pre-flight: enforce single active application per organization
-                const { data: existingActive } = await supabase
-                    .from('certification_applications')
-                    .select('id, application_number, status')
-                    .eq('organization_id', organization_id)
-                    .not('status', 'in', '(expired,rejected,withdrawn)')
-                    .limit(1);
-                if (existingActive && existingActive.length > 0) {
-                    throw new Error("You already have an active application. You can only create a new one after the current application expires.");
-                }
-
-                // Create new draft
+                // Drafts are unlimited per business — no active-application check here.
                 const { data: appNum } = await supabase.rpc('generate_application_number');
                 const { data: appData, error: appErr } = await supabase.from('certification_applications').insert({
                     organization_id,
+                    business_id: selectedBusinessId,
                     application_type: "Full Certification",
                     sector: formData.categories[0] || "General",
                     scope: formData.categories.join(', '),
                     application_number: appNum || `APP-${Date.now()}`,
                     status: 'draft',
-                }).select('id').single();
-                if (appErr) {
-                    // Friendly mapping of DB trigger error
-                    const msg = (appErr as any).message || '';
-                    if (msg.includes('already have an active application')) {
-                        throw new Error("You already have an active application. You can only create a new one after the current application expires.");
-                    }
-                    throw appErr;
-                }
+                } as any).select('id').single();
+                if (appErr) throw appErr;
 
                 setDraftId(appData.id);
 
@@ -517,43 +528,29 @@ export default function CertificationApplication() {
             return;
         }
 
+        if (!selectedBusinessId) {
+            toast({ variant: "destructive", title: "Select a Business", description: "Please select the business you are applying for." });
+            return;
+        }
+
         setIsLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not authenticated");
 
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('organization_id')
-                .eq('id', user.id)
-                .single();
+            const organization_id = await ensureBusinessOrganization(selectedBusinessId);
+            await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
 
-            let organization_id = profile?.organization_id;
-
-            if (!organization_id) {
-                const { data: orgData, error: orgError } = await supabase
-                    .from('organizations')
-                    .select('id')
-                    .eq('registration_number', formData.registration_number)
-                    .single();
-
-                if (orgError && orgError.code === 'PGRST116') {
-                    const newOrgId = crypto.randomUUID();
-                    await supabase.from('organizations').insert({
-                        id: newOrgId,
-                        name: formData.entity_name,
-                        registration_number: formData.registration_number,
-                        sector: formData.categories[0] || "General",
-                        address: formData.address,
-                        country: formData.country
-                    });
-                    organization_id = newOrgId;
-                    await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
-                } else if (orgError) {
-                    throw orgError;
-                } else {
-                    organization_id = orgData.id;
-                }
+            // Per-business active-application guard (drafts allowed; final guard is the DB trigger)
+            const { data: blocking } = await supabase
+                .from('certification_applications')
+                .select('id, application_number, status')
+                .eq('business_id', selectedBusinessId)
+                .not('status', 'in', '(draft,expired,rejected,withdrawn)')
+                .neq('id', draftId || '00000000-0000-0000-0000-000000000000')
+                .limit(1);
+            if (blocking && blocking.length > 0) {
+                throw new Error("This business already has an active application. You can apply again once it expires.");
             }
 
             let applicationNumber: string;
@@ -567,12 +564,13 @@ export default function CertificationApplication() {
                     .single();
                 applicationNumber = existingApp?.application_number || `APP-${Date.now()}`;
 
-                // Keep as draft — only update scope/sector
+                // Keep as draft — only update scope/sector/business
                 await supabase.from('certification_applications').update({
                     scope: formData.categories.join(', '),
                     sector: formData.categories[0] || "General",
+                    business_id: selectedBusinessId,
                     updated_at: new Date().toISOString(),
-                }).eq('id', draftId);
+                } as any).eq('id', draftId);
                 appId = draftId;
 
                 await supabase.from('application_products').delete().eq('application_id', draftId);
@@ -584,12 +582,13 @@ export default function CertificationApplication() {
                     .from('certification_applications')
                     .insert({
                         organization_id,
+                        business_id: selectedBusinessId,
                         application_type: "Full Certification",
                         sector: formData.categories[0] || "General",
                         scope: formData.categories.join(', '),
                         application_number: applicationNumber,
                         status: 'draft',
-                    })
+                    } as any)
                     .select('id')
                     .single();
                 if (appError) throw appError;
@@ -743,12 +742,20 @@ export default function CertificationApplication() {
         try {
             if (!draftId) return;
 
-            // Promote draft to submitted
-            await supabase.from('certification_applications').update({
+            // Promote draft to submitted (DB trigger enforces one-active-per-business)
+            const { error: promoteErr } = await supabase.from('certification_applications').update({
                 status: 'submitted',
                 submitted_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
             }).eq('id', draftId);
+            if (promoteErr) {
+                const msg = promoteErr.message || '';
+                if (msg.includes('active application')) {
+                    toast({ variant: "destructive", title: "Cannot Submit", description: "This business already has an active application. You can apply again once it expires." });
+                    return;
+                }
+                throw promoteErr;
+            }
 
             // Log Audit
             await supabase.rpc('log_audit', {
