@@ -1,0 +1,122 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { PDFDocument, rgb, StandardFonts } from 'https://esm.sh/pdf-lib@1.17.1';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+);
+
+async function buildQuotationPdf(quotationId: string) {
+  const { data: q, error } = await supabase
+    .from('quotations')
+    .select('*, organizations(name, contact_email)')
+    .eq('id', quotationId)
+    .single();
+  if (error || !q) throw new Error(error?.message || 'Quotation not found');
+
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([595, 842]);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const navy = rgb(0.06, 0.18, 0.34);
+  const gold = rgb(0.78, 0.62, 0.23);
+  const grey = rgb(0.4, 0.4, 0.4);
+  const black = rgb(0, 0, 0);
+
+  page.drawRectangle({ x: 0, y: 780, width: 595, height: 62, color: navy });
+  page.drawText('AFRICAN HALAL INSTITUTE', { x: 40, y: 812, size: 16, font: bold, color: rgb(1, 1, 1) });
+  page.drawText('QUOTATION', { x: 440, y: 808, size: 20, font: bold, color: gold });
+
+  page.drawText(`Quotation #: ${q.quotation_number}`, { x: 40, y: 745, size: 11, font: bold });
+  if (q.valid_until) page.drawText(`Valid Until: ${new Date(q.valid_until).toLocaleDateString('en-GB')}`, { x: 40, y: 728, size: 10, font, color: grey });
+
+  const org = q.organizations || {};
+  page.drawText('PREPARED FOR', { x: 350, y: 745, size: 9, font: bold, color: gold });
+  page.drawText(org.name || '—', { x: 350, y: 728, size: 11, font: bold });
+
+  page.drawText(q.title, { x: 40, y: 680, size: 13, font: bold, color: navy });
+
+  let y = 650;
+  page.drawRectangle({ x: 40, y: y - 4, width: 515, height: 22, color: navy });
+  page.drawText('ITEM', { x: 50, y: y + 4, size: 10, font: bold, color: rgb(1, 1, 1) });
+  page.drawText('QTY', { x: 360, y: y + 4, size: 10, font: bold, color: rgb(1, 1, 1) });
+  page.drawText('UNIT', { x: 410, y: y + 4, size: 10, font: bold, color: rgb(1, 1, 1) });
+  page.drawText('TOTAL', { x: 500, y: y + 4, size: 10, font: bold, color: rgb(1, 1, 1) });
+  y -= 22;
+  for (const it of (q.items as any[]) || []) {
+    if (y < 200) break;
+    page.drawText(String(it.label || '').slice(0, 50), { x: 50, y, size: 10, font });
+    page.drawText(String(it.qty ?? 1), { x: 365, y, size: 10, font });
+    page.drawText(Number(it.unit_price || 0).toFixed(2), { x: 410, y, size: 10, font });
+    page.drawText(Number(it.total || 0).toFixed(2), { x: 500, y, size: 10, font });
+    y -= 18;
+  }
+  y -= 10;
+  page.drawText('TOTAL', { x: 360, y, size: 13, font: bold, color: navy });
+  page.drawText(`${q.currency} ${Number(q.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, { x: 460, y, size: 14, font: bold, color: gold });
+
+  return { bytes: await pdf.save(), quotation: q };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  try {
+    const { quotation_id } = await req.json();
+    if (!quotation_id) throw new Error('quotation_id required');
+
+    const { bytes, quotation } = await buildQuotationPdf(quotation_id);
+    const recipient = quotation.organizations?.contact_email;
+    if (!recipient) throw new Error('Organization has no contact email');
+
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
+
+    const b64 = btoa(String.fromCharCode(...bytes));
+    const orgName = quotation.organizations?.name || 'Client';
+    const total = `${quotation.currency} ${Number(quotation.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
+        <div style="background: #0f2e57; padding: 24px; color: #fff;">
+          <h1 style="margin: 0; font-size: 20px;">African Halal Institute</h1>
+        </div>
+        <div style="padding: 28px 24px;">
+          <h2 style="color: #0f2e57; margin-top: 0;">Quotation ${quotation.quotation_number}</h2>
+          <p>Dear ${orgName},</p>
+          <p>Please find your quotation <strong>"${quotation.title}"</strong> attached. Total: <strong>${total}</strong>.</p>
+          <p>Sign in to your client portal to review and accept this quotation.</p>
+          <p><a href="https://africanhalaal.com" style="background: #c79e3b; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Review Quotation</a></p>
+        </div>
+      </div>
+    `;
+
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
+      body: JSON.stringify({
+        from: 'African Halal Institute <accounts@africanhalaal.com>',
+        to: [recipient],
+        subject: `Quotation ${quotation.quotation_number} from African Halal Institute`,
+        html,
+        attachments: [{ filename: `${quotation.quotation_number}.pdf`, content: b64 }],
+      }),
+    });
+    const respBody = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(`Email send failed: ${respBody?.message || resp.statusText}`);
+
+    await supabase.from('quotations').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', quotation_id);
+
+    return new Response(JSON.stringify({ success: true, recipient }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e.message }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
