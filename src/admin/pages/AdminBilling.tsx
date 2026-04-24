@@ -590,14 +590,13 @@ export default function AdminBilling() {
                 </div>
                 <div>
                   <Label>Certification Validity Period</Label>
-                  <Select value={newInvoice.validity_period} onValueChange={(v) => {
-                    const amount = v === '6_months' ? '1500' : v === '1_year' ? '3000' : newInvoice.amount;
-                    setNewInvoice(p => ({ ...p, validity_period: v, amount }));
-                  }}>
+                  <Select value={newInvoice.validity_period} onValueChange={(v) => setNewInvoice(p => ({ ...p, validity_period: v }))}>
                     <SelectTrigger><SelectValue placeholder="Select validity period (optional)" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="6_months">6 Months (ZMW 1)</SelectItem>
-                      <SelectItem value="1_year">1 Year (ZMW 1)</SelectItem>
+                      <SelectItem value="1_quarter">1 Quarter (3 months)</SelectItem>
+                      <SelectItem value="2_quarter">2 Quarters (6 months)</SelectItem>
+                      <SelectItem value="3_quarter">3 Quarters (9 months)</SelectItem>
+                      <SelectItem value="4_quarter">4 Quarters (12 months)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
