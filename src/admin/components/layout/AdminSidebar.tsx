@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Key,
   Receipt,
+  Calculator,
   FlaskConical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -104,9 +105,9 @@ const navItems: NavItem[] = [
     permission: 'canViewEnforcement',
   },
   {
-    title: 'Billing & Invoices',
+    title: 'Accountant',
     href: '/admin/billing',
-    icon: Receipt,
+    icon: Calculator,
     permission: 'canViewFinance',
   },
   {
