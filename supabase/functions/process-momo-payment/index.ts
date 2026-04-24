@@ -99,10 +99,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: profile } = await adminClient.from("profiles").select("organization_id").eq("id", user.id).single();
+    // Multi-business authorization: invoice's org must be linked to the user
+    // either via client_businesses (new model) or profiles.organization_id (legacy).
+    const { data: linkedBiz } = await adminClient
+      .from("client_businesses")
+      .select("organization_id")
+      .eq("user_id", user.id)
+      .eq("organization_id", invoice.organization_id)
+      .maybeSingle();
 
-    if (!profile || profile.organization_id !== invoice.organization_id) {
-      return new Response(JSON.stringify({ error: "Unauthorized: invoice does not belong to your organization" }), {
+    let isAuthorized = !!linkedBiz;
+    if (!isAuthorized) {
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      isAuthorized = !!profile && profile.organization_id === invoice.organization_id;
+    }
+
+    if (!isAuthorized) {
+      return new Response(JSON.stringify({ error: "Unauthorized: invoice does not belong to your business" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -189,8 +206,7 @@ Deno.serve(async (req) => {
     console.log("Calling ZynlePay API:", isCard ? "Card" : "MoMo", "invoice:", invoice.invoice_number);
 
     const zynleResponse = await fetch(
-      //  "https://payments.zynlepay.com/zynlepay/jsonapi/",
-      "http://africanhalaal.com/Proxy/zynlepayProxy.js",
+      "https://payments.africanhalaal.com/zynlepayProxy.php",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

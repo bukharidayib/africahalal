@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
     console.log("Checking status for reference:", transaction.zynlepay_reference);
 
     const zynleResponse = await fetch(
-      "http://africanhalaal.com/Proxy/zynlepayStatusProxy.js",
+      "https://payments.africanhalaal.com/zynlepayStatusProxy.php",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
