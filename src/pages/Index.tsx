@@ -141,27 +141,45 @@ const testimonials = [
   },
 ];
 
+const BLOG_PAGE_SIZE = 3;
+
 export default function Index() {
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
+  const [blogsLoading, setBlogsLoading] = useState(true);
+  const [blogsLoadingMore, setBlogsLoadingMore] = useState(false);
+  const [hasMoreBlogs, setHasMoreBlogs] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    fetchBlogs();
+    fetchBlogs(0);
     supabase.auth.getSession().then(({ data: { session } }) => setIsAuthenticated(!!session));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setIsAuthenticated(!!session));
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchBlogs = async () => {
+  const fetchBlogs = async (offset: number) => {
+    if (offset === 0) setBlogsLoading(true);
+    else setBlogsLoadingMore(true);
+
     const { data } = await (supabase
       .from('blogs' as any)
       .select('*')
       .eq('published', true)
       .order('published_at', { ascending: false })
-      .limit(3) as any);
+      .range(offset, offset + BLOG_PAGE_SIZE) as any);
 
-    if (data) setBlogs(data as BlogPost[]);
+    const rows = (data as BlogPost[]) || [];
+    const hasMore = rows.length > BLOG_PAGE_SIZE;
+    const pageRows = hasMore ? rows.slice(0, BLOG_PAGE_SIZE) : rows;
+
+    setBlogs((prev) => (offset === 0 ? pageRows : [...prev, ...pageRows]));
+    setHasMoreBlogs(hasMore);
+    setBlogsLoading(false);
+    setBlogsLoadingMore(false);
   };
+
+  const handleLoadMoreBlogs = () => fetchBlogs(blogs.length);
+
 
   return (
     <Layout>
