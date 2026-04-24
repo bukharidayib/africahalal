@@ -1,66 +1,128 @@
-## Verified
 
-I just live-tested both new proxy URLs:
+# Accountant Module — Full Financial Workflow
 
-```
-POST https://payments.africanhalaal.com/zynlepayProxy.php
-→ 200, application/json
-→ {"response":{...,"response_description":"Invalid method","response_code":"9901",...}}
+Rename **Billing & Invoices** to **Accountant** and turn it into the single module that controls all money flows: per-application pricing (set manually by admin), recurring subscriptions, quotations, and invoice delivery with PDF attachments.
 
-POST https://payments.africanhalaal.com/zynlepayStatusProxy.php
-→ 200, application/json
-→ {"response_code":"9902","response_description":"Invalid API Credentials",...}
-```
+---
 
-Both proxies are reachable and correctly forwarding to ZynlePay (the error codes above are expected — they came from my dummy `{"ping":1}` payload, not from real credentials). Real payloads from the edge function will succeed.
+## 1. Database changes
 
-## Changes
+**New tables**
+- `subscriptions` — `id, organization_id, application_id (nullable), plan_name, billing_cycle ('monthly'|'quarterly'|'yearly'), amount, currency ('ZMW'), status ('active'|'paused'|'cancelled'|'expired'), start_date, next_billing_date, end_date, created_by, created_at, updated_at, notes`. RLS: clients read own (via organization), admins with `canViewFinance` manage.
+- `quotations` — `id, quotation_number (auto AHIS-QUO-YYYY-NNNNN), organization_id, business_id (nullable), application_id (nullable), title, items jsonb (array of {label, qty, unit_price, total}), subtotal, tax, total, currency, valid_until, status ('draft'|'sent'|'accepted'|'rejected'|'expired'|'converted'), notes, sent_at, accepted_at, converted_invoice_id, created_by, created_at, updated_at`. RLS same model.
+- `generate_quotation_number()` SECURITY DEFINER function (mirrors `generate_invoice_number`).
 
-### 1. `supabase/functions/process-momo-payment/index.ts` (line ~191-199)
-Replace the broken proxy URL:
-```ts
-// from
-"http://africanhalaal.com/Proxy/zynlepayProxy.js"
-// to
-"https://payments.africanhalaal.com/zynlepayProxy.php"
-```
+**Modify `invoices`**
+- Add `subscription_id uuid` (nullable, FK to subscriptions).
+- Add `quotation_id uuid` (nullable).
+- Allow `fee_type` value `'subscription'` (already free text).
+- Index on `subscription_id`, `quotation_id`.
 
-### 2. `supabase/functions/check-payment-status/index.ts` (line ~119-126)
-Replace the broken proxy URL:
-```ts
-// from
-"http://africanhalaal.com/Proxy/zynlepayStatusProxy.js"
-// to
-"https://payments.africanhalaal.com/zynlepayStatusProxy.php"
-```
+**Modify `certification_applications`**
+- Update `validity_period` semantics to support `'1_quarter' | '2_quarter' | '3_quarter' | '4_quarter'`. Stored as text — no schema change needed, but migrate any existing `'6_months'`/`'1_year'` values to `'2_quarter'`/`'4_quarter'` for consistency.
+- `application_fee` stays nullable; admin sets it post-submission.
 
-### 3. Fix multi-business invoice authorization in `process-momo-payment`
-Current code (line ~102-109) checks `profile.organization_id === invoice.organization_id`. With the new multi-business model, a user can own several businesses, each with their own `organization_id`. This check rejects payments for any business other than the one cached on `profiles.organization_id`.
+**RLS** — append-only audit pattern; finance/admin roles can insert/update; clients can only SELECT rows scoped to their organization.
 
-Switch to: invoice's `organization_id` must be linked to the current user via `client_businesses`:
-```ts
-const { data: linkedBiz } = await adminClient
-  .from("client_businesses")
-  .select("organization_id")
-  .eq("user_id", user.id)
-  .eq("organization_id", invoice.organization_id)
-  .maybeSingle();
+---
 
-if (!linkedBiz) {
-  return 403 "Unauthorized: invoice does not belong to your business";
-}
-```
-(Keep the existing `profiles.organization_id` check as a fallback so legacy single-business users still work.)
+## 2. Client portal — Application flow cleanup
 
-### 4. Deploy & test
-- Auto-deploys on save.
-- I'll then trigger the function with a small live test against the proxy to confirm the round-trip works end-to-end (real credentials on the server side, no dummy payload).
-- We'll watch edge function logs to confirm: HTTP 200 from proxy → valid JSON → response code mapped → transaction recorded.
+`src/pages/client/CertificationApplication.tsx`:
 
-## What you'll see after this lands
+1. **Remove fixed fees** from "Select Business Category" — strip the `ZMW {fee}` badge and remove `application_fee` updates. Drop the `BUSINESS_CATEGORY_FEES` import + `src/lib/applicationFees.ts` references in this page.
+2. **Replace validity period** options with 4 quarter cards: `1 Quarter (3 months)`, `2 Quarters (6 months)`, `3 Quarters (9 months)`, `4 Quarters (12 months)`. Default `2_quarter`.
+3. **Remove the Payment step (Step 6)** from the in-application flow. Steps become: Establishment → Scope → Products → Documents → Declaration → **Submit**.
+4. On submission, set application `status = 'submitted'` and `application_fee = null` (admin will price it). Show a confirmation screen telling the client: "Your application is awaiting pricing from the Accountant team. You will receive an invoice by email."
+5. Remove the inline invoice creation that currently happens in `handleAdvanceToPayment` — invoice is now created by admin from the Accountant module.
 
-- Click "Save draft and continue to payment" → MoMo prompt arrives on phone (response code `120` = pending).
-- Approve on phone → status check returns `100` → invoice flips to `paid`, application flips to `submitted`.
-- No more 500 / "invalid response" errors.
+`src/components/billing/MoMoPaymentDialog.tsx` continues to work for paying invoices that arrive later (from BillingDashboard).
 
-No DB migration needed. No new secrets needed (ZynlePay creds already configured).
+---
+
+## 3. Admin "Accountant" module
+
+Rename existing route `/admin/billing` → keep route for back-compat but relabel sidebar and page header to **Accountant** (`src/admin/components/layout/AdminSidebar.tsx`, `src/admin/pages/AdminBilling.tsx`). Replace icon `Receipt` with `Calculator`. Rename file to `AdminAccountant.tsx` (update App.tsx import).
+
+Add tabs to the page (the file already uses `Tabs`):
+
+### Tab A — Invoices (existing, enhanced)
+- Existing list stays. Add filter chip for `fee_type = subscription`.
+- "Create Invoice" dialog gains:
+  - **Application picker** (autocomplete by application number) — when chosen, prefills organization and shows app summary.
+  - **Fee type**: `application_fee | subscription | inspection | renewal | other`.
+  - **Validity period** (when `application_fee`): quarter dropdown, written back to `certification_applications.validity_period` and `application_fee`.
+  - **Subscription link** (when `subscription`): pick existing subscription.
+  - **Send by email** checkbox (default on) — generates PDF and emails invoice to org `contact_email`.
+
+### Tab B — Pending Pricing (new)
+- Lists `certification_applications` where `status='submitted'` and no invoice yet.
+- Each row: "Set Price & Send Invoice" → opens a streamlined form (category context, validity period quarter selector, application fee amount, optional subscription bundle: cycle + amount, due date, notes). Single submit creates one or two invoices and emails them.
+
+### Tab C — Subscriptions (new)
+- List subscriptions with status badges and next billing date.
+- Create/Edit dialog: organization, optional application, plan name, billing cycle (monthly/quarterly/yearly), amount, start date, end date, notes.
+- Action: "Generate Invoice Now" creates an invoice tied to the subscription and advances `next_billing_date` by the cycle.
+
+### Tab D — Quotations (new)
+- List quotations with status badges.
+- Create dialog: organization, optional business/application, title, line items (label, qty, unit price — auto-totals), tax %, valid-until date, notes.
+- Actions: **Send** (emails PDF quote, sets `status='sent'`), **Convert to Invoice** (creates invoice from totals, links both ways, sets `status='converted'`), **Mark Accepted/Rejected**.
+
+### Tab E — Payment Transactions, Tab F — Offline Payments
+Keep as-is from current AdminBilling.
+
+---
+
+## 4. Invoice & Quotation PDF + Email
+
+**New edge function `generate-invoice-pdf`** (Deno + `pdf-lib`):
+- Input: `{ invoice_id }`. Loads invoice + organization + application (if any) + line items derived from invoice. Renders branded AHI PDF (logo, invoice #, dates, bill-to, item table, totals, payment instructions, footer). Returns base64 PDF.
+
+**New edge function `generate-quotation-pdf`**: mirrors the above for quotations with line-item table.
+
+**New edge function `send-invoice-email`**:
+- Input: `{ invoice_id }`. Calls `generate-invoice-pdf` internally, then sends through existing Resend setup (`RESEND_API_KEY` already present) with PDF attachment to org `contact_email`. Subject: `Invoice {number} from African Halal Institute`. Logs to `invoice_activity_log` (`action='invoice_emailed'`).
+
+**New edge function `send-quotation-email`**: same pattern for quotations.
+
+Admin "Send invoice" / "Send quotation" buttons invoke these. Client-side download buttons (in `BillingInvoiceDetail.tsx` and a new quotation detail) call `generate-*-pdf` and trigger browser download.
+
+---
+
+## 5. Client portal additions
+
+- `BillingDashboard` and `BillingInvoices` already list invoices — no rename needed (client-facing label stays "Billing & Payments").
+- Add **Subscriptions** card on `BillingDashboard` showing active subscriptions + next billing date.
+- Add **Quotations** page `/client/billing/quotations` listing org quotations with view/accept/reject buttons.
+- Each invoice row gets "Download PDF" calling `generate-invoice-pdf`.
+
+---
+
+## 6. Files touched
+
+**New**
+- `supabase/migrations/<ts>_accountant_module.sql` (subscriptions, quotations, generate_quotation_number, invoice FK columns, validity migration).
+- `supabase/functions/generate-invoice-pdf/index.ts`
+- `supabase/functions/generate-quotation-pdf/index.ts`
+- `supabase/functions/send-invoice-email/index.ts`
+- `supabase/functions/send-quotation-email/index.ts`
+- `src/admin/pages/AdminAccountant.tsx` (renamed from AdminBilling.tsx, new tabs)
+- `src/admin/components/accountant/PendingPricingTab.tsx`
+- `src/admin/components/accountant/SubscriptionsTab.tsx`
+- `src/admin/components/accountant/QuotationsTab.tsx`
+- `src/pages/client/BillingQuotations.tsx`
+
+**Modified**
+- `src/pages/client/CertificationApplication.tsx` — remove fees & payment step, quarter validity, submission UX.
+- `src/admin/components/layout/AdminSidebar.tsx` — rename to "Accountant", icon `Calculator`.
+- `src/App.tsx` — route + import update, new `/client/billing/quotations` route.
+- `src/pages/client/BillingDashboard.tsx` — subscriptions block + PDF download.
+- `src/pages/client/BillingInvoices.tsx` / `BillingInvoiceDetail.tsx` — PDF download button.
+- `src/lib/applicationFees.ts` — kept for category labels only (fees become 0/decorative) or deleted; categories source moves to a simple labels list.
+
+---
+
+## 7. Open question
+
+Should **clients be able to accept a quotation in-portal** (one-click "Accept → auto-convert to invoice"), or is acceptance handled offline and admin manually converts? Default plan: client can Accept/Reject; admin still does the actual conversion to invoice to keep finance control. Adjust if you want full auto-conversion.
