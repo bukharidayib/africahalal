@@ -28,7 +28,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Layout } from "@/components/layout/Layout";
 import { SectionHeader } from "@/components/sections/SectionHeader";
 import { SEO } from "@/components/SEO";
-import { BUSINESS_CATEGORY_FEES } from "@/lib/applicationFees";
+
 
 interface BlogPost {
   id: string;
@@ -410,103 +410,94 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Blogs Section */}
-      {blogs.length > 0 && (
-        <section className="section-padding bg-background/50">
-          <div className="container">
-            <SectionHeader
-              subtitle="Latest Updates"
-              title="Blogs"
-              description="Stay informed with the latest news and articles from the African Halal Institute."
-            />
-            <div className="grid md:grid-cols-3 gap-8">
-              {blogs.map((blog) => (
-                <Card key={blog.id} className="group overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 h-full flex flex-col bg-card/50 backdrop-blur-sm">
-                  {blog.image_url ? (
-                    <div className="h-52 overflow-hidden relative">
-                      <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors z-10" />
-                      <img
-                        src={blog.image_url}
-                        alt={blog.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-52 bg-secondary/10 flex items-center justify-center">
-                      <Info className="h-12 w-12 text-secondary/40" />
-                    </div>
-                  )}
-                  <CardHeader className="pb-3">
-                    <div className="text-xs font-medium text-primary mb-2 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                      {new Date(blog.published_at).toLocaleDateString(undefined, {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </div>
-                    <CardTitle className="text-xl font-bold leading-tight group-hover:text-primary transition-colors line-clamp-2">
-                      {blog.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-grow pb-4">
-                    <p className="text-muted-foreground line-clamp-3 text-sm leading-relaxed">{blog.excerpt}</p>
-                  </CardContent>
-                  <div className="p-6 pt-0 mt-auto border-t border-border/50">
-                    <Button variant="ghost" className="w-full justify-between hover:bg-transparent hover:text-primary px-0 group/btn" asChild>
-                      <Link to={`/blog/${blog.slug}`}>
-                        <span className="font-semibold">Read Article</span>
-                        <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
-                      </Link>
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+      {/* Blog Section */}
+      <section id="blog" className="section-padding bg-gradient-to-b from-background via-muted/20 to-background relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-32 -right-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+          <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
+        </div>
 
-      {/* Application Fees Section */}
-      <section id="fees" className="section-padding bg-muted/30">
-        <div className="container max-w-3xl">
-          <SectionHeader
-            subtitle="Pricing"
-            title="Application Fees"
-            description="Transparent, one-time application fees by business category. All amounts in Zambian Kwacha (ZMW)."
-          />
-          <Card className="border shadow-md overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-primary text-primary-foreground">
-                  <tr>
-                    <th className="px-6 py-3 text-left font-semibold">Business Category</th>
-                    <th className="px-6 py-3 text-right font-semibold">Application Fee (ZMW)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {BUSINESS_CATEGORY_FEES.map((c) => (
-                    <tr key={c.key} className="border-t hover:bg-muted/40 transition-colors">
-                      <td className="px-6 py-3 font-medium text-foreground">{c.label}</td>
-                      <td className="px-6 py-3 text-right font-bold text-foreground">K{c.fee.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="container relative">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+            <div className="max-w-2xl">
+              <p className="text-secondary font-semibold mb-3 tracking-wider uppercase text-xs">
+                Insights & Updates
+              </p>
+              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground leading-tight tracking-tight">
+                From the <span className="text-primary">AHI Journal</span>
+              </h2>
+              <p className="text-muted-foreground text-lg mt-4 leading-relaxed">
+                Expert perspectives on Halal certification, compliance standards, and industry developments.
+              </p>
             </div>
-            <CardContent className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
-              <p>• All application fees are <strong>non-refundable</strong>.</p>
-              <p>• Payment must be made prior to commencement of the certification process.</p>
-              <p>• Covers initial application review and administrative processing only. Inspection, audit, and annual certification fees are billed separately.</p>
-            </CardContent>
-          </Card>
-          <div className="text-center mt-8">
-            <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90" asChild>
-              <Link to={isAuthenticated ? "/client/applications/new" : "/auth/signup?redirect=/client/applications/new"}>
-                Apply for Certification <ArrowRight className="ml-2 h-5 w-5" />
+            <Button variant="outline" className="self-start md:self-end group" asChild>
+              <Link to="/blog">
+                View All Articles
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </Button>
           </div>
+
+          {blogs.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {blogs.map((blog, idx) => (
+                <Link
+                  key={blog.id}
+                  to={`/blog/${blog.slug}`}
+                  className={`group relative flex flex-col overflow-hidden rounded-2xl bg-card border border-border/60 hover:border-primary/40 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 ${idx === 0 ? "lg:col-span-1" : ""}`}
+                >
+                  <div className="relative h-56 overflow-hidden bg-muted">
+                    {blog.image_url ? (
+                      <img
+                        src={blog.image_url}
+                        alt={blog.title}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-primary/10 via-secondary/10 to-primary/5 flex items-center justify-center">
+                        <BadgeCheck className="h-14 w-14 text-primary/30" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="absolute top-4 left-4">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-background/90 backdrop-blur-sm text-xs font-semibold text-primary border border-border/40 shadow-sm">
+                        Article
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col flex-grow p-6">
+                    <p className="text-xs font-medium text-muted-foreground mb-3 tracking-wide uppercase">
+                      {new Date(blog.published_at).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                    <h3 className="text-xl font-bold leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2 mb-3">
+                      {blog.title}
+                    </h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed line-clamp-3 flex-grow">
+                      {blog.excerpt}
+                    </p>
+                    <div className="mt-5 pt-4 border-t border-border/40 flex items-center justify-between">
+                      <span className="text-sm font-semibold text-primary">Read article</span>
+                      <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-1" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-20 rounded-2xl bg-card/50 border border-dashed border-border">
+              <Info className="h-14 w-14 text-muted-foreground/30 mx-auto mb-4" />
+              <h3 className="text-xl font-bold mb-2">Articles Coming Soon</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                We're crafting in-depth articles on Halal certification and compliance. Check back shortly.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
