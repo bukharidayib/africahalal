@@ -159,6 +159,9 @@ export default function CertificationApplication() {
             if (error || !app) return;
 
             const org = app.organizations as any;
+            if ((app as any).business_id) {
+                setSelectedBusinessId((app as any).business_id);
+            }
             setFormData(prev => ({
                 ...prev,
                 entity_name: org?.name || '',
