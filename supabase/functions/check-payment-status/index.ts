@@ -125,7 +125,21 @@ Deno.serve(async (req) => {
       }
     );
 
-    const zynleResult = await zynleResponse.json();
+    const rawText = await zynleResponse.text();
+    console.log("ZynlePay status HTTP:", zynleResponse.status, "raw (first 500):", rawText.slice(0, 500));
+    let zynleResult: any;
+    try {
+      zynleResult = JSON.parse(rawText);
+    } catch (_) {
+      return new Response(
+        JSON.stringify({
+          error: "Payment gateway returned an invalid response while checking status.",
+          status: zynleResponse.status,
+          gateway_preview: rawText.slice(0, 200),
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     console.log("ZynlePay status response:", JSON.stringify(zynleResult));
 
     const responseCode = String(zynleResult.response_code || zynleResult.code || "");
