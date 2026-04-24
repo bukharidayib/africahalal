@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, Clock, AlertTriangle, CheckCircle2, Loader2, Search,
   Receipt, Plus, Eye, Pencil, Trash2, RefreshCw, CreditCard, Banknote,
-  Image, XCircle, CheckCircle
+  Image, XCircle, CheckCircle, Calculator, Send, FileText, Repeat, Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -29,6 +29,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import PendingPricingTab from '../components/accountant/PendingPricingTab';
+import SubscriptionsTab from '../components/accountant/SubscriptionsTab';
+import QuotationsTab from '../components/accountant/QuotationsTab';
 
 // --- ZynlePay response code map ---
 const ZYNLE_CODES: Record<string, { description: string; color: 'green' | 'yellow' | 'red' }> = {
@@ -442,10 +445,8 @@ export default function AdminBilling() {
       const { error } = await supabase.from('invoices').update(updateData).eq('id', editInvoice.id);
       if (error) throw error;
       if (editInvoice.application_id && editForm.validity_period) {
-        const appFee = editForm.validity_period === '6_months' ? 1 : editForm.validity_period === '1_year' ? 1 : null;
         await supabase.from('certification_applications').update({
           validity_period: editForm.validity_period,
-          ...(appFee ? { application_fee: appFee } : {}),
         }).eq('id', editInvoice.application_id);
       }
       await supabase.from('invoice_activity_log').insert({
@@ -475,6 +476,40 @@ export default function AdminBilling() {
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     } finally { setIsDeleting(false); }
+  };
+
+  const [emailingId, setEmailingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleSendInvoiceEmail = async (inv: Invoice) => {
+    setEmailingId(inv.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-invoice-email', { body: { invoice_id: inv.id } });
+      if (error) throw error;
+      toast({ title: 'Email sent', description: `Invoice emailed to ${data?.recipient || 'client'}.` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Email failed', description: e.message });
+    } finally { setEmailingId(null); }
+  };
+
+  const handleDownloadInvoicePdf = async (inv: Invoice) => {
+    setDownloadingId(inv.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-invoice-pdf', { body: { invoice_id: inv.id } });
+      if (error) throw error;
+      const b64 = (data as any)?.pdf_base64;
+      if (!b64) throw new Error('No PDF returned');
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${inv.invoice_number}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Download failed', description: e.message });
+    } finally { setDownloadingId(null); }
   };
 
   const statusBadge = (status: string) => {
@@ -511,7 +546,8 @@ export default function AdminBilling() {
 
   const feeTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      certification: 'Certification Fee', renewal: 'Renewal Fee',
+      application_fee: 'Application Fee', certification: 'Certification Fee',
+      subscription: 'Subscription Fee', renewal: 'Renewal Fee',
       inspection: 'Inspection Fee', other: 'Service Charge',
     };
     return labels[type] || type;
@@ -522,8 +558,8 @@ export default function AdminBilling() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold font-serif">Billing & Invoices</h1>
-            <p className="text-muted-foreground">Manage client invoices and track payments.</p>
+            <h1 className="text-2xl font-bold font-serif flex items-center gap-2"><Calculator className="h-6 w-6" /> Accountant</h1>
+            <p className="text-muted-foreground">Pricing, invoices, subscriptions, quotations and payment reconciliation.</p>
           </div>
           <Dialog open={showCreate} onOpenChange={setShowCreate}>
             <DialogTrigger asChild>
@@ -544,7 +580,9 @@ export default function AdminBilling() {
                   <Select value={newInvoice.fee_type} onValueChange={(v) => setNewInvoice(p => ({ ...p, fee_type: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="application_fee">Application Fee</SelectItem>
                       <SelectItem value="certification">Certification Fee</SelectItem>
+                      <SelectItem value="subscription">Subscription Fee</SelectItem>
                       <SelectItem value="renewal">Renewal Fee</SelectItem>
                       <SelectItem value="inspection">Inspection Fee</SelectItem>
                       <SelectItem value="other">Other Service Charge</SelectItem>
@@ -553,14 +591,13 @@ export default function AdminBilling() {
                 </div>
                 <div>
                   <Label>Certification Validity Period</Label>
-                  <Select value={newInvoice.validity_period} onValueChange={(v) => {
-                    const amount = v === '6_months' ? '1500' : v === '1_year' ? '3000' : newInvoice.amount;
-                    setNewInvoice(p => ({ ...p, validity_period: v, amount }));
-                  }}>
+                  <Select value={newInvoice.validity_period} onValueChange={(v) => setNewInvoice(p => ({ ...p, validity_period: v }))}>
                     <SelectTrigger><SelectValue placeholder="Select validity period (optional)" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="6_months">6 Months (ZMW 1)</SelectItem>
-                      <SelectItem value="1_year">1 Year (ZMW 1)</SelectItem>
+                      <SelectItem value="1_quarter">1 Quarter (3 months)</SelectItem>
+                      <SelectItem value="2_quarter">2 Quarters (6 months)</SelectItem>
+                      <SelectItem value="3_quarter">3 Quarters (9 months)</SelectItem>
+                      <SelectItem value="4_quarter">4 Quarters (12 months)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -621,12 +658,20 @@ export default function AdminBilling() {
         </div>
 
         {/* Tabs: Invoices + Payment Transactions */}
-        <Tabs defaultValue="invoices" className="space-y-4">
-          <TabsList>
+        <Tabs defaultValue="pending" className="space-y-4">
+          <TabsList className="flex-wrap h-auto">
+            <TabsTrigger value="pending" className="gap-2"><AlertTriangle className="h-4 w-4" /> Pending Pricing</TabsTrigger>
             <TabsTrigger value="invoices" className="gap-2"><Receipt className="h-4 w-4" /> Invoices</TabsTrigger>
+            <TabsTrigger value="subscriptions" className="gap-2"><Repeat className="h-4 w-4" /> Subscriptions</TabsTrigger>
+            <TabsTrigger value="quotations" className="gap-2"><FileText className="h-4 w-4" /> Quotations</TabsTrigger>
             <TabsTrigger value="transactions" className="gap-2"><CreditCard className="h-4 w-4" /> Payment Transactions</TabsTrigger>
             <TabsTrigger value="offline" className="gap-2"><Banknote className="h-4 w-4" /> Offline Payments</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="pending"><PendingPricingTab /></TabsContent>
+          <TabsContent value="subscriptions"><SubscriptionsTab /></TabsContent>
+          <TabsContent value="quotations"><QuotationsTab /></TabsContent>
+
 
           {/* Invoices Tab */}
           <TabsContent value="invoices">
@@ -683,6 +728,12 @@ export default function AdminBilling() {
                             <div className="flex items-center justify-end gap-1">
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenView(inv)} title="View">
                                 <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadInvoicePdf(inv)} title="Download PDF" disabled={downloadingId === inv.id}>
+                                {downloadingId === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleSendInvoiceEmail(inv)} title="Email to client" disabled={emailingId === inv.id}>
+                                {emailingId === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                               </Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEdit(inv)} title="Edit">
                                 <Pencil className="h-4 w-4" />
@@ -986,7 +1037,9 @@ export default function AdminBilling() {
                 <Select value={editForm.fee_type} onValueChange={(v) => setEditForm(p => ({ ...p, fee_type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="application_fee">Application Fee</SelectItem>
                     <SelectItem value="certification">Certification Fee</SelectItem>
+                    <SelectItem value="subscription">Subscription Fee</SelectItem>
                     <SelectItem value="renewal">Renewal Fee</SelectItem>
                     <SelectItem value="inspection">Inspection Fee</SelectItem>
                     <SelectItem value="other">Other Service Charge</SelectItem>
@@ -995,14 +1048,13 @@ export default function AdminBilling() {
               </div>
               <div>
                 <Label>Certification Validity Period</Label>
-                <Select value={editForm.validity_period} onValueChange={(v) => {
-                  const amount = v === '6_months' ? '1' : v === '1_year' ? '1' : editForm.amount;
-                  setEditForm(p => ({ ...p, validity_period: v, amount }));
-                }}>
+                <Select value={editForm.validity_period} onValueChange={(v) => setEditForm(p => ({ ...p, validity_period: v }))}>
                   <SelectTrigger><SelectValue placeholder="Select validity period (optional)" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="6_months">6 Months (ZMW 1)</SelectItem>
-                    <SelectItem value="1_year">1 Year (ZMW 1)</SelectItem>
+                    <SelectItem value="1_quarter">1 Quarter (3 months)</SelectItem>
+                    <SelectItem value="2_quarter">2 Quarters (6 months)</SelectItem>
+                    <SelectItem value="3_quarter">3 Quarters (9 months)</SelectItem>
+                    <SelectItem value="4_quarter">4 Quarters (12 months)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
