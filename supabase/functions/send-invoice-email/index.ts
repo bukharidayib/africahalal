@@ -102,13 +102,42 @@ async function buildInvoicePdf(invoiceId: string) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  let invoice_id: string | undefined;
+  let actor_user_id: string | null = null;
+  let actor_email: string | null = null;
   try {
-    const { invoice_id } = await req.json();
+    const body = await req.json();
+    invoice_id = body.invoice_id;
     if (!invoice_id) throw new Error('invoice_id required');
 
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const { data } = await supabase.auth.getUser(token);
+      actor_user_id = data?.user?.id || null;
+      actor_email = data?.user?.email || null;
+    }
+
     const { bytes, invoice } = await buildInvoicePdf(invoice_id);
-    const recipient = invoice.organizations?.contact_email;
-    if (!recipient) throw new Error('Organization has no contact email');
+    const recipientInfo = await resolveRecipient(invoice.organizations, invoice.organization_id);
+
+    if (!recipientInfo.email) {
+      const msg = `Cannot send invoice: missing ${recipientInfo.missing}`;
+      await logAudit({
+        event_type: 'invoice_send_failed',
+        actor_user_id, actor_email,
+        invoice_id,
+        organization_id: invoice.organization_id,
+        status: 'error',
+        error_message: msg,
+        metadata: { missing_field: recipientInfo.missing },
+      });
+      return new Response(
+        JSON.stringify({ error: msg, missing_field: recipientInfo.missing }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    const recipient = recipientInfo.email;
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
@@ -134,7 +163,7 @@ Deno.serve(async (req) => {
             <tr><td style="padding: 8px;"><strong>Reference</strong></td><td style="padding: 8px; text-align: right;">${invoice.invoice_number}</td></tr>
           </table>
           <p>You can pay online via Mobile Money or Card by signing into your client portal:</p>
-          <p><a href="https://africanhalaal.com" style="background: #c79e3b; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Pay Invoice Online</a></p>
+          <p><a href="https://africanhalaal.com/client/billing/invoices/${invoice.id}" style="background: #c79e3b; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Pay Invoice Online</a></p>
           <p style="color: #777; font-size: 12px; margin-top: 24px;">For any questions, reply to this email or contact accounts@africanhalaal.com.</p>
         </div>
       </div>
@@ -153,7 +182,20 @@ Deno.serve(async (req) => {
     });
 
     const respBody = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(`Email send failed: ${respBody?.message || resp.statusText}`);
+    if (!resp.ok) {
+      const msg = `Email send failed: ${respBody?.message || resp.statusText}`;
+      await logAudit({
+        event_type: 'invoice_send_failed',
+        actor_user_id, actor_email,
+        invoice_id,
+        organization_id: invoice.organization_id,
+        recipient_email: recipient,
+        status: 'error',
+        error_message: msg,
+        metadata: { resend_status: resp.status, recipient_source: recipientInfo.source },
+      });
+      throw new Error(msg);
+    }
 
     await supabase.from('invoice_activity_log').insert({
       invoice_id,
@@ -161,10 +203,33 @@ Deno.serve(async (req) => {
       metadata: { recipient, resend_id: respBody?.id || null },
     });
 
-    return new Response(JSON.stringify({ success: true, recipient }), {
+    await logAudit({
+      event_type: 'invoice_sent',
+      actor_user_id, actor_email,
+      invoice_id,
+      organization_id: invoice.organization_id,
+      recipient_email: recipient,
+      status: 'success',
+      metadata: {
+        invoice_number: invoice.invoice_number,
+        amount: invoice.amount,
+        currency: invoice.currency,
+        recipient_source: recipientInfo.source,
+        resend_id: respBody?.id || null,
+      },
+    });
+
+    return new Response(JSON.stringify({ success: true, recipient, recipient_source: recipientInfo.source }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e: any) {
+    await logAudit({
+      event_type: 'invoice_send_failed',
+      actor_user_id, actor_email,
+      invoice_id: invoice_id || null,
+      status: 'error',
+      error_message: e.message,
+    });
     return new Response(JSON.stringify({ error: e.message }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
