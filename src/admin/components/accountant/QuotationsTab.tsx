@@ -28,7 +28,8 @@ interface Quotation {
   title: string;
   items: Item[];
   subtotal: number;
-  tax: number;
+  tax_rate: number;
+  tax_amount: number;
   total: number;
   currency: string;
   valid_until: string | null;
@@ -104,7 +105,8 @@ export default function QuotationsTab() {
         title: form.title,
         items: form.items as any,
         subtotal,
-        tax: taxAmt,
+        tax_rate: Number(form.tax_pct) || 0,
+        tax_amount: taxAmt,
         total,
         valid_until: form.valid_until || null,
         notes: form.notes || null,
