@@ -456,66 +456,121 @@ export default function Index() {
             </Button>
           </div>
 
-          {blogs.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {blogs.map((blog, idx) => (
-                <Link
-                  key={blog.id}
-                  to={`/blog/${blog.slug}`}
-                  className={`group relative flex flex-col overflow-hidden rounded-2xl bg-card border border-border/60 hover:border-primary/40 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 ${idx === 0 ? "lg:col-span-1" : ""}`}
-                >
-                  <div className="relative h-56 overflow-hidden bg-muted">
-                    {blog.image_url ? (
-                      <img
-                        src={blog.image_url}
-                        alt={blog.title}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-primary/10 via-secondary/10 to-primary/5 flex items-center justify-center">
-                        <BadgeCheck className="h-14 w-14 text-primary/30" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                    <div className="absolute top-4 left-4">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-background/90 backdrop-blur-sm text-xs font-semibold text-primary border border-border/40 shadow-sm">
-                        Article
-                      </span>
+          {blogsLoading ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex flex-col overflow-hidden rounded-2xl bg-card border border-border/60 shadow-sm">
+                  <Skeleton className="w-full aspect-[16/10]" />
+                  <div className="p-6 space-y-3">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-3/4" />
+                    <div className="space-y-2 pt-2">
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-5/6" />
+                      <Skeleton className="h-3 w-4/6" />
+                    </div>
+                    <div className="pt-4 border-t border-border/40">
+                      <Skeleton className="h-4 w-28" />
                     </div>
                   </div>
-
-                  <div className="flex flex-col flex-grow p-6">
-                    <p className="text-xs font-medium text-muted-foreground mb-3 tracking-wide uppercase">
-                      {new Date(blog.published_at).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </p>
-                    <h3 className="text-xl font-bold leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2 mb-3">
-                      {blog.title}
-                    </h3>
-                    <p className="text-muted-foreground text-sm leading-relaxed line-clamp-3 flex-grow">
-                      {blog.excerpt}
-                    </p>
-                    <div className="mt-5 pt-4 border-t border-border/40 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-primary">Read article</span>
-                      <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-1" />
-                    </div>
-                  </div>
-                </Link>
+                </div>
               ))}
             </div>
+          ) : blogs.length > 0 ? (
+            <>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {blogs.map((blog) => (
+                  <Link
+                    key={blog.id}
+                    to={`/blog/${blog.slug}`}
+                    className="group relative flex flex-col overflow-hidden rounded-2xl bg-card border border-border/60 hover:border-primary/40 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-500"
+                  >
+                    <AspectRatio ratio={16 / 10} className="bg-muted overflow-hidden">
+                      {blog.image_url ? (
+                        <img
+                          src={blog.image_url}
+                          alt={blog.title}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          loading="lazy"
+                          decoding="async"
+                          sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-primary/10 via-secondary/10 to-primary/5 flex items-center justify-center">
+                          <BadgeCheck className="h-14 w-14 text-primary/30" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                      <div className="absolute top-4 left-4">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full bg-background/90 backdrop-blur-sm text-xs font-semibold text-primary border border-border/40 shadow-sm">
+                          Article
+                        </span>
+                      </div>
+                    </AspectRatio>
+
+                    <div className="flex flex-col flex-grow p-6">
+                      <p className="text-xs font-medium text-muted-foreground mb-3 tracking-wide uppercase">
+                        {new Date(blog.published_at).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </p>
+                      <h3 className="text-xl font-bold leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2 mb-3">
+                        {blog.title}
+                      </h3>
+                      <p className="text-muted-foreground text-sm leading-relaxed line-clamp-3 flex-grow">
+                        {blog.excerpt}
+                      </p>
+                      <div className="mt-5 pt-4 border-t border-border/40 flex items-center justify-between">
+                        <span className="text-sm font-semibold text-primary">Read article</span>
+                        <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-1" />
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              {hasMoreBlogs && (
+                <div className="text-center mt-12">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={handleLoadMoreBlogs}
+                    disabled={blogsLoadingMore}
+                    className="min-w-[200px]"
+                  >
+                    {blogsLoadingMore ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>Load More Articles</>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
-            <div className="text-center py-20 rounded-2xl bg-card/50 border border-dashed border-border">
-              <Info className="h-14 w-14 text-muted-foreground/30 mx-auto mb-4" />
+            <div className="text-center py-16 px-6 rounded-2xl bg-card/50 border border-dashed border-border">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <Info className="h-8 w-8 text-primary/60" />
+              </div>
               <h3 className="text-xl font-bold mb-2">Articles Coming Soon</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
+              <p className="text-muted-foreground max-w-md mx-auto mb-6">
                 We're crafting in-depth articles on Halal certification and compliance. Check back shortly.
               </p>
+              <Button variant="outline" asChild>
+                <Link to="/blog">
+                  View All Articles
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
             </div>
           )}
+
         </div>
       </section>
 
