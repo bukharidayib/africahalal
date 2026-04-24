@@ -28,6 +28,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Layout } from "@/components/layout/Layout";
 import { SectionHeader } from "@/components/sections/SectionHeader";
 import { SEO } from "@/components/SEO";
+import { BUSINESS_CATEGORY_FEES } from "@/lib/applicationFees";
 
 interface BlogPost {
   id: string;
@@ -142,9 +143,13 @@ const testimonials = [
 
 export default function Index() {
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     fetchBlogs();
+    supabase.auth.getSession().then(({ data: { session } }) => setIsAuthenticated(!!session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setIsAuthenticated(!!session));
+    return () => subscription.unsubscribe();
   }, []);
 
   const fetchBlogs = async () => {
@@ -218,9 +223,11 @@ export default function Index() {
             </p>
 
             <div className="flex flex-wrap justify-center gap-4 pt-2">
-              <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
-                Apply for Certification
-                <ArrowRight className="ml-2 h-5 w-5" />
+              <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20" asChild>
+                <Link to={isAuthenticated ? "/client/applications/new" : "/auth/signup?redirect=/client/applications/new"}>
+                  Apply for Certification
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
               </Button>
               <Button size="lg" variant="outline" className="border-border hover:bg-accent" asChild>
                 <Link to="/verify">Verify a Certificate</Link>
@@ -459,6 +466,49 @@ export default function Index() {
           </div>
         </section>
       )}
+
+      {/* Application Fees Section */}
+      <section id="fees" className="section-padding bg-muted/30">
+        <div className="container max-w-3xl">
+          <SectionHeader
+            subtitle="Pricing"
+            title="Application Fees"
+            description="Transparent, one-time application fees by business category. All amounts in Zambian Kwacha (ZMW)."
+          />
+          <Card className="border shadow-md overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-primary text-primary-foreground">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-semibold">Business Category</th>
+                    <th className="px-6 py-3 text-right font-semibold">Application Fee (ZMW)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {BUSINESS_CATEGORY_FEES.map((c) => (
+                    <tr key={c.key} className="border-t hover:bg-muted/40 transition-colors">
+                      <td className="px-6 py-3 font-medium text-foreground">{c.label}</td>
+                      <td className="px-6 py-3 text-right font-bold text-foreground">K{c.fee.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <CardContent className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
+              <p>• All application fees are <strong>non-refundable</strong>.</p>
+              <p>• Payment must be made prior to commencement of the certification process.</p>
+              <p>• Covers initial application review and administrative processing only. Inspection, audit, and annual certification fees are billed separately.</p>
+            </CardContent>
+          </Card>
+          <div className="text-center mt-8">
+            <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90" asChild>
+              <Link to={isAuthenticated ? "/client/applications/new" : "/auth/signup?redirect=/client/applications/new"}>
+                Apply for Certification <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
 
       {/* FAQ Section */}
       <section id="faq" className="section-padding bg-background">
