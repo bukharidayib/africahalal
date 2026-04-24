@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Layout } from "@/components/layout/Layout";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { SectionHeader } from "@/components/sections/SectionHeader";
+import { BUSINESS_CATEGORY_FEES } from "@/lib/applicationFees";
 
 import halalCertImg from "@/assets/services/halal-certification.jpg";
 import auditingImg from "@/assets/services/auditing-inspection.jpg";
