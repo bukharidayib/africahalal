@@ -178,6 +178,7 @@ export type Database = {
           id: string
           message: string
           message_type: string
+          reply_to_id: string | null
           sender_role: string
           sent_at: string
           sent_by: string
@@ -191,6 +192,7 @@ export type Database = {
           id?: string
           message: string
           message_type: string
+          reply_to_id?: string | null
           sender_role?: string
           sent_at?: string
           sent_by: string
@@ -204,6 +206,7 @@ export type Database = {
           id?: string
           message?: string
           message_type?: string
+          reply_to_id?: string | null
           sender_role?: string
           sent_at?: string
           sent_by?: string
@@ -214,6 +217,13 @@ export type Database = {
             columns: ["application_id"]
             isOneToOne: false
             referencedRelation: "certification_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "application_messages"
             referencedColumns: ["id"]
           },
         ]

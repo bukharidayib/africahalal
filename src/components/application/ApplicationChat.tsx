@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { Send, User, Shield, Loader2, Paperclip, FileText, Image as ImageIcon, X, Download } from "lucide-react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { Send, User, Shield, Loader2, Paperclip, FileText, Image as ImageIcon, X, Download, Reply, CornerUpLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface Message {
   id: string;
@@ -21,6 +22,7 @@ interface Message {
   attachment_name?: string | null;
   attachment_type?: string | null;
   attachment_size?: number | null;
+  reply_to_id?: string | null;
 }
 
 interface Participant {
@@ -39,12 +41,20 @@ interface Props {
 
 const ACCEPT = "image/png,image/jpeg,image/jpg,image/webp,image/gif,application/pdf";
 const MAX_BYTES = 10 * 1024 * 1024; // 10MB
+const TYPING_TIMEOUT = 3500;
 
 function formatBytes(bytes?: number | null) {
   if (!bytes) return "";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function previewText(m?: Message | null) {
+  if (!m) return "";
+  if (m.message) return m.message.length > 120 ? m.message.slice(0, 120) + "…" : m.message;
+  if (m.attachment_name) return `📎 ${m.attachment_name}`;
+  return "(message)";
 }
 
 export function ApplicationChat({ applicationId, viewerRole, participants = [] }: Props) {
@@ -56,11 +66,23 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [typingRoles, setTypingRoles] = useState<Record<string, number>>({});
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isNearBottomRef = useRef(true);
   const notifPermRef = useRef<NotificationPermission | "default">("default");
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
+  const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const messagesById = useMemo(() => {
+    const map: Record<string, Message> = {};
+    for (const m of messages) map[m.id] = m;
+    return map;
+  }, [messages]);
 
   // Track if user is near bottom of chat
   const handleScroll = useCallback(() => {
@@ -80,6 +102,15 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
     if (!el) return;
     if (force || isNearBottomRef.current) {
       el.scrollTop = el.scrollHeight;
+    }
+  }, []);
+
+  const scrollToMessage = useCallback((id: string) => {
+    const el = document.getElementById(`appmsg-${id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-primary");
+      setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 1500);
     }
   }, []);
 
@@ -105,6 +136,23 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
         notifPermRef.current = p;
       });
     }
+  }, []);
+
+  // Prune stale typing entries
+  useEffect(() => {
+    const t = setInterval(() => {
+      const now = Date.now();
+      setTypingRoles((prev) => {
+        const next: Record<string, number> = {};
+        let changed = false;
+        for (const [k, v] of Object.entries(prev)) {
+          if (now - v < TYPING_TIMEOUT) next[k] = v;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
@@ -147,7 +195,7 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
     })();
 
     const channel = supabase
-      .channel(`app-chat-${applicationId}`)
+      .channel(`app-chat-${applicationId}`, { config: { broadcast: { self: false } } })
       .on(
         "postgres_changes",
         {
@@ -162,6 +210,13 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
 
           const isFromOther = m.sender_role !== viewerRole;
           if (isFromOther) {
+            // Clear typing indicator for that role on real message
+            setTypingRoles((prev) => {
+              if (!(m.sender_role in prev)) return prev;
+              const { [m.sender_role]: _, ...rest } = prev;
+              return rest;
+            });
+
             // Browser notification
             if (
               typeof window !== "undefined" &&
@@ -195,14 +250,59 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
           }
         },
       )
+      .on("broadcast", { event: "typing" }, (payload) => {
+        const role = (payload.payload as any)?.role as string | undefined;
+        if (!role || role === viewerRole) return;
+        setTypingRoles((prev) => ({ ...prev, [role]: Date.now() }));
+      })
+      .on("broadcast", { event: "stop_typing" }, (payload) => {
+        const role = (payload.payload as any)?.role as string | undefined;
+        if (!role) return;
+        setTypingRoles((prev) => {
+          if (!(role in prev)) return prev;
+          const { [role]: _, ...rest } = prev;
+          return rest;
+        });
+      })
       .subscribe();
+
+    channelRef.current = channel;
 
     return () => {
       cancelled = true;
+      if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
       supabase.removeChannel(channel);
+      channelRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicationId, viewerRole]);
+
+  const broadcastTyping = useCallback(() => {
+    const ch = channelRef.current;
+    if (!ch) return;
+    const now = Date.now();
+    if (now - lastTypingSentRef.current > 1500) {
+      lastTypingSentRef.current = now;
+      ch.send({ type: "broadcast", event: "typing", payload: { role: viewerRole } });
+    }
+    if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+    typingStopTimerRef.current = setTimeout(() => {
+      ch.send({ type: "broadcast", event: "stop_typing", payload: { role: viewerRole } });
+      lastTypingSentRef.current = 0;
+    }, 2500);
+  }, [viewerRole]);
+
+  const stopTyping = useCallback(() => {
+    const ch = channelRef.current;
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current);
+      typingStopTimerRef.current = null;
+    }
+    if (ch && lastTypingSentRef.current) {
+      ch.send({ type: "broadcast", event: "stop_typing", payload: { role: viewerRole } });
+    }
+    lastTypingSentRef.current = 0;
+  }, [viewerRole]);
 
   const handlePickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -213,6 +313,11 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
       return;
     }
     setPendingFile(f);
+  };
+
+  const startReply = (m: Message) => {
+    setReplyTo(m);
+    setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
   const handleSend = async () => {
@@ -251,10 +356,13 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
         attachment_name,
         attachment_type,
         attachment_size,
+        reply_to_id: replyTo?.id ?? null,
       });
       if (error) throw error;
       setText("");
       setPendingFile(null);
+      setReplyTo(null);
+      stopTyping();
     } catch (e: any) {
       toast({ variant: "destructive", title: "Failed to send", description: e.message });
     } finally {
@@ -290,6 +398,8 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
       if (Object.keys(updates).length) setSignedThumbs((s) => ({ ...s, ...updates }));
     })();
   }, [messages]);
+
+  const typingLabels = Object.keys(typingRoles).filter((r) => r !== viewerRole);
 
   return (
     <Card className="flex flex-col h-[620px]">
@@ -356,8 +466,13 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
                 const isOwn = m.sender_role === viewerRole;
                 const isAdmin = m.sender_role === "admin";
                 const isImage = m.attachment_type?.startsWith("image/");
+                const parent = m.reply_to_id ? messagesById[m.reply_to_id] : null;
                 return (
-                  <div key={m.id} className={`flex gap-3 ${isOwn ? "flex-row-reverse" : ""}`}>
+                  <div
+                    key={m.id}
+                    id={`appmsg-${m.id}`}
+                    className={`group flex gap-3 rounded transition-all ${isOwn ? "flex-row-reverse" : ""}`}
+                  >
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                         isAdmin
@@ -368,17 +483,45 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
                       {isAdmin ? <Shield className="h-4 w-4" /> : <User className="h-4 w-4" />}
                     </div>
                     <div className={`max-w-[70%] ${isOwn ? "text-right" : ""}`}>
-                      <div className="flex items-center gap-2 mb-1 text-xs text-muted-foreground">
+                      <div className={`flex items-center gap-2 mb-1 text-xs text-muted-foreground ${isOwn ? "justify-end" : ""}`}>
                         <Badge variant="outline" className="text-[10px] py-0">
                           {isAdmin ? "Admin" : "Client"}
                         </Badge>
                         <span>{format(new Date(m.sent_at), "dd MMM yyyy HH:mm")}</span>
+                        <button
+                          type="button"
+                          onClick={() => startReply(m)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 hover:text-foreground"
+                          title="Reply to this message"
+                        >
+                          <Reply className="h-3 w-3" />
+                          Reply
+                        </button>
                       </div>
                       <div
                         className={`rounded-lg p-3 inline-block text-left ${
                           isOwn ? "bg-primary text-primary-foreground" : "bg-muted"
                         }`}
                       >
+                        {parent && (
+                          <button
+                            type="button"
+                            onClick={() => scrollToMessage(parent.id)}
+                            className={`mb-2 flex items-start gap-2 w-full text-left rounded border-l-2 px-2 py-1 text-xs ${
+                              isOwn
+                                ? "border-primary-foreground/60 bg-primary-foreground/10"
+                                : "border-primary/60 bg-background/60"
+                            }`}
+                          >
+                            <CornerUpLeft className="h-3 w-3 mt-0.5 flex-shrink-0 opacity-70" />
+                            <div className="min-w-0">
+                              <div className="font-medium opacity-80 capitalize">
+                                {parent.sender_role}
+                              </div>
+                              <div className="truncate opacity-80">{previewText(parent)}</div>
+                            </div>
+                          </button>
+                        )}
                         {m.message && (
                           <p className="text-sm whitespace-pre-wrap mb-2 last:mb-0">{m.message}</p>
                         )}
@@ -421,6 +564,24 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
                   </div>
                 );
               })}
+
+              {typingLabels.length > 0 && (
+                <div className="flex gap-3 items-center">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-muted text-muted-foreground">
+                    {typingLabels[0] === "admin" ? <Shield className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                  </div>
+                  <div className="rounded-lg bg-muted px-3 py-2 inline-flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground capitalize mr-1">
+                      {typingLabels.join(" & ")} typing
+                    </span>
+                    <span className="flex gap-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/70 animate-bounce [animation-delay:-0.3s]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/70 animate-bounce [animation-delay:-0.15s]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/70 animate-bounce" />
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -441,6 +602,24 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
       )}
 
       <div className="p-4 border-t flex-shrink-0 space-y-2">
+        {replyTo && (
+          <div className="flex items-start gap-2 rounded border-l-2 border-primary bg-muted/50 px-2 py-1.5 text-xs">
+            <CornerUpLeft className="h-3 w-3 mt-0.5 flex-shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <div className="font-medium capitalize">Replying to {replyTo.sender_role}</div>
+              <div className="truncate text-muted-foreground">{previewText(replyTo)}</div>
+            </div>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={() => setReplyTo(null)}
+              disabled={sending}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
         {pendingFile && (
           <div className="flex items-center gap-2 rounded border bg-muted/40 px-2 py-1.5 text-xs">
             {pendingFile.type.startsWith("image/") ? (
@@ -481,13 +660,21 @@ export function ApplicationChat({ applicationId, viewerRole, participants = [] }
             <Paperclip className="h-4 w-4" />
           </Button>
           <Textarea
-            placeholder="Type your message..."
+            ref={textareaRef}
+            placeholder={replyTo ? `Reply to ${replyTo.sender_role}...` : "Type your message..."}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (e.target.value.trim()) broadcastTyping();
+              else stopTyping();
+            }}
+            onBlur={stopTyping}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 handleSend();
+              } else if (e.key === "Escape" && replyTo) {
+                setReplyTo(null);
               }
             }}
             className="min-h-[60px] max-h-[120px] resize-none"
