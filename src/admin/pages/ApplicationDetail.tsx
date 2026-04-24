@@ -20,6 +20,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AdminLayout } from '../components/layout/AdminLayout';
+import { ApplicationChat } from '@/components/application/ApplicationChat';
+import { ApplicationTimeline } from '@/components/application/ApplicationTimeline';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -93,6 +95,7 @@ const statusConfig: Record<ApplicationStatus, { label: string; variant: 'default
   rejected: { label: 'Rejected', variant: 'destructive' },
   suspended: { label: 'Suspended', variant: 'destructive' },
   withdrawn: { label: 'Withdrawn', variant: 'outline' },
+  expired: { label: 'Expired', variant: 'outline' },
 };
 
 // Maps each application status to its corresponding workflow stage system_code
@@ -107,6 +110,7 @@ const STATUS_TO_STAGE: Record<ApplicationStatus, string> = {
   rejected: 'REJECTED',
   suspended: 'SUSPENDED',
   withdrawn: 'REJECTED',
+  expired: 'APPROVED',
 };
 
 export default function ApplicationDetail() {
@@ -606,9 +610,18 @@ export default function ApplicationDetail() {
             <TabsTrigger value="status">Status Update</TabsTrigger>
             <TabsTrigger value="send-message" className="gap-1"><MessageSquare className="h-4 w-4" />Send Message</TabsTrigger>
             <TabsTrigger value="ai-analysis" className="gap-1"><Brain className="h-4 w-4" />AI Analysis</TabsTrigger>
+            <TabsTrigger value="chat" className="gap-1"><MessageSquare className="h-4 w-4" />Chat</TabsTrigger>
+            <TabsTrigger value="timeline" className="gap-1"><Clock className="h-4 w-4" />Timeline</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="chat" className="space-y-4">
+            <ApplicationChat applicationId={application!.id} viewerRole="admin" />
+          </TabsContent>
+          <TabsContent value="timeline" className="space-y-4">
+            <ApplicationTimeline applicationId={application!.id} createdAt={application!.created_at} />
+          </TabsContent>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">

@@ -263,6 +263,17 @@ export default function CertificationApplication() {
 
                 toast({ title: "Draft Saved", description: "Your application draft has been updated." });
             } else {
+                // Pre-flight: enforce single active application per organization
+                const { data: existingActive } = await supabase
+                    .from('certification_applications')
+                    .select('id, application_number, status')
+                    .eq('organization_id', organization_id)
+                    .not('status', 'in', '(expired,rejected,withdrawn)')
+                    .limit(1);
+                if (existingActive && existingActive.length > 0) {
+                    throw new Error("You already have an active application. You can only create a new one after the current application expires.");
+                }
+
                 // Create new draft
                 const { data: appNum } = await supabase.rpc('generate_application_number');
                 const { data: appData, error: appErr } = await supabase.from('certification_applications').insert({
@@ -273,7 +284,14 @@ export default function CertificationApplication() {
                     application_number: appNum || `APP-${Date.now()}`,
                     status: 'draft',
                 }).select('id').single();
-                if (appErr) throw appErr;
+                if (appErr) {
+                    // Friendly mapping of DB trigger error
+                    const msg = (appErr as any).message || '';
+                    if (msg.includes('already have an active application')) {
+                        throw new Error("You already have an active application. You can only create a new one after the current application expires.");
+                    }
+                    throw appErr;
+                }
 
                 setDraftId(appData.id);
 

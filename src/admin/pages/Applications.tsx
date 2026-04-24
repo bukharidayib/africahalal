@@ -45,7 +45,8 @@ type ApplicationStatus =
   | 'approved'
   | 'rejected'
   | 'suspended'
-  | 'withdrawn';
+  | 'withdrawn'
+  | 'expired';
 
 interface Application {
   id: string;
@@ -74,6 +75,7 @@ const statusConfig: Record<ApplicationStatus, { label: string; variant: 'default
   rejected: { label: 'Rejected', variant: 'destructive', icon: XCircle },
   suspended: { label: 'Suspended', variant: 'destructive', icon: AlertCircle },
   withdrawn: { label: 'Withdrawn', variant: 'outline', icon: XCircle },
+  expired: { label: 'Expired', variant: 'outline', icon: Clock },
 };
 
 export default function Applications() {

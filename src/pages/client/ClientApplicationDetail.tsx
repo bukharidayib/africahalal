@@ -13,7 +13,8 @@ import {
     Building2,
     MapPin,
     Calendar,
-    Beaker
+    Beaker,
+    MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,8 +24,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { ApplicationChat } from "@/components/application/ApplicationChat";
+import { ApplicationTimeline } from "@/components/application/ApplicationTimeline";
 
-type ApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'awaiting_inspection' | 'inspection_complete' | 'pending_decision' | 'approved' | 'rejected' | 'suspended' | 'withdrawn';
+type ApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'awaiting_inspection' | 'inspection_complete' | 'pending_decision' | 'approved' | 'rejected' | 'suspended' | 'withdrawn' | 'expired';
 
 interface Application {
     id: string;
@@ -88,6 +91,7 @@ const statusConfig: Record<ApplicationStatus, { label: string; color: string }> 
     rejected: { label: "Rejected", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
     suspended: { label: "Suspended", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
     withdrawn: { label: "Withdrawn", color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200" },
+    expired: { label: "Expired", color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
 };
 
 export default function ClientApplicationDetail() {
@@ -240,7 +244,7 @@ export default function ClientApplicationDetail() {
 
                 {/* Tabs */}
                 <Tabs defaultValue="overview" className="space-y-6">
-                    <TabsList className="grid grid-cols-4 w-full max-w-xl">
+                    <TabsList className="grid grid-cols-5 w-full max-w-2xl">
                         <TabsTrigger value="overview" className="gap-2">
                             <Building2 className="h-4 w-4" />
                             Overview
@@ -252,6 +256,10 @@ export default function ClientApplicationDetail() {
                         <TabsTrigger value="documents" className="gap-2">
                             <FolderOpen className="h-4 w-4" />
                             Documents
+                        </TabsTrigger>
+                        <TabsTrigger value="chat" className="gap-2">
+                            <MessageSquare className="h-4 w-4" />
+                            Chat
                         </TabsTrigger>
                         <TabsTrigger value="timeline" className="gap-2">
                             <Clock className="h-4 w-4" />
@@ -426,48 +434,14 @@ export default function ClientApplicationDetail() {
                         )}
                     </TabsContent>
 
+                    {/* Chat Tab */}
+                    <TabsContent value="chat" className="space-y-6">
+                        <ApplicationChat applicationId={application.id} viewerRole="client" />
+                    </TabsContent>
+
                     {/* Timeline Tab */}
                     <TabsContent value="timeline" className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Application Timeline</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="relative">
-                                    <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
-                                    <div className="space-y-6">
-                                        {/* Created */}
-                                        <div className="relative pl-10">
-                                            <div className="absolute left-2.5 top-1 w-3 h-3 rounded-full bg-primary border-2 border-background" />
-                                            <div>
-                                                <p className="font-medium">Application Created</p>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {format(new Date(application.created_at), 'dd MMM yyyy, HH:mm')}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        {/* Status History */}
-                                        {statusHistory.map((item) => (
-                                            <div key={item.id} className="relative pl-10">
-                                                <div className="absolute left-2.5 top-1 w-3 h-3 rounded-full bg-secondary border-2 border-background" />
-                                                <div>
-                                                    <p className="font-medium">
-                                                        Status changed to {statusConfig[item.to_status]?.label || item.to_status}
-                                                    </p>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        {format(new Date(item.created_at), 'dd MMM yyyy, HH:mm')}
-                                                    </p>
-                                                    {item.reason && (
-                                                        <p className="text-sm text-muted-foreground mt-1">{item.reason}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <ApplicationTimeline applicationId={application.id} createdAt={application.created_at} />
                     </TabsContent>
                 </Tabs>
             </div>
