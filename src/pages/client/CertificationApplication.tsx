@@ -133,7 +133,7 @@ export default function CertificationApplication() {
         country: "",
         categories: [] as string[],
         validity_period: "1_year", // Default to 1 Year
-        application_fee: 1,
+        application_fee: 0,
         products: [] as ProductItem[],
         uploadedFiles: [] as UploadedFile[],
         declaration_confirmed: false,
