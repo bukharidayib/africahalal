@@ -93,6 +93,7 @@ const statusConfig: Record<ApplicationStatus, { label: string; variant: 'default
   rejected: { label: 'Rejected', variant: 'destructive' },
   suspended: { label: 'Suspended', variant: 'destructive' },
   withdrawn: { label: 'Withdrawn', variant: 'outline' },
+  expired: { label: 'Expired', variant: 'outline' },
 };
 
 // Maps each application status to its corresponding workflow stage system_code
@@ -107,6 +108,7 @@ const STATUS_TO_STAGE: Record<ApplicationStatus, string> = {
   rejected: 'REJECTED',
   suspended: 'SUSPENDED',
   withdrawn: 'REJECTED',
+  expired: 'APPROVED',
 };
 
 export default function ApplicationDetail() {
