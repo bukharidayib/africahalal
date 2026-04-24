@@ -1,128 +1,77 @@
+## Root Causes Identified
 
-# Accountant Module — Full Financial Workflow
+### 1. Invoice number generator is broken (causes all 3 "invoice_number null" errors)
+The DB function `generate_invoice_number()` reads:
+```
+SUBSTRING(invoice_number FROM 11)  -- expects "AHIS-INV-" (10 chars)
+```
+But the actual prefix is `AHIS-INV-YYYY-` (14 chars). When it tries to parse `"026-00001"` as INTEGER, it throws `22P02 invalid input syntax`. The frontend catches no `error` from `supabase.rpc()` because the destructuring `{ data: invNum }` ignores the error → `invNum` becomes `null` → insert fails with the NOT NULL constraint violation.
 
-Rename **Billing & Invoices** to **Accountant** and turn it into the single module that controls all money flows: per-application pricing (set manually by admin), recurring subscriptions, quotations, and invoice delivery with PDF attachments.
+This affects:
+- **Set Pricing dialog** (`PendingPricingTab.tsx`)
+- **Create New Invoice dialog** (`AdminBilling.tsx`)
+- **Subscriptions "Invoice Now" button** (`SubscriptionsTab.tsx`)
+- **Quotations "To Invoice"** (`QuotationsTab.tsx`)
 
----
+### 2. Quotation number generator has the same bug
+`generate_quotation_number()` uses `SUBSTRING FROM 11` but `AHIS-QUO-YYYY-` is 14 chars. Saving a quotation succeeds the first time (seq=1 fallback) but breaks afterwards. Sending also fails when the org has no `contact_email`.
 
-## 1. Database changes
-
-**New tables**
-- `subscriptions` — `id, organization_id, application_id (nullable), plan_name, billing_cycle ('monthly'|'quarterly'|'yearly'), amount, currency ('ZMW'), status ('active'|'paused'|'cancelled'|'expired'), start_date, next_billing_date, end_date, created_by, created_at, updated_at, notes`. RLS: clients read own (via organization), admins with `canViewFinance` manage.
-- `quotations` — `id, quotation_number (auto AHIS-QUO-YYYY-NNNNN), organization_id, business_id (nullable), application_id (nullable), title, items jsonb (array of {label, qty, unit_price, total}), subtotal, tax, total, currency, valid_until, status ('draft'|'sent'|'accepted'|'rejected'|'expired'|'converted'), notes, sent_at, accepted_at, converted_invoice_id, created_by, created_at, updated_at`. RLS same model.
-- `generate_quotation_number()` SECURITY DEFINER function (mirrors `generate_invoice_number`).
-
-**Modify `invoices`**
-- Add `subscription_id uuid` (nullable, FK to subscriptions).
-- Add `quotation_id uuid` (nullable).
-- Allow `fee_type` value `'subscription'` (already free text).
-- Index on `subscription_id`, `quotation_id`.
-
-**Modify `certification_applications`**
-- Update `validity_period` semantics to support `'1_quarter' | '2_quarter' | '3_quarter' | '4_quarter'`. Stored as text — no schema change needed, but migrate any existing `'6_months'`/`'1_year'` values to `'2_quarter'`/`'4_quarter'` for consistency.
-- `application_fee` stays nullable; admin sets it post-submission.
-
-**RLS** — append-only audit pattern; finance/admin roles can insert/update; clients can only SELECT rows scoped to their organization.
+### 3. Send-quotation-email returns 500
+Edge function throws `"Organization has no contact email"` when the linked org's `contact_email` is null. The frontend swallowed the message into a generic "non-2xx" toast.
 
 ---
 
-## 2. Client portal — Application flow cleanup
+## Fix Plan
 
-`src/pages/client/CertificationApplication.tsx`:
+### A. Database migration (fix both number generators)
+```sql
+CREATE OR REPLACE FUNCTION public.generate_invoice_number() ...
+  -- 'AHIS-INV-' (9) + 'YYYY-' (5) = 14 → SUBSTRING FROM 15
+  SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 15) AS INTEGER)), 0) + 1 ...
+  WHERE invoice_number ~ ('^AHIS-INV-' || _year || '-[0-9]+$')
 
-1. **Remove fixed fees** from "Select Business Category" — strip the `ZMW {fee}` badge and remove `application_fee` updates. Drop the `BUSINESS_CATEGORY_FEES` import + `src/lib/applicationFees.ts` references in this page.
-2. **Replace validity period** options with 4 quarter cards: `1 Quarter (3 months)`, `2 Quarters (6 months)`, `3 Quarters (9 months)`, `4 Quarters (12 months)`. Default `2_quarter`.
-3. **Remove the Payment step (Step 6)** from the in-application flow. Steps become: Establishment → Scope → Products → Documents → Declaration → **Submit**.
-4. On submission, set application `status = 'submitted'` and `application_fee = null` (admin will price it). Show a confirmation screen telling the client: "Your application is awaiting pricing from the Accountant team. You will receive an invoice by email."
-5. Remove the inline invoice creation that currently happens in `handleAdvanceToPayment` — invoice is now created by admin from the Accountant module.
+CREATE OR REPLACE FUNCTION public.generate_quotation_number() ...
+  -- 'AHIS-QUO-' (9) + 'YYYY-' (5) = 14 → SUBSTRING FROM 15
+  SELECT COALESCE(MAX(CAST(SUBSTRING(quotation_number FROM 15) AS INTEGER)), 0) + 1 ...
+  WHERE quotation_number ~ ('^AHIS-QUO-' || _year || '-[0-9]+$')
+```
+Using a regex WHERE filter also makes the function safe against any legacy malformed numbers.
 
-`src/components/billing/MoMoPaymentDialog.tsx` continues to work for paying invoices that arrive later (from BillingDashboard).
+### B. Frontend hardening (4 files)
+In every `supabase.rpc('generate_invoice_number')` / `generate_quotation_number` call:
+- Destructure both `{ data, error }`, throw on error, throw if data is null.
+- Files: `PendingPricingTab.tsx`, `AdminBilling.tsx` (handleCreateInvoice), `SubscriptionsTab.tsx` (handleGenerateInvoice), `QuotationsTab.tsx` (handleSave + handleConvert).
 
----
+### C. Send-invoice-email / send-quotation-email
+- Surface a **clear toast** to the user when the org has no contact email (instead of generic 500), and offer to fall back to the organization's `profiles` user email if `organizations.contact_email` is null. Update both edge functions to also try `profiles.email` for the org owner as a fallback recipient.
 
-## 3. Admin "Accountant" module
-
-Rename existing route `/admin/billing` → keep route for back-compat but relabel sidebar and page header to **Accountant** (`src/admin/components/layout/AdminSidebar.tsx`, `src/admin/pages/AdminBilling.tsx`). Replace icon `Receipt` with `Calculator`. Rename file to `AdminAccountant.tsx` (update App.tsx import).
-
-Add tabs to the page (the file already uses `Tabs`):
-
-### Tab A — Invoices (existing, enhanced)
-- Existing list stays. Add filter chip for `fee_type = subscription`.
-- "Create Invoice" dialog gains:
-  - **Application picker** (autocomplete by application number) — when chosen, prefills organization and shows app summary.
-  - **Fee type**: `application_fee | subscription | inspection | renewal | other`.
-  - **Validity period** (when `application_fee`): quarter dropdown, written back to `certification_applications.validity_period` and `application_fee`.
-  - **Subscription link** (when `subscription`): pick existing subscription.
-  - **Send by email** checkbox (default on) — generates PDF and emails invoice to org `contact_email`.
-
-### Tab B — Pending Pricing (new)
-- Lists `certification_applications` where `status='submitted'` and no invoice yet.
-- Each row: "Set Price & Send Invoice" → opens a streamlined form (category context, validity period quarter selector, application fee amount, optional subscription bundle: cycle + amount, due date, notes). Single submit creates one or two invoices and emails them.
-
-### Tab C — Subscriptions (new)
-- List subscriptions with status badges and next billing date.
-- Create/Edit dialog: organization, optional application, plan name, billing cycle (monthly/quarterly/yearly), amount, start date, end date, notes.
-- Action: "Generate Invoice Now" creates an invoice tied to the subscription and advances `next_billing_date` by the cycle.
-
-### Tab D — Quotations (new)
-- List quotations with status badges.
-- Create dialog: organization, optional business/application, title, line items (label, qty, unit price — auto-totals), tax %, valid-until date, notes.
-- Actions: **Send** (emails PDF quote, sets `status='sent'`), **Convert to Invoice** (creates invoice from totals, links both ways, sets `status='converted'`), **Mark Accepted/Rejected**.
-
-### Tab E — Payment Transactions, Tab F — Offline Payments
-Keep as-is from current AdminBilling.
+### D. Client payment via API (already wired — verify + improve email CTA)
+The client portal already has `MoMoPaymentDialog` calling `process-momo-payment` from `/client/billing/invoices/:id` (`BillingInvoiceDetail.tsx`). 
+- Update the invoice email HTML in `send-invoice-email/index.ts` so the **Pay Online** button deep-links to `https://africahalal.lovable.app/client/billing/invoices/{invoice_id}` instead of just the homepage.
+- That page already shows the invoice + Pay button → MoMo flow → `process-momo-payment` → `zynlepay-momo-callback` → marks invoice paid.
 
 ---
 
-## 4. Invoice & Quotation PDF + Email
+## Files To Change
 
-**New edge function `generate-invoice-pdf`** (Deno + `pdf-lib`):
-- Input: `{ invoice_id }`. Loads invoice + organization + application (if any) + line items derived from invoice. Renders branded AHI PDF (logo, invoice #, dates, bill-to, item table, totals, payment instructions, footer). Returns base64 PDF.
+**Database**
+- New migration: replace `generate_invoice_number()` and `generate_quotation_number()` with corrected SUBSTRING offset + regex guard.
 
-**New edge function `generate-quotation-pdf`**: mirrors the above for quotations with line-item table.
+**Frontend**
+- `src/admin/pages/AdminBilling.tsx` — check rpc error/null in `handleCreateInvoice`.
+- `src/admin/components/accountant/PendingPricingTab.tsx` — same in `handleSubmit` (2 rpc calls).
+- `src/admin/components/accountant/SubscriptionsTab.tsx` — same in `handleGenerateInvoice`.
+- `src/admin/components/accountant/QuotationsTab.tsx` — same in `handleSave` + `handleConvert`.
 
-**New edge function `send-invoice-email`**:
-- Input: `{ invoice_id }`. Calls `generate-invoice-pdf` internally, then sends through existing Resend setup (`RESEND_API_KEY` already present) with PDF attachment to org `contact_email`. Subject: `Invoice {number} from African Halal Institute`. Logs to `invoice_activity_log` (`action='invoice_emailed'`).
-
-**New edge function `send-quotation-email`**: same pattern for quotations.
-
-Admin "Send invoice" / "Send quotation" buttons invoke these. Client-side download buttons (in `BillingInvoiceDetail.tsx` and a new quotation detail) call `generate-*-pdf` and trigger browser download.
-
----
-
-## 5. Client portal additions
-
-- `BillingDashboard` and `BillingInvoices` already list invoices — no rename needed (client-facing label stays "Billing & Payments").
-- Add **Subscriptions** card on `BillingDashboard` showing active subscriptions + next billing date.
-- Add **Quotations** page `/client/billing/quotations` listing org quotations with view/accept/reject buttons.
-- Each invoice row gets "Download PDF" calling `generate-invoice-pdf`.
+**Edge functions**
+- `supabase/functions/send-invoice-email/index.ts` — fallback to organization profile email; deep-link CTA to `/client/billing/invoices/{id}`.
+- `supabase/functions/send-quotation-email/index.ts` — fallback recipient resolution + clearer error.
 
 ---
 
-## 6. Files touched
-
-**New**
-- `supabase/migrations/<ts>_accountant_module.sql` (subscriptions, quotations, generate_quotation_number, invoice FK columns, validity migration).
-- `supabase/functions/generate-invoice-pdf/index.ts`
-- `supabase/functions/generate-quotation-pdf/index.ts`
-- `supabase/functions/send-invoice-email/index.ts`
-- `supabase/functions/send-quotation-email/index.ts`
-- `src/admin/pages/AdminAccountant.tsx` (renamed from AdminBilling.tsx, new tabs)
-- `src/admin/components/accountant/PendingPricingTab.tsx`
-- `src/admin/components/accountant/SubscriptionsTab.tsx`
-- `src/admin/components/accountant/QuotationsTab.tsx`
-- `src/pages/client/BillingQuotations.tsx`
-
-**Modified**
-- `src/pages/client/CertificationApplication.tsx` — remove fees & payment step, quarter validity, submission UX.
-- `src/admin/components/layout/AdminSidebar.tsx` — rename to "Accountant", icon `Calculator`.
-- `src/App.tsx` — route + import update, new `/client/billing/quotations` route.
-- `src/pages/client/BillingDashboard.tsx` — subscriptions block + PDF download.
-- `src/pages/client/BillingInvoices.tsx` / `BillingInvoiceDetail.tsx` — PDF download button.
-- `src/lib/applicationFees.ts` — kept for category labels only (fees become 0/decorative) or deleted; categories source moves to a simple labels list.
-
----
-
-## 7. Open question
-
-Should **clients be able to accept a quotation in-portal** (one-click "Accept → auto-convert to invoice"), or is acceptance handled offline and admin manually converts? Default plan: client can Accept/Reject; admin still does the actual conversion to invoice to keep finance control. Adjust if you want full auto-conversion.
+## Expected Result
+- Set Pricing dialog → creates invoice + (optional) subscription + emails PDF with working "Pay Online" link.
+- Create New Invoice → succeeds, emails client.
+- Subscriptions "Invoice now" → succeeds.
+- Quotations save / send / convert → all succeed; if no contact email, user sees an actionable message.
+- Client receives email → clicks "Pay Online" → lands on invoice detail page → pays via Mobile Money (ZynlePay).
