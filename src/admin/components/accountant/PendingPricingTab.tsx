@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, KeyboardEvent } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Loader2, DollarSign, Send, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, DollarSign, Send, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 const VALIDITY_OPTIONS = [
@@ -25,6 +25,14 @@ const VALIDITY_OPTIONS = [
   { value: '3_quarter', label: '3 Quarters (9 months)' },
   { value: '4_quarter', label: '4 Quarters (12 months)' },
 ];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const addDaysStr = (base: string, days: number) => {
+  const d = new Date(base);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};
 
 interface PendingApp {
   id: string;
@@ -41,15 +49,14 @@ export default function PendingPricingTab() {
   const [apps, setApps] = useState<PendingApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [pricingApp, setPricingApp] = useState<PendingApp | null>(null);
+  const [emails, setEmails] = useState<string[]>([]);
+  const [emailDraft, setEmailDraft] = useState('');
   const [form, setForm] = useState({
     application_fee: '',
     validity_period: '2_quarter',
-    due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    start_date: todayStr(),
+    due_date: addDaysStr(todayStr(), 7),
     description: '',
-    add_subscription: false,
-    sub_cycle: 'yearly' as 'monthly' | 'quarterly' | 'yearly',
-    sub_amount: '',
-    sub_plan: 'Annual Maintenance',
     send_email: true,
   });
   const [saving, setSaving] = useState(false);
@@ -58,7 +65,6 @@ export default function PendingPricingTab() {
   const fetchApps = async () => {
     setLoading(true);
     try {
-      // submitted apps
       const { data: subs, error } = await supabase
         .from('certification_applications')
         .select('id, application_number, scope, sector, validity_period, organization_id, submitted_at, organizations(name, contact_email)')
@@ -66,7 +72,6 @@ export default function PendingPricingTab() {
         .order('submitted_at', { ascending: false });
       if (error) throw error;
 
-      // exclude apps that already have an application_fee invoice
       const appIds = (subs || []).map((a: any) => a.id);
       let invoicedIds = new Set<string>();
       if (appIds.length > 0) {
@@ -87,19 +92,56 @@ export default function PendingPricingTab() {
 
   useEffect(() => { fetchApps(); }, []);
 
-  const openPricing = (app: PendingApp) => {
+  const openPricing = async (app: PendingApp) => {
     setPricingApp(app);
+    const start = todayStr();
     setForm({
       application_fee: '',
       validity_period: app.validity_period || '2_quarter',
-      due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+      start_date: start,
+      due_date: addDaysStr(start, 7),
       description: `Halal certification application fee — ${app.application_number}`,
-      add_subscription: false,
-      sub_cycle: 'yearly',
-      sub_amount: '',
-      sub_plan: 'Annual Maintenance',
       send_email: true,
     });
+    // Pre-populate emails: org contact + any linked profile emails
+    const seed: string[] = [];
+    if (app.organizations?.contact_email) seed.push(app.organizations.contact_email.trim());
+    try {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('organization_id', app.organization_id);
+      (profiles || []).forEach((p: any) => {
+        if (p?.email && !seed.includes(p.email.trim())) seed.push(p.email.trim());
+      });
+    } catch { /* ignore */ }
+    setEmails(seed.filter((e) => EMAIL_RE.test(e)));
+    setEmailDraft('');
+  };
+
+  const addEmailFromDraft = () => {
+    const parts = emailDraft.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 0) return;
+    const next = [...emails];
+    let invalid = '';
+    for (const p of parts) {
+      if (!EMAIL_RE.test(p)) { invalid = p; continue; }
+      if (!next.includes(p)) next.push(p);
+    }
+    setEmails(next);
+    setEmailDraft('');
+    if (invalid) toast({ variant: 'destructive', title: 'Invalid email', description: invalid });
+  };
+
+  const handleEmailKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ';' || e.key === 'Tab') {
+      if (emailDraft.trim()) {
+        e.preventDefault();
+        addEmailFromDraft();
+      }
+    } else if (e.key === 'Backspace' && !emailDraft && emails.length) {
+      setEmails(emails.slice(0, -1));
+    }
   };
 
   const handleSubmit = async () => {
@@ -107,76 +149,45 @@ export default function PendingPricingTab() {
       toast({ variant: 'destructive', title: 'Missing fields', description: 'Enter a valid application fee.' });
       return;
     }
+    if (form.send_email && emails.length === 0) {
+      toast({ variant: 'destructive', title: 'Recipient required', description: 'Add at least one email address.' });
+      return;
+    }
     setSaving(true);
     try {
-      // Update validity + fee on application
       await supabase.from('certification_applications').update({
         validity_period: form.validity_period,
         application_fee: parseFloat(form.application_fee),
       }).eq('id', pricingApp.id);
 
-      // Create application_fee invoice
       const { data: invNum } = await supabase.rpc('generate_invoice_number');
+      const startNote = `Start date: ${format(new Date(form.start_date), 'dd MMM yyyy')}`;
+      const fullDescription = form.description ? `${form.description}\n${startNote}` : startNote;
+
       const { data: createdInv, error: invErr } = await supabase.from('invoices').insert({
         invoice_number: invNum as string,
         organization_id: pricingApp.organization_id,
         application_id: pricingApp.id,
         fee_type: 'application_fee',
-        description: form.description || null,
+        description: fullDescription,
         amount: parseFloat(form.application_fee),
         due_date: form.due_date,
       }).select('id').single();
       if (invErr) throw invErr;
-      const createdInvoiceIds: string[] = [createdInv!.id];
 
-      // Optional subscription + linked invoice
-      if (form.add_subscription && form.sub_amount && Number(form.sub_amount) > 0) {
-        const startDate = new Date().toISOString().slice(0, 10);
-        const next = new Date();
-        if (form.sub_cycle === 'monthly') next.setMonth(next.getMonth() + 1);
-        else if (form.sub_cycle === 'quarterly') next.setMonth(next.getMonth() + 3);
-        else next.setFullYear(next.getFullYear() + 1);
-        const { data: sub, error: subErr } = await supabase.from('subscriptions').insert({
-          organization_id: pricingApp.organization_id,
-          application_id: pricingApp.id,
-          plan_name: form.sub_plan,
-          billing_cycle: form.sub_cycle,
-          amount: parseFloat(form.sub_amount),
-          start_date: startDate,
-          next_billing_date: next.toISOString().slice(0, 10),
-          status: 'active',
-        }).select('id').single();
-        if (subErr) throw subErr;
-
-        const { data: subInvNum } = await supabase.rpc('generate_invoice_number');
-        const { data: subInv, error: subInvErr } = await supabase.from('invoices').insert({
-          invoice_number: subInvNum as string,
-          organization_id: pricingApp.organization_id,
-          application_id: pricingApp.id,
-          subscription_id: sub!.id,
-          fee_type: 'subscription',
-          description: `${form.sub_plan} (${form.sub_cycle})`,
-          amount: parseFloat(form.sub_amount),
-          due_date: form.due_date,
-        }).select('id').single();
-        if (subInvErr) throw subInvErr;
-        createdInvoiceIds.push(subInv!.id);
-      }
-
-      // Send emails
       if (form.send_email) {
-        for (const id of createdInvoiceIds) {
-          try {
-            await supabase.functions.invoke('send-invoice-email', { body: { invoice_id: id } });
-          } catch (e) {
-            console.error('email send failed', e);
-          }
+        const { error: emailErr } = await supabase.functions.invoke('send-invoice-email', {
+          body: { invoice_id: createdInv!.id, recipient_emails: emails },
+        });
+        if (emailErr) {
+          console.error(emailErr);
+          toast({ variant: 'destructive', title: 'Email send failed', description: emailErr.message });
         }
       }
 
       toast({
         title: 'Invoice created',
-        description: form.send_email ? 'Invoice(s) emailed to client.' : 'Invoice(s) saved.',
+        description: form.send_email ? `Invoice emailed to ${emails.length} recipient(s).` : 'Invoice saved.',
       });
       setPricingApp(null);
       fetchApps();
@@ -243,36 +254,87 @@ export default function PendingPricingTab() {
       </CardContent>
 
       <Dialog open={!!pricingApp} onOpenChange={(o) => !o && setPricingApp(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Set Pricing — {pricingApp?.application_number}</DialogTitle>
           </DialogHeader>
           {pricingApp && (
             <div className="space-y-4 py-2">
-              <div className="rounded-md bg-muted p-3 text-sm">
-                <p className="font-medium">{pricingApp.organizations?.name}</p>
-                <p className="text-muted-foreground text-xs mt-1">{pricingApp.organizations?.contact_email || 'No contact email on file'}</p>
+              <div>
+                <Label>Business Name</Label>
+                <Input value={pricingApp.organizations?.name || ''} readOnly className="bg-muted" />
+              </div>
+
+              <div>
+                <Label>Recipient Emails *</Label>
+                <div className="min-h-10 w-full rounded-md border border-input bg-background px-2 py-1.5 flex flex-wrap gap-1.5 items-center focus-within:ring-2 focus-within:ring-ring">
+                  {emails.map((e) => (
+                    <span key={e} className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-xs">
+                      {e}
+                      <button
+                        type="button"
+                        onClick={() => setEmails(emails.filter(x => x !== e))}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label={`Remove ${e}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    className="flex-1 min-w-[140px] bg-transparent outline-none text-sm py-1"
+                    placeholder={emails.length ? 'Add another…' : 'client@company.com, another@company.com'}
+                    value={emailDraft}
+                    onChange={(e) => setEmailDraft(e.target.value)}
+                    onKeyDown={handleEmailKey}
+                    onBlur={() => emailDraft.trim() && addEmailFromDraft()}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Press Enter or comma to add. Backspace to remove last.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Validity Period *</Label>
+                  <Label>Certificate Validity Period *</Label>
                   <Select value={form.validity_period} onValueChange={(v) => setForm(p => ({ ...p, validity_period: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {VALIDITY_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">Applies once the certificate is issued.</p>
                 </div>
                 <div>
-                  <Label>Application Fee (ZMW) *</Label>
-                  <Input type="number" step="0.01" min="0" value={form.application_fee} onChange={(e) => setForm(p => ({ ...p, application_fee: e.target.value }))} placeholder="e.g. 3500.00" />
+                  <Label>Application Fee *</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">ZMW</span>
+                    <Input
+                      type="number" step="0.01" min="0"
+                      value={form.application_fee}
+                      onChange={(e) => setForm(p => ({ ...p, application_fee: e.target.value }))}
+                      placeholder="3500.00"
+                      className="pl-14"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <Label>Due Date *</Label>
-                <Input type="date" value={form.due_date} onChange={(e) => setForm(p => ({ ...p, due_date: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Start Date *</Label>
+                  <Input
+                    type="date"
+                    value={form.start_date}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setForm(p => ({ ...p, start_date: v, due_date: addDaysStr(v, 7) }));
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label>Due Date *</Label>
+                  <Input type="date" value={form.due_date} onChange={(e) => setForm(p => ({ ...p, due_date: e.target.value }))} />
+                </div>
               </div>
 
               <div>
@@ -280,39 +342,9 @@ export default function PendingPricingTab() {
                 <Textarea rows={2} value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} />
               </div>
 
-              <div className="border rounded-md p-3 space-y-3">
-                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                  <input type="checkbox" checked={form.add_subscription} onChange={(e) => setForm(p => ({ ...p, add_subscription: e.target.checked }))} />
-                  Bundle a recurring subscription
-                </label>
-                {form.add_subscription && (
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div>
-                      <Label className="text-xs">Plan name</Label>
-                      <Input value={form.sub_plan} onChange={(e) => setForm(p => ({ ...p, sub_plan: e.target.value }))} />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Cycle</Label>
-                      <Select value={form.sub_cycle} onValueChange={(v: any) => setForm(p => ({ ...p, sub_cycle: v }))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                          <SelectItem value="quarterly">Quarterly</SelectItem>
-                          <SelectItem value="yearly">Yearly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-xs">Subscription amount (ZMW)</Label>
-                      <Input type="number" step="0.01" min="0" value={form.sub_amount} onChange={(e) => setForm(p => ({ ...p, sub_amount: e.target.value }))} />
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={form.send_email} onChange={(e) => setForm(p => ({ ...p, send_email: e.target.checked }))} />
-                Email invoice(s) with PDF attachment now
+                Email invoice with PDF attachment now
               </label>
             </div>
           )}
