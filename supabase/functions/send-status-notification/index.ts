@@ -491,7 +491,7 @@ const handler = async (req: Request): Promise<Response> => {
         ];
       }
 
-      const emailResponse = await resend.emails.send(emailPayload as Parameters<typeof resend.emails.send>[0]);
+      const emailResponse = await resend.emails.send(emailPayload as unknown as Parameters<typeof resend.emails.send>[0]);
       console.log("Congratulations email sent:", emailResponse);
 
       return new Response(
