@@ -218,7 +218,10 @@ export function MoMoPaymentDialog({
         body: { transaction_id: transactionId },
       });
 
-      if (error) throw error;
+      if (error) {
+        const realMsg = await extractFunctionError(error, "Could not check payment status.");
+        throw new Error(realMsg);
+      }
 
       setMessage(data.message);
       if (data.status === "completed") {
@@ -228,7 +231,7 @@ export function MoMoPaymentDialog({
         setPaymentState("error");
       }
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message });
+      toast({ variant: "destructive", title: "Error", description: err?.message || "Status check failed" });
     } finally {
       setIsCheckingStatus(false);
     }
