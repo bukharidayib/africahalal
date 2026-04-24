@@ -127,12 +127,19 @@ export default function QuotationsTab() {
   const handleSend = async (q: Quotation) => {
     setActingId(q.id);
     try {
-      const { error } = await supabase.functions.invoke('send-quotation-email', { body: { quotation_id: q.id } });
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('send-quotation-email', { body: { quotation_id: q.id } });
+      if (error) {
+        // Try to surface the function's JSON error message
+        const ctx: any = (error as any).context;
+        let detail = error.message;
+        try { const body = await ctx?.json?.(); if (body?.error) detail = body.error; } catch {}
+        throw new Error(detail);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
       toast({ title: 'Sent', description: 'Quotation emailed to client.' });
       fetchData();
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
+      toast({ variant: 'destructive', title: 'Send failed', description: e.message });
     } finally { setActingId(null); }
   };
 
