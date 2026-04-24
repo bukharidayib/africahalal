@@ -81,6 +81,7 @@ import RoleEditor from "./admin/pages/RoleEditor";
 import AdminBilling from "./admin/pages/AdminBilling";
 import IngredientTracker from "./admin/pages/IngredientTracker";
 import AdminSupervisorReportDetail from "./admin/pages/AdminSupervisorReportDetail";
+import { AdminProtectedRoute } from "./admin/components/AdminProtectedRoute";
 
 // Supervisor Portal
 import { SupervisorProtectedRoute } from "./components/auth/SupervisorProtectedRoute";
@@ -204,32 +205,37 @@ const App = () => (
 
             {/* Admin Portal Routes */}
             <Route path="/admin" element={<AdminProviderWrapper />}>
+              {/* Public admin routes */}
               <Route path="login" element={<AdminLogin />} />
               <Route path="register" element={<AdminRegister />} />
-              <Route path="dashboard" element={<AdminDashboard />} />
-              <Route path="applications" element={<Applications />} />
-              <Route path="applications/:id" element={<ApplicationDetail />} />
-              <Route path="certificates" element={<Certificates />} />
-              <Route path="inspections" element={<Inspections />} />
-              <Route path="inspections/:id" element={<AdminInspectionDetail />} />
-              <Route path="approvals" element={<PendingApprovals />} />
-              <Route path="audit-logs" element={<AuditLogs />} />
-              <Route path="users" element={<UserManagement />} />
-              <Route path="supervisors" element={<Supervisors />} />
-              <Route path="blogs" element={<Blogs />} />
-              <Route path="enforcement" element={<Enforcement />} />
-              <Route path="inspectors" element={<Inspectors />} />
-              <Route path="settings" element={<AdminSettings />} />
-              <Route path="support" element={<AdminSupportCenter />} />
-              <Route path="support/tickets" element={<AdminSupportTickets />} />
-              <Route path="support/tickets/:id" element={<AdminSupportTicketDetail />} />
-              <Route path="support/chats" element={<AdminSupportChats />} />
-              <Route path="support/chats/:id" element={<AdminSupportChatSession />} />
-              <Route path="roles" element={<RolesPermissions />} />
-              <Route path="roles/:id" element={<RoleEditor />} />
-              <Route path="billing" element={<AdminBilling />} />
-              <Route path="ingredients" element={<IngredientTracker />} />
-              <Route path="supervisor-reports/:id" element={<AdminSupervisorReportDetail />} />
+
+              {/* Protected admin routes — guarded centrally */}
+              <Route element={<AdminProtectedRoute><Outlet /></AdminProtectedRoute>}>
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="applications" element={<Applications />} />
+                <Route path="applications/:id" element={<ApplicationDetail />} />
+                <Route path="certificates" element={<Certificates />} />
+                <Route path="inspections" element={<Inspections />} />
+                <Route path="inspections/:id" element={<AdminInspectionDetail />} />
+                <Route path="approvals" element={<PendingApprovals />} />
+                <Route path="audit-logs" element={<AuditLogs />} />
+                <Route path="users" element={<UserManagement />} />
+                <Route path="supervisors" element={<Supervisors />} />
+                <Route path="blogs" element={<Blogs />} />
+                <Route path="enforcement" element={<Enforcement />} />
+                <Route path="inspectors" element={<Inspectors />} />
+                <Route path="settings" element={<AdminSettings />} />
+                <Route path="support" element={<AdminSupportCenter />} />
+                <Route path="support/tickets" element={<AdminSupportTickets />} />
+                <Route path="support/tickets/:id" element={<AdminSupportTicketDetail />} />
+                <Route path="support/chats" element={<AdminSupportChats />} />
+                <Route path="support/chats/:id" element={<AdminSupportChatSession />} />
+                <Route path="roles" element={<RolesPermissions />} />
+                <Route path="roles/:id" element={<RoleEditor />} />
+                <Route path="billing" element={<AdminBilling />} />
+                <Route path="ingredients" element={<IngredientTracker />} />
+                <Route path="supervisor-reports/:id" element={<AdminSupervisorReportDetail />} />
+              </Route>
             </Route>
 
             {/* Inspector Auth Routes (public) */}
