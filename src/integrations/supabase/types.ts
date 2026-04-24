@@ -144,9 +144,37 @@ export type Database = {
           },
         ]
       }
+      application_message_reads: {
+        Row: {
+          application_id: string
+          id: string
+          last_read_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          application_id: string
+          id?: string
+          last_read_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          application_id?: string
+          id?: string
+          last_read_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       application_messages: {
         Row: {
           application_id: string
+          attachment_name: string | null
+          attachment_size: number | null
+          attachment_type: string | null
+          attachment_url: string | null
           id: string
           message: string
           message_type: string
@@ -156,6 +184,10 @@ export type Database = {
         }
         Insert: {
           application_id: string
+          attachment_name?: string | null
+          attachment_size?: number | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           id?: string
           message: string
           message_type: string
@@ -165,6 +197,10 @@ export type Database = {
         }
         Update: {
           application_id?: string
+          attachment_name?: string | null
+          attachment_size?: number | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           id?: string
           message?: string
           message_type?: string
