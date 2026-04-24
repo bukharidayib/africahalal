@@ -1,77 +1,77 @@
-## Root Causes Identified
+## Root cause of the invoice errors
 
-### 1. Invoice number generator is broken (causes all 3 "invoice_number null" errors)
-The DB function `generate_invoice_number()` reads:
-```
-SUBSTRING(invoice_number FROM 11)  -- expects "AHIS-INV-" (10 chars)
-```
-But the actual prefix is `AHIS-INV-YYYY-` (14 chars). When it tries to parse `"026-00001"` as INTEGER, it throws `22P02 invalid input syntax`. The frontend catches no `error` from `supabase.rpc()` because the destructuring `{ data: invNum }` ignores the error → `invNum` becomes `null` → insert fails with the NOT NULL constraint violation.
+The `invoices.fee_type` CHECK constraint currently only allows:
+`'certification' | 'renewal' | 'inspection' | 'other'`
 
-This affects:
-- **Set Pricing dialog** (`PendingPricingTab.tsx`)
-- **Create New Invoice dialog** (`AdminBilling.tsx`)
-- **Subscriptions "Invoice Now" button** (`SubscriptionsTab.tsx`)
-- **Quotations "To Invoice"** (`QuotationsTab.tsx`)
+But the code inserts these values:
+- `PendingPricingTab` → `'application_fee'` and `'subscription'`
+- `SubscriptionsTab` → `'subscription'`
+- `QuotationsTab` → `'other'` (this one passes)
+- `AdminBilling` "Create New Invoice" → defaults to `'certification'` (passes), but the **same insert silently allows** other unsupported flows
 
-### 2. Quotation number generator has the same bug
-`generate_quotation_number()` uses `SUBSTRING FROM 11` but `AHIS-QUO-YYYY-` is 14 chars. Saving a quotation succeeds the first time (seq=1 fallback) but breaks afterwards. Sending also fails when the org has no `contact_email`.
+That mismatch produces `invoices_fee_type_check` violations on every Set Pricing, Subscription "Invoice Now" and bundled-subscription action.
 
-### 3. Send-quotation-email returns 500
-Edge function throws `"Organization has no contact email"` when the linked org's `contact_email` is null. The frontend swallowed the message into a generic "non-2xx" toast.
+## Fix plan
 
----
-
-## Fix Plan
-
-### A. Database migration (fix both number generators)
+### 1. Database migration — widen the `fee_type` constraint
+Drop the existing CHECK and recreate with the full set of values used by the app:
 ```sql
-CREATE OR REPLACE FUNCTION public.generate_invoice_number() ...
-  -- 'AHIS-INV-' (9) + 'YYYY-' (5) = 14 → SUBSTRING FROM 15
-  SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM 15) AS INTEGER)), 0) + 1 ...
-  WHERE invoice_number ~ ('^AHIS-INV-' || _year || '-[0-9]+$')
-
-CREATE OR REPLACE FUNCTION public.generate_quotation_number() ...
-  -- 'AHIS-QUO-' (9) + 'YYYY-' (5) = 14 → SUBSTRING FROM 15
-  SELECT COALESCE(MAX(CAST(SUBSTRING(quotation_number FROM 15) AS INTEGER)), 0) + 1 ...
-  WHERE quotation_number ~ ('^AHIS-QUO-' || _year || '-[0-9]+$')
+ALTER TABLE public.invoices DROP CONSTRAINT invoices_fee_type_check;
+ALTER TABLE public.invoices ADD CONSTRAINT invoices_fee_type_check
+  CHECK (fee_type IN (
+    'application_fee','certification','renewal',
+    'inspection','subscription','quotation','other'
+  ));
 ```
-Using a regex WHERE filter also makes the function safe against any legacy malformed numbers.
+No data backfill needed (existing rows already use the legacy values).
 
-### B. Frontend hardening (4 files)
-In every `supabase.rpc('generate_invoice_number')` / `generate_quotation_number` call:
-- Destructure both `{ data, error }`, throw on error, throw if data is null.
-- Files: `PendingPricingTab.tsx`, `AdminBilling.tsx` (handleCreateInvoice), `SubscriptionsTab.tsx` (handleGenerateInvoice), `QuotationsTab.tsx` (handleSave + handleConvert).
+### 2. Redesign the "Set Pricing" dialog (`PendingPricingTab.tsx`)
 
-### C. Send-invoice-email / send-quotation-email
-- Surface a **clear toast** to the user when the org has no contact email (instead of generic 500), and offer to fall back to the organization's `profiles` user email if `organizations.contact_email` is null. Update both edge functions to also try `profiles.email` for the org owner as a fallback recipient.
+New form fields in this order:
+1. **Business Name** — read-only input, auto-populated from `pricingApp.organizations.name`.
+2. **Recipient Emails** — multi-email input (chip-style: type/paste, press Enter or comma to add; backspace removes). Pre-fills with `organizations.contact_email` if present. Validates each entry as email. At least one required.
+3. **Validity Period** — dropdown using existing `VALIDITY_OPTIONS` (1–4 quarters). Labeled clearly as "Certificate Validity Period (once issued)".
+4. **Application Fee (ZMW)** — numeric input with `ZMW` prefix adornment.
+5. **Start Date** — date input, defaults to today (`new Date().toISOString().slice(0,10)`). Used as the invoice issue/start date and stored on the application as `pricing_start_date` (or surfaced via existing `created_at`; we'll keep it on the invoice description metadata to avoid schema bloat unless you want a dedicated column).
+6. **Due Date** — kept (defaults to start date + 7 days, recomputes when Start Date changes).
+7. **Description** — textarea, prefilled with `Halal certification application fee — {application_number}`.
 
-### D. Client payment via API (already wired — verify + improve email CTA)
-The client portal already has `MoMoPaymentDialog` calling `process-momo-payment` from `/client/billing/invoices/:id` (`BillingInvoiceDetail.tsx`). 
-- Update the invoice email HTML in `send-invoice-email/index.ts` so the **Pay Online** button deep-links to `https://africahalal.lovable.app/client/billing/invoices/{invoice_id}` instead of just the homepage.
-- That page already shows the invoice + Pay button → MoMo flow → `process-momo-payment` → `zynlepay-momo-callback` → marks invoice paid.
+Removed:
+- The entire "Bundle a recurring subscription" block and its sub-fields.
+- The single contact-email preview chip (replaced by the multi-email field).
 
----
+Submission changes:
+- Insert one invoice with `fee_type: 'application_fee'` (now allowed by the new constraint).
+- Pass the multi-email list to `send-invoice-email` as `recipient_emails: string[]` (override). Edge function will use that list when provided, falling back to organization/profile resolution otherwise.
 
-## Files To Change
+### 3. Edge function update — `send-invoice-email`
+- Accept optional `recipient_emails: string[]` in the request body.
+- If provided and non-empty, validate each, dedupe, and use as `to` (skip the `resolveRecipient` fallback). Audit log records the explicit list and source `'manual_override'`.
+- Keep existing behavior when not provided.
 
-**Database**
-- New migration: replace `generate_invoice_number()` and `generate_quotation_number()` with corrected SUBSTRING offset + regex guard.
+### 4. Modern, clean email templates (HTML)
+Rebuild the HTML in both `send-invoice-email` and `send-quotation-email` with a unified, premium, mobile-friendly layout:
+- 600px centered card on a soft neutral background (`#f5f5f4`)
+- Navy header (`#0f2e57`) with AHI wordmark + small tagline
+- Gold accent bar (`#c79e3b`) under the header
+- Clear "Invoice Summary" / "Quotation Summary" panel: Invoice #, Date, Due/Valid Until, Amount (large, gold)
+- Itemized table for quotation items
+- Prominent CTA button ("Pay Invoice" → links to client billing portal; "Review Quotation" → client portal)
+- Footer: contact details, address, automated-message disclaimer
+- Inline CSS only (Gmail/Outlook safe), table-based structure for compatibility, alt text on logo, dark-mode color hints via `@media (prefers-color-scheme: dark)`
 
-**Frontend**
-- `src/admin/pages/AdminBilling.tsx` — check rpc error/null in `handleCreateInvoice`.
-- `src/admin/components/accountant/PendingPricingTab.tsx` — same in `handleSubmit` (2 rpc calls).
-- `src/admin/components/accountant/SubscriptionsTab.tsx` — same in `handleGenerateInvoice`.
-- `src/admin/components/accountant/QuotationsTab.tsx` — same in `handleSave` + `handleConvert`.
+### 5. Verification
+- After migration, retry: Set Pricing → Create Invoice; Subscriptions → Invoice Now; Create New Invoice. All should succeed.
+- Quotations sending continues to work and uses the new template.
+- Audit log entries include the recipient list and source.
 
-**Edge functions**
-- `supabase/functions/send-invoice-email/index.ts` — fallback to organization profile email; deep-link CTA to `/client/billing/invoices/{id}`.
-- `supabase/functions/send-quotation-email/index.ts` — fallback recipient resolution + clearer error.
+## Files to change
+- `supabase/migrations/<new>.sql` — widen CHECK constraint
+- `src/admin/components/accountant/PendingPricingTab.tsx` — new form (multi-email chip input, business name read-only, start date, removed subscription bundle)
+- `supabase/functions/send-invoice-email/index.ts` — accept `recipient_emails`, new HTML template
+- `supabase/functions/send-quotation-email/index.ts` — new HTML template (matching style)
 
----
+No changes needed to `SubscriptionsTab` or `AdminBilling` create-invoice — the constraint widening alone unblocks them.
 
-## Expected Result
-- Set Pricing dialog → creates invoice + (optional) subscription + emails PDF with working "Pay Online" link.
-- Create New Invoice → succeeds, emails client.
-- Subscriptions "Invoice now" → succeeds.
-- Quotations save / send / convert → all succeed; if no contact email, user sees an actionable message.
-- Client receives email → clicks "Pay Online" → lands on invoice detail page → pays via Mobile Money (ZynlePay).
+## Open question
+The "Start Date" you described — should it be persisted as a dedicated `start_date` column on `invoices`, or is it acceptable to use it only as the invoice issue date (stored implicitly via `created_at` and shown in the description)? I'll go with the implicit approach unless you say otherwise, to avoid extra schema churn.
