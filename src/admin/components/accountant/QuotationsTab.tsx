@@ -98,7 +98,9 @@ export default function QuotationsTab() {
     }
     setSaving(true);
     try {
-      const { data: qNum } = await supabase.rpc('generate_quotation_number');
+      const { data: qNum, error: numErr } = await supabase.rpc('generate_quotation_number');
+      if (numErr) throw numErr;
+      if (!qNum) throw new Error('Could not generate quotation number');
       const { error } = await supabase.from('quotations').insert({
         quotation_number: qNum as string,
         organization_id: form.organization_id,
