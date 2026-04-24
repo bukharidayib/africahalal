@@ -854,29 +854,21 @@ export default function CertificationApplication() {
                                 </div>
                                 <div className="space-y-4">
                                     <Label className="text-foreground">Select Business Category *</Label>
-                                    <p className="text-xs text-muted-foreground">Choose the category that best describes your establishment. The application fee is determined by your category.</p>
-                                    {BUSINESS_CATEGORY_FEES.map((cat) => {
-                                        const selected = formData.categories[0] === cat.key;
+                                    <p className="text-xs text-muted-foreground">Choose the category that best describes your establishment. Pricing for your application will be set by our Accountant team after submission.</p>
+                                    {BUSINESS_CATEGORIES.map((cat) => {
+                                        const selected = formData.categories[0] === cat;
                                         return (
                                             <div
-                                                key={cat.key}
-                                                className={`flex items-center justify-between gap-3 p-4 border rounded-lg hover:border-primary/50 transition-colors cursor-pointer ${selected ? 'border-primary bg-primary/5' : 'border-border'}`}
-                                                onClick={() => {
-                                                    updateFormData('categories', [cat.key]);
-                                                    updateFormData('application_fee', cat.fee);
-                                                }}
+                                                key={cat}
+                                                className={`flex items-center gap-3 p-4 border rounded-lg hover:border-primary/50 transition-colors cursor-pointer ${selected ? 'border-primary bg-primary/5' : 'border-border'}`}
+                                                onClick={() => updateFormData('categories', [cat])}
                                             >
-                                                <div className="flex items-center space-x-3">
-                                                    <Checkbox
-                                                        checked={selected}
-                                                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                                        onCheckedChange={() => { }}
-                                                    />
-                                                    <span className="text-sm font-medium text-foreground">{cat.label}</span>
-                                                </div>
-                                                <Badge variant="outline" className="bg-background font-semibold">
-                                                    ZMW {cat.fee.toLocaleString()}
-                                                </Badge>
+                                                <Checkbox
+                                                    checked={selected}
+                                                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                                    onCheckedChange={() => { }}
+                                                />
+                                                <span className="text-sm font-medium text-foreground">{cat}</span>
                                             </div>
                                         );
                                     })}
@@ -884,32 +876,26 @@ export default function CertificationApplication() {
 
                                 <div className="space-y-4 pt-4 border-t">
                                     <Label className="text-foreground">Certification Validity Period *</Label>
+                                    <p className="text-xs text-muted-foreground">Select how long you want your halal certification to remain valid. Each quarter equals 3 months.</p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div
-                                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.validity_period === '6_months' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
-                                            onClick={() => updateFormData('validity_period', '6_months')}
-                                        >
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="font-bold text-foreground">6 Months</span>
+                                        {VALIDITY_OPTIONS.map((opt) => (
+                                            <div
+                                                key={opt.key}
+                                                className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.validity_period === opt.key ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                                                onClick={() => updateFormData('validity_period', opt.key)}
+                                            >
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="font-bold text-foreground">{opt.label}</span>
+                                                    <Badge variant="outline" className="text-xs">{opt.months}</Badge>
+                                                </div>
+                                                <p className="text-sm text-muted-foreground">Certification valid for {opt.months} from date of issuance.</p>
                                             </div>
-                                            <p className="text-sm text-muted-foreground">Short-term certification valid for six months from issuance.</p>
-                                        </div>
-
-                                        <div
-                                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.validity_period === '1_year' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
-                                            onClick={() => updateFormData('validity_period', '1_year')}
-                                        >
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="font-bold text-foreground">1 Year</span>
-                                            </div>
-                                            <p className="text-sm text-muted-foreground">Standard certification valid for one year from issuance.</p>
-                                        </div>
+                                        ))}
                                     </div>
                                 </div>
 
                                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-foreground/80 space-y-1">
-                                    <p><strong>Note:</strong> Application fees are <strong>non-refundable</strong> and must be paid before the certification process begins.</p>
-                                    <p>This fee covers initial application review and administrative processing only. Inspection, audit, and annual certification fees are billed separately.</p>
+                                    <p><strong>Note:</strong> After submission, our Accountant team will review your application and send you a quotation/invoice with the application fee and any optional subscription plan.</p>
                                 </div>
                             </div>
                         )}
