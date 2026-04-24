@@ -50,8 +50,24 @@ import {
 } from "@/components/ui/dialog";
 import { ProductIngredientModal, Ingredient } from "@/components/client/ProductIngredientModal";
 import { MandatoryDocuments } from "@/components/client/MandatoryDocuments";
-import { organizationSchema, productSchema, declarationSchema, paymentPhoneSchema, cardPaymentSchema } from "@/lib/validations";
-import { BUSINESS_CATEGORY_FEES, getFeeForCategory } from "@/lib/applicationFees";
+import { organizationSchema, productSchema, declarationSchema } from "@/lib/validations";
+
+// Business categories (no fixed fees — pricing is set by admin Accountant after submission)
+const BUSINESS_CATEGORIES = [
+    "Restaurants",
+    "Cafés",
+    "Butcheries",
+    "Abattoirs",
+    "Franchises",
+    "Manufacturing Companies",
+];
+
+const VALIDITY_OPTIONS = [
+    { key: "1_quarter", label: "1 Quarter", months: "3 months" },
+    { key: "2_quarter", label: "2 Quarters", months: "6 months" },
+    { key: "3_quarter", label: "3 Quarters", months: "9 months" },
+    { key: "4_quarter", label: "4 Quarters", months: "12 months" },
+];
 
 const steps = [
     { id: 1, name: "Establishment Details", icon: Building2 },
@@ -59,7 +75,6 @@ const steps = [
     { id: 3, name: "Product Information", icon: ClipboardList },
     { id: 4, name: "Mandatory Documents", icon: FileCheck },
     { id: 5, name: "Declaration", icon: BadgeCheck },
-    { id: 6, name: "Payment", icon: CreditCard },
 ];
 
 const PROVIDERS = [
