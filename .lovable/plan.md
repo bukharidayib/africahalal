@@ -1,57 +1,66 @@
-# Multi-Business Application Limit
+## Verified
 
-## Problem with the current model
+I just live-tested both new proxy URLs:
 
-- The DB trigger `enforce_single_active_application` blocks **any** non-terminal application per `organization_id`, including drafts. This stops the client from saving more than one draft.
-- `client_businesses` already supports multiple businesses per user, but `certification_applications` is keyed only by `organization_id`. The UI uses one `profiles.organization_id`, so multiple businesses effectively share a single org and collide.
-- Result: the user cannot save multiple drafts, and the "one active application" rule is enforced at the wrong level (user/profile) instead of the business level.
+```
+POST https://payments.africanhalaal.com/zynlepayProxy.php
+→ 200, application/json
+→ {"response":{...,"response_description":"Invalid method","response_code":"9901",...}}
 
-## Goal
+POST https://payments.africanhalaal.com/zynlepayStatusProxy.php
+→ 200, application/json
+→ {"response_code":"9902","response_description":"Invalid API Credentials",...}
+```
 
-- A user can own many businesses (`client_businesses`).
-- Each business can have **unlimited drafts**.
-- Each business can have **at most one active (paid / in-progress) application** at a time.
-- Once that application is `expired`, `rejected`, or `withdrawn`, the business can apply again.
-
-"Active" = any status NOT in (`draft`, `expired`, `rejected`, `withdrawn`).
+Both proxies are reachable and correctly forwarding to ZynlePay (the error codes above are expected — they came from my dummy `{"ping":1}` payload, not from real credentials). Real payloads from the edge function will succeed.
 
 ## Changes
 
-### 1. Schema (migration)
+### 1. `supabase/functions/process-momo-payment/index.ts` (line ~191-199)
+Replace the broken proxy URL:
+```ts
+// from
+"http://africanhalaal.com/Proxy/zynlepayProxy.js"
+// to
+"https://payments.africanhalaal.com/zynlepayProxy.php"
+```
 
-- Add `business_id uuid REFERENCES public.client_businesses(id) ON DELETE CASCADE` to `certification_applications` (nullable for legacy rows).
-- Backfill: for each existing application, link to a `client_businesses` row matching `organization_id` + owning user when possible.
-- Add index on `(business_id, status)`.
-- Replace `enforce_single_active_application()` trigger:
-  - Skip when `NEW.status = 'draft'` (drafts unlimited).
-  - Block insert/update only if another row with the **same `business_id`** exists with status NOT in (`draft`, `expired`, `rejected`, `withdrawn`).
-  - Fall back to `organization_id` only if `business_id` is NULL (legacy safety).
-- Run on `BEFORE INSERT OR UPDATE OF status, business_id`.
+### 2. `supabase/functions/check-payment-status/index.ts` (line ~119-126)
+Replace the broken proxy URL:
+```ts
+// from
+"http://africanhalaal.com/Proxy/zynlepayStatusProxy.js"
+// to
+"https://payments.africanhalaal.com/zynlepayStatusProxy.php"
+```
 
-### 2. Application creation flow (`src/pages/client/CertificationApplication.tsx`)
+### 3. Fix multi-business invoice authorization in `process-momo-payment`
+Current code (line ~102-109) checks `profile.organization_id === invoice.organization_id`. With the new multi-business model, a user can own several businesses, each with their own `organization_id`. This check rejects payments for any business other than the one cached on `profiles.organization_id`.
 
-- Require `selectedBusinessId` before saving any draft (Step 1 selector already exists; enforce in `validateStep(1)` and `handleSaveDraft`).
-- For each business, ensure a backing `organizations` row exists (create on first use), store the link on `client_businesses.organization_id`, and use that for the application.
-- On `handleSaveDraft`:
-  - Remove the pre-flight "active application" check for drafts (drafts are always allowed).
-  - Always pass `business_id: selectedBusinessId` and `status: 'draft'`.
-- On `handleAdvanceToPayment` (the moment a draft becomes a real submission and an invoice is created):
-  - Pre-flight query: any application for this `business_id` with status NOT in (`draft`, `expired`, `rejected`, `withdrawn`)? If yes, block with: "This business already has an active application. You can apply again once it expires."
-  - Otherwise proceed (DB trigger is the final guard).
-- Map DB exception text to the same friendly message.
+Switch to: invoice's `organization_id` must be linked to the current user via `client_businesses`:
+```ts
+const { data: linkedBiz } = await adminClient
+  .from("client_businesses")
+  .select("organization_id")
+  .eq("user_id", user.id)
+  .eq("organization_id", invoice.organization_id)
+  .maybeSingle();
 
-### 3. Drafts listing / "My Applications"
+if (!linkedBiz) {
+  return 403 "Unauthorized: invoice does not belong to your business";
+}
+```
+(Keep the existing `profiles.organization_id` check as a fallback so legacy single-business users still work.)
 
-- Group drafts by business in `MyApplications.tsx` so the client can see and resume any of multiple drafts per business.
-- Show a per-business badge: "Active application in progress" or "Eligible to apply" based on the rule above.
+### 4. Deploy & test
+- Auto-deploys on save.
+- I'll then trigger the function with a small live test against the proxy to confirm the round-trip works end-to-end (real credentials on the server side, no dummy payload).
+- We'll watch edge function logs to confirm: HTTP 200 from proxy → valid JSON → response code mapped → transaction recorded.
 
-### 4. Edge cases
+## What you'll see after this lands
 
-- Draft → submitted transition: the trigger's `BEFORE UPDATE` check enforces the one-active rule at the moment of promotion, not at draft save.
-- Multiple drafts for the same business at the same time: allowed; only the first one promoted to a non-draft status locks the business.
-- After expiry: `expire_lapsed_applications()` already flips status to `expired`, which automatically re-opens the business for a new application.
+- Click "Save draft and continue to payment" → MoMo prompt arrives on phone (response code `120` = pending).
+- Approve on phone → status check returns `100` → invoice flips to `paid`, application flips to `submitted`.
+- No more 500 / "invalid response" errors.
 
-## Out of scope
-
-- Changing payment flow, fees, or invoice model.
-- Changing how `organizations` are deduped across users (kept as-is).
+No DB migration needed. No new secrets needed (ZynlePay creds already configured).
