@@ -480,6 +480,40 @@ export default function AdminBilling() {
     } finally { setIsDeleting(false); }
   };
 
+  const [emailingId, setEmailingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleSendInvoiceEmail = async (inv: Invoice) => {
+    setEmailingId(inv.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-invoice-email', { body: { invoice_id: inv.id } });
+      if (error) throw error;
+      toast({ title: 'Email sent', description: `Invoice emailed to ${data?.recipient || 'client'}.` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Email failed', description: e.message });
+    } finally { setEmailingId(null); }
+  };
+
+  const handleDownloadInvoicePdf = async (inv: Invoice) => {
+    setDownloadingId(inv.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-invoice-pdf', { body: { invoice_id: inv.id } });
+      if (error) throw error;
+      const b64 = (data as any)?.pdf_base64;
+      if (!b64) throw new Error('No PDF returned');
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${inv.invoice_number}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Download failed', description: e.message });
+    } finally { setDownloadingId(null); }
+  };
+
   const statusBadge = (status: string) => {
     const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
       paid: { variant: 'default', label: 'Paid' },
