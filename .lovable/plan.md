@@ -1,95 +1,57 @@
-# Plan: Route Refresh Audit, Friendly 404, and Admin Route Guard
+# Multi-Business Application Limit
 
-Three independent improvements bundled together.
+## Problem with the current model
 
----
+- The DB trigger `enforce_single_active_application` blocks **any** non-terminal application per `organization_id`, including drafts. This stops the client from saving more than one draft.
+- `client_businesses` already supports multiple businesses per user, but `certification_applications` is keyed only by `organization_id`. The UI uses one `profiles.organization_id`, so multiple businesses effectively share a single org and collide.
+- Result: the user cannot save multiple drafts, and the "one active application" rule is enforced at the wrong level (user/profile) instead of the business level.
 
-## 1. Hostinger Route Refresh Audit (automated check)
+## Goal
 
-**Goal:** From the live Hostinger domain, hit every portal route directly (simulating a hard refresh) and report which ones return a non-HTML response (i.e. SPA fallback failed).
+- A user can own many businesses (`client_businesses`).
+- Each business can have **unlimited drafts**.
+- Each business can have **at most one active (paid / in-progress) application** at a time.
+- Once that application is `expired`, `rejected`, or `withdrawn`, the business can apply again.
 
-**Approach:** A standalone Node script (`scripts/audit-hostinger-routes.mjs`) that:
+"Active" = any status NOT in (`draft`, `expired`, `rejected`, `withdrawn`).
 
-1. Hard-codes the list of all routes from `src/App.tsx` (public, `/auth/*`, `/client/*`, `/admin/*`, `/inspector/*`, `/supervisor/*`).
-2. Accepts the deployed origin as an arg, e.g. `node scripts/audit-hostinger-routes.mjs https://yourdomain.com`.
-3. For each route, performs a `GET` with `Accept: text/html` and checks:
-   - HTTP status is `200`
-   - `Content-Type` includes `text/html`
-   - Body contains `<div id="root"`(confirms it's the SPA shell, not a real Apache 404 page)
-4. Prints a table to the terminal: `OK` / `FAIL (reason)` per route, then a summary count.
-5. Exits with code `1` if any route fails (so it can be wired into CI later).
+## Changes
 
-**You run it locally** after deploying to Hostinger:
-```
-node scripts/audit-hostinger-routes.mjs https://your-hostinger-domain.com
-```
-This tells you exactly which routes the `.htaccess` is or isn't catching.
+### 1. Schema (migration)
 
-No browser automation needed — pure `fetch()` from Node 18+.
+- Add `business_id uuid REFERENCES public.client_businesses(id) ON DELETE CASCADE` to `certification_applications` (nullable for legacy rows).
+- Backfill: for each existing application, link to a `client_businesses` row matching `organization_id` + owning user when possible.
+- Add index on `(business_id, status)`.
+- Replace `enforce_single_active_application()` trigger:
+  - Skip when `NEW.status = 'draft'` (drafts unlimited).
+  - Block insert/update only if another row with the **same `business_id`** exists with status NOT in (`draft`, `expired`, `rejected`, `withdrawn`).
+  - Fall back to `organization_id` only if `business_id` is NULL (legacy safety).
+- Run on `BEFORE INSERT OR UPDATE OF status, business_id`.
 
----
+### 2. Application creation flow (`src/pages/client/CertificationApplication.tsx`)
 
-## 2. Friendly Not-Found Page with Portal Suggestions
+- Require `selectedBusinessId` before saving any draft (Step 1 selector already exists; enforce in `validateStep(1)` and `handleSaveDraft`).
+- For each business, ensure a backing `organizations` row exists (create on first use), store the link on `client_businesses.organization_id`, and use that for the application.
+- On `handleSaveDraft`:
+  - Remove the pre-flight "active application" check for drafts (drafts are always allowed).
+  - Always pass `business_id: selectedBusinessId` and `status: 'draft'`.
+- On `handleAdvanceToPayment` (the moment a draft becomes a real submission and an invoice is created):
+  - Pre-flight query: any application for this `business_id` with status NOT in (`draft`, `expired`, `rejected`, `withdrawn`)? If yes, block with: "This business already has an active application. You can apply again once it expires."
+  - Otherwise proceed (DB trigger is the final guard).
+- Map DB exception text to the same friendly message.
 
-Replace the bare `src/pages/NotFound.tsx` with a helpful page that:
+### 3. Drafts listing / "My Applications"
 
-- Shows the attempted path so the user can see what they typed.
-- Detects the path prefix (`/admin`, `/client`, `/inspector`, `/supervisor`) and suggests the matching portal sign-in or dashboard with a "Did you mean…?" callout.
-- Always shows a card grid of all four portals + the public homepage with a short description and a button:
-  - Home (`/`)
-  - Client Portal (`/auth/signin`)
-  - Admin Portal (`/admin/login`)
-  - Inspector Portal (`/inspector/signin`)
-  - Supervisor Portal (`/supervisor/signin`)
-- Uses existing design system tokens (Card, Button, Lucide icons) — no new dependencies.
-- Keeps the existing `console.error` so 404s remain logged.
+- Group drafts by business in `MyApplications.tsx` so the client can see and resume any of multiple drafts per business.
+- Show a per-business badge: "Active application in progress" or "Eligible to apply" based on the rule above.
 
-The route registration stays the same (`<Route path="*" element={<NotFound />} />` — already present at end of `App.tsx`).
+### 4. Edge cases
 
----
+- Draft → submitted transition: the trigger's `BEFORE UPDATE` check enforces the one-active rule at the moment of promotion, not at draft save.
+- Multiple drafts for the same business at the same time: allowed; only the first one promoted to a non-draft status locks the business.
+- After expiry: `expire_lapsed_applications()` already flips status to `expired`, which automatically re-opens the business for a new application.
 
-## 3. Centralized Admin Route Protection
+## Out of scope
 
-**Current state:** Every admin page individually wraps itself in `<AdminLayout>`, which calls `useAdminAuthContext()` and redirects to `/admin/login` when not authenticated. This works but is fragile — any new admin page that forgets `<AdminLayout>` becomes publicly accessible.
-
-**Fix:** Add a dedicated `AdminProtectedRoute` component and apply it once at the route level so protection isn't dependent on page authors remembering the layout.
-
-**Changes:**
-
-1. **New file `src/admin/components/AdminProtectedRoute.tsx`** — reads `useAdminAuthContext()`, shows the same loader during `isLoading`, and `<Navigate to="/admin/login" replace />` when not authenticated. Mirrors the existing `ProtectedRoute` pattern used for client routes.
-
-2. **Update `src/App.tsx`** — restructure the `/admin` route block:
-   ```text
-   /admin (AdminProviderWrapper)
-     ├── login          (public)
-     ├── register       (public)
-     └── *              (AdminProtectedRoute → all other admin pages)
-   ```
-   Implementation: split into two child route groups under the same `AdminProviderWrapper` — one for `login`/`register`, and a nested wrapper element `<AdminProtectedRoute><Outlet/></AdminProtectedRoute>` containing every other admin route.
-
-3. **No page changes required.** `AdminLayout` keeps its own auth check as defense-in-depth, but the route guard becomes the source of truth.
-
----
-
-## Files to Add / Modify
-
-**Add:**
-- `scripts/audit-hostinger-routes.mjs`
-- `src/admin/components/AdminProtectedRoute.tsx`
-
-**Modify:**
-- `src/pages/NotFound.tsx` — friendly portal suggestions
-- `src/App.tsx` — wrap admin routes in `AdminProtectedRoute`
-
-**Unchanged:**
-- `public/.htaccess` (already deployed)
-- All admin page files
-- All other portal protected-route components
-
----
-
-## Out of Scope
-
-- Testing routes in a real browser (the audit script handles this from the command line).
-- Changing inspector/supervisor protection (they already have dedicated guards at the route level).
-- Server-side rendering or pre-rendering.
+- Changing payment flow, fees, or invoice model.
+- Changing how `organizations` are deduped across users (kept as-is).
