@@ -443,7 +443,6 @@ export default function ClientApplicationDetail() {
                     <TabsContent value="timeline" className="space-y-6">
                         <ApplicationTimeline applicationId={application.id} createdAt={application.created_at} />
                     </TabsContent>
-                    </TabsContent>
                 </Tabs>
             </div>
         </ClientLayout>
