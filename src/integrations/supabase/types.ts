@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      accountant_audit_log: {
+        Row: {
+          actor_email: string | null
+          actor_user_id: string | null
+          created_at: string
+          error_message: string | null
+          event_type: string
+          id: string
+          invoice_id: string | null
+          metadata: Json
+          organization_id: string | null
+          quotation_id: string | null
+          recipient_email: string | null
+          status: string
+        }
+        Insert: {
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          event_type: string
+          id?: string
+          invoice_id?: string | null
+          metadata?: Json
+          organization_id?: string | null
+          quotation_id?: string | null
+          recipient_email?: string | null
+          status?: string
+        }
+        Update: {
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          invoice_id?: string | null
+          metadata?: Json
+          organization_id?: string | null
+          quotation_id?: string | null
+          recipient_email?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       admin_invitations: {
         Row: {
           accepted_at: string | null
