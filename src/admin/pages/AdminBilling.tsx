@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, Clock, AlertTriangle, CheckCircle2, Loader2, Search,
   Receipt, Plus, Eye, Pencil, Trash2, RefreshCw, CreditCard, Banknote,
-  Image, XCircle, CheckCircle
+  Image, XCircle, CheckCircle, Calculator, Send, FileText, Repeat, Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -29,6 +29,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import PendingPricingTab from '../components/accountant/PendingPricingTab';
+import SubscriptionsTab from '../components/accountant/SubscriptionsTab';
+import QuotationsTab from '../components/accountant/QuotationsTab';
 
 // --- ZynlePay response code map ---
 const ZYNLE_CODES: Record<string, { description: string; color: 'green' | 'yellow' | 'red' }> = {
@@ -522,8 +525,8 @@ export default function AdminBilling() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold font-serif">Billing & Invoices</h1>
-            <p className="text-muted-foreground">Manage client invoices and track payments.</p>
+            <h1 className="text-2xl font-bold font-serif flex items-center gap-2"><Calculator className="h-6 w-6" /> Accountant</h1>
+            <p className="text-muted-foreground">Pricing, invoices, subscriptions, quotations and payment reconciliation.</p>
           </div>
           <Dialog open={showCreate} onOpenChange={setShowCreate}>
             <DialogTrigger asChild>
