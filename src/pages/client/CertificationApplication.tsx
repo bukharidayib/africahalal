@@ -936,35 +936,33 @@ export default function CertificationApplication() {
                                     </p>
                                 </div>
                                 <div className="space-y-4">
-                                    <Label className="text-foreground">Select Certification Category (select all that apply) *</Label>
-                                    {[
-                                        "Restuarents & Coffee",
-                                        "Abbatoirs",
-                                        "Meat Processing",
-                                        "Hospitality",
-                                        "Manufacturies"
-                                    ].map((cat) => (
-                                        <div
-                                            key={cat}
-                                            className={`flex items-center space-x-3 p-4 border rounded-lg hover:border-primary/50 transition-colors cursor-pointer group ${formData.categories.includes(cat) ? 'border-primary bg-primary/5' : 'border-border'
-                                                }`}
-                                            onClick={() => {
-                                                const current = formData.categories;
-                                                const next = current.includes(cat)
-                                                    ? current.filter(c => c !== cat)
-                                                    : [...current, cat];
-                                                updateFormData('categories', next);
-                                            }}
-                                        >
-                                            <Checkbox
-                                                id={cat}
-                                                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                                checked={formData.categories.includes(cat)}
-                                                onCheckedChange={() => { }}
-                                            />
-                                            <label htmlFor={cat} className="text-sm font-medium leading-none cursor-pointer flex-1 text-foreground">{cat}</label>
-                                        </div>
-                                    ))}
+                                    <Label className="text-foreground">Select Business Category *</Label>
+                                    <p className="text-xs text-muted-foreground">Choose the category that best describes your establishment. The application fee is determined by your category.</p>
+                                    {BUSINESS_CATEGORY_FEES.map((cat) => {
+                                        const selected = formData.categories[0] === cat.key;
+                                        return (
+                                            <div
+                                                key={cat.key}
+                                                className={`flex items-center justify-between gap-3 p-4 border rounded-lg hover:border-primary/50 transition-colors cursor-pointer ${selected ? 'border-primary bg-primary/5' : 'border-border'}`}
+                                                onClick={() => {
+                                                    updateFormData('categories', [cat.key]);
+                                                    updateFormData('application_fee', cat.fee);
+                                                }}
+                                            >
+                                                <div className="flex items-center space-x-3">
+                                                    <Checkbox
+                                                        checked={selected}
+                                                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                                        onCheckedChange={() => { }}
+                                                    />
+                                                    <span className="text-sm font-medium text-foreground">{cat.label}</span>
+                                                </div>
+                                                <Badge variant="outline" className="bg-background font-semibold">
+                                                    ZMW {cat.fee.toLocaleString()}
+                                                </Badge>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
 
                                 <div className="space-y-4 pt-4 border-t">
@@ -972,26 +970,29 @@ export default function CertificationApplication() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div
                                             className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.validity_period === '6_months' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
-                                            onClick={() => { updateFormData('validity_period', '6_months'); updateFormData('application_fee', 1); }}
+                                            onClick={() => updateFormData('validity_period', '6_months')}
                                         >
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="font-bold text-foreground">6 Months</span>
-                                                <Badge variant="outline" className="bg-background">ZMW 1</Badge>
                                             </div>
                                             <p className="text-sm text-muted-foreground">Short-term certification valid for six months from issuance.</p>
                                         </div>
 
                                         <div
                                             className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.validity_period === '1_year' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
-                                            onClick={() => { updateFormData('validity_period', '1_year'); updateFormData('application_fee', 1); }}
+                                            onClick={() => updateFormData('validity_period', '1_year')}
                                         >
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="font-bold text-foreground">1 Year</span>
-                                                <Badge variant="outline" className="bg-background">ZMW 1</Badge>
                                             </div>
                                             <p className="text-sm text-muted-foreground">Standard certification valid for one year from issuance.</p>
                                         </div>
                                     </div>
+                                </div>
+
+                                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-foreground/80 space-y-1">
+                                    <p><strong>Note:</strong> Application fees are <strong>non-refundable</strong> and must be paid before the certification process begins.</p>
+                                    <p>This fee covers initial application review and administrative processing only. Inspection, audit, and annual certification fees are billed separately.</p>
                                 </div>
                             </div>
                         )}
