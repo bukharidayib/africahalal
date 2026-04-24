@@ -624,12 +624,20 @@ export default function AdminBilling() {
         </div>
 
         {/* Tabs: Invoices + Payment Transactions */}
-        <Tabs defaultValue="invoices" className="space-y-4">
-          <TabsList>
+        <Tabs defaultValue="pending" className="space-y-4">
+          <TabsList className="flex-wrap h-auto">
+            <TabsTrigger value="pending" className="gap-2"><AlertTriangle className="h-4 w-4" /> Pending Pricing</TabsTrigger>
             <TabsTrigger value="invoices" className="gap-2"><Receipt className="h-4 w-4" /> Invoices</TabsTrigger>
+            <TabsTrigger value="subscriptions" className="gap-2"><Repeat className="h-4 w-4" /> Subscriptions</TabsTrigger>
+            <TabsTrigger value="quotations" className="gap-2"><FileText className="h-4 w-4" /> Quotations</TabsTrigger>
             <TabsTrigger value="transactions" className="gap-2"><CreditCard className="h-4 w-4" /> Payment Transactions</TabsTrigger>
             <TabsTrigger value="offline" className="gap-2"><Banknote className="h-4 w-4" /> Offline Payments</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="pending"><PendingPricingTab /></TabsContent>
+          <TabsContent value="subscriptions"><SubscriptionsTab /></TabsContent>
+          <TabsContent value="quotations"><QuotationsTab /></TabsContent>
+
 
           {/* Invoices Tab */}
           <TabsContent value="invoices">
