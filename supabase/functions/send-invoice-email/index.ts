@@ -97,6 +97,7 @@ Deno.serve(async (req) => {
     const orgName = invoice.organizations?.name || 'Client';
     const dueDate = new Date(invoice.due_date).toLocaleDateString('en-GB');
     const amount = `${invoice.currency} ${Number(invoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    const payUrl = `https://africahalal.lovable.app/client/billing/invoices/${invoice_id}`;
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
