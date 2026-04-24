@@ -1,50 +1,96 @@
-## Update Application Categories, Pricing & Fix "Apply for Certification" CTA
+## Application Lifecycle Hardening — Single Active App, Chat, History & Timeline
 
-Align the client portal's certification application with the official AHI Application Fee Structure (effective 09-04-2026) and connect the broken "Apply for Certification" button on the homepage.
+Enforce one active application per business, add a per-application admin↔client chat, restrict the public Directory to current certificates, and surface application history + timeline in both portals.
 
-### 1. New Business Categories & Pricing
+### 1. Database changes (migration)
 
-Replace the existing 5 categories on **Step 2** of `src/pages/client/CertificationApplication.tsx` with the official 6 categories, each tied to a fixed application fee in ZMW:
+**a) Extend `application_status` enum**
+Add value `'expired'` to the `application_status` enum. An application becomes `expired` when its issued certificate passes `expiry_date` (mirrors the existing `certificate_status.expired`).
 
-| Business Category | Application Fee |
-|---|---|
-| Restaurants | K10,000 |
-| Cafés | K10,000 |
-| Butcheries | K10,000 |
-| Abattoirs | K20,000 |
-| Franchises | K20,000 |
-| Manufacturing Companies | K30,000 |
+**b) Validation trigger: one active application per organization**
+Create `BEFORE INSERT` trigger on `certification_applications` that raises if any existing row for the same `organization_id` has status NOT IN (`expired`, `rejected`, `withdrawn`).
 
-### 2. Fee Calculation Logic
+```sql
+RAISE EXCEPTION 'You already have an active application. You can only create a new one after the current application expires.'
+  USING ERRCODE = 'P0001';
+```
 
-- Replace the current "Validity Period" fee selector (which sets `application_fee = 1`) with a **business category single-select** that drives the fee automatically.
-- Keep the validity period (6 months / 1 year) as a separate informational choice (no price change — fee is per category, not per validity).
-- When a category is selected, `formData.application_fee` is set to the matching tier (10,000 / 20,000 / 30,000 ZMW).
-- The fee summary card on Step 5 (Review) and the invoice created on Step 6 (Payment) will then reflect the correct ZMW amount, currency already `'ZMW'`.
-- Add a non-refundable notice + line "Covers initial application review and administrative processing only. Inspection, audit, and annual fees billed separately." per the official document.
+This enforces the rule at the DB layer regardless of client.
 
-### 3. Fix "Apply for Certification" Button on Homepage
+**c) Auto-expire job (function only, called from edge cron-style invocation or on read)**
+Create SQL function `public.expire_lapsed_applications()` (security definer) that:
+- Finds applications with status `approved` whose certificate `expiry_date < CURRENT_DATE`
+- Updates them to `expired` (status change is logged via existing `log_application_status_change` trigger)
+- Marks the certificate `status = 'expired'`
 
-In `src/pages/Index.tsx` (line ~221), the hero CTA button has no `onClick` or `asChild`/`Link` wrapper — it's a dead button. Wrap it with React Router `Link` so:
-- If user is signed in → navigate to `/client/applications/new`
-- If not signed in → navigate to `/auth/signup?redirect=/client/applications/new`
+**d) Reuse existing `application_messages` table for chat**
+Already has `application_id, sent_by, message, message_type, sent_at`. Add column `sender_role text` (values: `client` | `admin`) for clear timeline rendering. RLS already allows clients to view own + admins to manage. Add INSERT policy for clients on their own org's applications (currently only admins can insert).
 
-Use the existing `useUser` (Clerk) hook on the page to decide the destination.
+**e) Realtime**
+Enable realtime on `application_messages` (`ALTER PUBLICATION supabase_realtime ADD TABLE application_messages`).
 
-Other "Apply for Certification" CTAs on `HalalCertificationZambia.tsx` and `CityLanding.tsx` already link to `/auth/signup` — leave them as-is since they target unauthenticated visitors.
+### 2. Backend logic — `CertificationApplication.tsx`
 
-### 4. Display Fee Table Publicly
+Pre-flight check before INSERT (defensive UX layer; trigger is the source of truth):
+- Query `certification_applications` for the user's org where status NOT IN (`expired`,`rejected`,`withdrawn`)
+- If found → block with toast and link to the existing application
+- Backend trigger guarantees enforcement even if frontend is bypassed
 
-On the **homepage** (`src/pages/Index.tsx`) and the **Services** page, add a small "Application Fees" section showing the 6-row pricing table (institutional card style) so visitors see fees before applying — fulfills the document's instruction to "ensure clear visibility under the Apply for Certification section."
+Surface trigger error (`P0001`) into a friendly toast.
 
-### Files Touched
+### 3. Application Chat component
 
-- `src/pages/client/CertificationApplication.tsx` — replace categories array, replace validity-period fee selector with category-driven fee, update Step 5 review summary
-- `src/pages/Index.tsx` — wire up "Apply for Certification" hero button + add fee table section
-- `src/pages/Services.tsx` — add the same fee table section
+New component: `src/components/application/ApplicationChat.tsx`
+- Loads `application_messages` for given `application_id`, ordered by `sent_at`
+- Realtime subscription on filter `application_id=eq.{id}`
+- Bubble UI: client right-aligned, admin left-aligned; role badge + timestamp
+- Textarea + Send button → INSERT with `sender_role` resolved from current user (admin if `is_admin_user`, else `client`)
+- Reused by both `ClientApplicationDetail.tsx` and admin `ApplicationDetail.tsx` (added as a new "Chat" tab)
 
-### Out of Scope
+### 4. Application Timeline component
 
-- No database schema changes (fee already stored as `amount` in `certification_invoices`, currency already ZMW).
-- No changes to ZynlePay/MoMo payment flow.
-- No edits to Standards / Industries pages.
+New component: `src/components/application/ApplicationTimeline.tsx`
+- Joins `application_status_history` (status transitions) + `application_messages` (chat highlights, optional toggle) + `certification_decisions` (key admin actions) into a single chronological feed
+- Vertical timeline with status pill, actor email/role, timestamp, optional reason
+- Embedded as a "Timeline" tab in both client and admin application detail pages
+
+### 5. Directory page (`src/pages/Directory.tsx`)
+
+Filter the `certificates` query so each organization shows **only its current certificate**:
+- Order by `issue_date DESC`, then dedupe by `organization_id` client-side keeping the first row
+- Exclude `status = 'expired'` from the default view (the "Expired" filter still allows opt-in viewing)
+- Auto-update certificate status to `expired` when `expiry_date < today` via the new SQL function (called best-effort via a lightweight edge function on directory load, or via scheduled cron)
+
+### 6. My Applications + Admin Applications — History view
+
+**Client `MyApplications.tsx`:**
+- Split list into two sections:
+  - **Current Application** (status NOT IN expired/rejected/withdrawn) — at most one
+  - **Previous Applications** — collapsible section listing expired/rejected/withdrawn rows
+- Add "expired" tab to the filter
+
+**Admin `Applications.tsx`:**
+- Add a "Per-Business" view toggle: groups applications by organization, shows current on top + an expandable "Previous applications" panel beneath
+- Each previous row links to detail (timeline, chat, status history)
+
+### 7. Application Detail tabs (both portals)
+
+Add two tabs to the existing detail tab strip:
+- **Chat** — `<ApplicationChat applicationId={id} />`
+- **Timeline** — `<ApplicationTimeline applicationId={id} />`
+
+### Files touched
+
+- New migration: `supabase/migrations/<ts>_application_lifecycle.sql`
+- New: `src/components/application/ApplicationChat.tsx`
+- New: `src/components/application/ApplicationTimeline.tsx`
+- Edited: `src/pages/client/CertificationApplication.tsx` (pre-flight + error mapping)
+- Edited: `src/pages/client/MyApplications.tsx` (Current vs Previous sections)
+- Edited: `src/pages/client/ClientApplicationDetail.tsx` (Chat + Timeline tabs)
+- Edited: `src/admin/pages/Applications.tsx` (per-business grouping)
+- Edited: `src/admin/pages/ApplicationDetail.tsx` (Chat + Timeline tabs)
+- Edited: `src/pages/Directory.tsx` (one row per org, exclude expired by default)
+
+### Out of scope
+- Email notifications for new chat messages (existing `send-application-message` edge function can be wired later if desired)
+- Rebuilding the supervisor/inspector chat — only the application-scoped client↔admin chat
