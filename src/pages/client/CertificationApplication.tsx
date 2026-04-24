@@ -51,6 +51,7 @@ import {
 import { ProductIngredientModal, Ingredient } from "@/components/client/ProductIngredientModal";
 import { MandatoryDocuments } from "@/components/client/MandatoryDocuments";
 import { organizationSchema, productSchema, declarationSchema, paymentPhoneSchema, cardPaymentSchema } from "@/lib/validations";
+import { BUSINESS_CATEGORY_FEES, getFeeForCategory } from "@/lib/applicationFees";
 
 const steps = [
     { id: 1, name: "Establishment Details", icon: Building2 },
