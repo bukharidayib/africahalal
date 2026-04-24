@@ -617,7 +617,22 @@ export default function ApplicationDetail() {
           </TabsList>
 
           <TabsContent value="chat" className="space-y-4">
-            <ApplicationChat applicationId={application!.id} viewerRole="admin" />
+            <ApplicationChat
+              applicationId={application!.id}
+              viewerRole="admin"
+              participants={[
+                {
+                  name: clientProfile?.full_name || application?.organizations?.contact_name || application?.organizations?.name || 'Client',
+                  role: 'client',
+                  subtitle: clientProfile?.email || application?.organizations?.contact_email || undefined,
+                },
+                {
+                  name: 'Certification Team',
+                  role: 'admin',
+                  subtitle: 'AHIS Officers',
+                },
+              ]}
+            />
           </TabsContent>
           <TabsContent value="timeline" className="space-y-4">
             <ApplicationTimeline applicationId={application!.id} createdAt={application!.created_at} />
