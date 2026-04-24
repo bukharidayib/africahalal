@@ -1,63 +1,50 @@
+## Update Application Categories, Pricing & Fix "Apply for Certification" CTA
 
+Align the client portal's certification application with the official AHI Application Fee Structure (effective 09-04-2026) and connect the broken "Apply for Certification" button on the homepage.
 
-## Inspectors Module Overhaul — Invitations, Edit/Delete, Manager Role, Business Assignments
+### 1. New Business Categories & Pricing
 
-Mirror the existing supervisor invitation pattern for inspectors, expand the Add dialog, add Edit/Delete, and introduce an Inspector Manager who oversees multiple businesses and inspectors.
+Replace the existing 5 categories on **Step 2** of `src/pages/client/CertificationApplication.tsx` with the official 6 categories, each tied to a fixed application fee in ZMW:
 
-### 1. Database changes (migration)
+| Business Category | Application Fee |
+|---|---|
+| Restaurants | K10,000 |
+| Cafés | K10,000 |
+| Butcheries | K10,000 |
+| Abattoirs | K20,000 |
+| Franchises | K20,000 |
+| Manufacturing Companies | K30,000 |
 
-**Add columns to `inspectors`:**
-- `nrc_number text`
-- `address text`
-- `full_name text` (denormalized, captured at invitation time so admins can see it before signup)
+### 2. Fee Calculation Logic
 
-**New table `inspector_invitations`** (mirrors `supervisor_invitations`):
-`id, email, full_name, nrc_number, address, organization_ids uuid[], is_manager bool, invited_by, status, token, expires_at, accepted_at, cancelled_at, created_at, updated_at` + RLS (admin only) + updated_at trigger.
+- Replace the current "Validity Period" fee selector (which sets `application_fee = 1`) with a **business category single-select** that drives the fee automatically.
+- Keep the validity period (6 months / 1 year) as a separate informational choice (no price change — fee is per category, not per validity).
+- When a category is selected, `formData.application_fee` is set to the matching tier (10,000 / 20,000 / 30,000 ZMW).
+- The fee summary card on Step 5 (Review) and the invoice created on Step 6 (Payment) will then reflect the correct ZMW amount, currency already `'ZMW'`.
+- Add a non-refundable notice + line "Covers initial application review and administrative processing only. Inspection, audit, and annual fees billed separately." per the official document.
 
-**New table `inspector_organizations`** — links an inspector to one or more client organizations (businesses):
-`id, inspector_id, organization_id, assigned_by, assigned_at` with UNIQUE(inspector_id, organization_id). RLS: admins manage; inspector can SELECT own rows.
+### 3. Fix "Apply for Certification" Button on Homepage
 
-**New table `inspector_manager_inspectors`** — links a manager (an inspector with `is_manager=true`) to the inspectors they oversee:
-`id, manager_id, inspector_id, assigned_by, assigned_at` with UNIQUE(manager_id, inspector_id). RLS: admins manage; manager can SELECT own rows.
+In `src/pages/Index.tsx` (line ~221), the hero CTA button has no `onClick` or `asChild`/`Link` wrapper — it's a dead button. Wrap it with React Router `Link` so:
+- If user is signed in → navigate to `/client/applications/new`
+- If not signed in → navigate to `/auth/signup?redirect=/client/applications/new`
 
-### 2. Edge functions
+Use the existing `useUser` (Clerk) hook on the page to decide the destination.
 
-- **`send-inspector-invitation`** — admin-only, sends branded Resend email with a registration link `/inspector/register?email=…&token=…`. Same template style as supervisor invitation, but routed to the inspector portal.
-- **`accept-inspector-invitation`** — token validation, marks invitation accepted, then on profile creation creates the `inspectors` row (copying full_name/NRC/address), inserts `inspector_organizations` rows for each assigned business, and sets `is_manager` if invitation flagged it.
+Other "Apply for Certification" CTAs on `HalalCertificationZambia.tsx` and `CityLanding.tsx` already link to `/auth/signup` — leave them as-is since they target unauthenticated visitors.
 
-### 3. New page: `src/pages/inspector/InspectorRegister.tsx`
-Mirror `SupervisorRegister.tsx` — email locked from token, password setup, calls `accept-inspector-invitation`, redirects to `/inspector/signin`. Add route in `App.tsx`.
+### 4. Display Fee Table Publicly
 
-### 4. Admin Inspectors page (`src/admin/pages/Inspectors.tsx`)
+On the **homepage** (`src/pages/Index.tsx`) and the **Services** page, add a small "Application Fees" section showing the 6-row pricing table (institutional card style) so visitors see fees before applying — fulfills the document's instruction to "ensure clear visibility under the Apply for Certification section."
 
-**Replace current Add dialog** with two-tab dialog:
-- **Tab "Inspector"** (default): Email, Full Name, NRC Number, Address, multi-select businesses (searchable list of `organizations`), Specializations, Regions. On submit → insert `inspector_invitations` row → invoke `send-inspector-invitation`.
-- **Tab "Inspector Manager"**: same fields + checkbox "Grant manager privileges" (sets `is_manager=true`), plus a multi-select of existing inspectors to oversee (creates `inspector_manager_inspectors` rows once the manager accepts).
+### Files Touched
 
-**Add Edit dialog** — pencil icon now opens a dialog to update: full_name, nrc_number, address, specializations, regions, assigned businesses, is_manager flag, managed inspectors.
+- `src/pages/client/CertificationApplication.tsx` — replace categories array, replace validity-period fee selector with category-driven fee, update Step 5 review summary
+- `src/pages/Index.tsx` — wire up "Apply for Certification" hero button + add fee table section
+- `src/pages/Services.tsx` — add the same fee table section
 
-**Add Delete action** — trash icon with confirmation `AlertDialog`. Hard-delete the `inspectors` row (cascade removes assignments). Audit-logged.
+### Out of Scope
 
-**New columns in the inspectors table**: "Role" badge (Inspector / Manager), "Businesses" count badge, NRC.
-
-**New "Pending Invitations" section** — list pending `inspector_invitations` with Resend / Cancel actions (mirrors what already exists for admin invitations).
-
-### 5. Manager portal wiring (already exists)
-
-The `is_manager` flag and `/inspector/manager/*` pages are already present. Update `InspectorManagerInspections.tsx` and `InspectorManagerSupervisors.tsx` queries to filter by `inspector_manager_inspectors` (only inspectors assigned to this manager) and by `inspector_organizations` (only those businesses' inspections/reports), instead of returning everything.
-
-### 6. Files touched
-
-- New: `supabase/migrations/<timestamp>_inspector_invitations.sql`
-- New: `supabase/functions/send-inspector-invitation/index.ts`
-- New: `supabase/functions/accept-inspector-invitation/index.ts`
-- New: `src/pages/inspector/InspectorRegister.tsx`
-- Edited: `src/admin/pages/Inspectors.tsx` (full overhaul)
-- Edited: `src/App.tsx` (register route)
-- Edited: `src/pages/inspector/InspectorManagerInspections.tsx` + `InspectorManagerSupervisors.tsx` (scope by assignments)
-
-### Out of scope
-- Changes to existing supervisor invitation flow
-- Changes to inspector portal layouts/sidebar (already supports `is_manager`)
-- Public signup for inspectors (invitation-only, by design)
-
+- No database schema changes (fee already stored as `amount` in `certification_invoices`, currency already ZMW).
+- No changes to ZynlePay/MoMo payment flow.
+- No edits to Standards / Industries pages.
