@@ -1149,8 +1149,6 @@ export default function CertificationApplication() {
                         </DialogContent>
                     </Dialog>
                 )}
-                    </CardContent>
-                </Card>
 
                 {/* Governance Note */}
                 <p className="text-center text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
