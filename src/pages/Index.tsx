@@ -218,9 +218,11 @@ export default function Index() {
             </p>
 
             <div className="flex flex-wrap justify-center gap-4 pt-2">
-              <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
-                Apply for Certification
-                <ArrowRight className="ml-2 h-5 w-5" />
+              <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20" asChild>
+                <Link to={isAuthenticated ? "/client/applications/new" : "/auth/signup?redirect=/client/applications/new"}>
+                  Apply for Certification
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
               </Button>
               <Button size="lg" variant="outline" className="border-border hover:bg-accent" asChild>
                 <Link to="/verify">Verify a Certificate</Link>
