@@ -533,6 +533,7 @@ export type Database = {
           application_number: string
           application_type: string
           assigned_officer_id: string | null
+          business_id: string | null
           created_at: string
           id: string
           organization_id: string
@@ -548,6 +549,7 @@ export type Database = {
           application_number: string
           application_type: string
           assigned_officer_id?: string | null
+          business_id?: string | null
           created_at?: string
           id?: string
           organization_id: string
@@ -563,6 +565,7 @@ export type Database = {
           application_number?: string
           application_type?: string
           assigned_officer_id?: string | null
+          business_id?: string | null
           created_at?: string
           id?: string
           organization_id?: string
@@ -574,6 +577,13 @@ export type Database = {
           validity_period?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "certification_applications_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "client_businesses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "certification_applications_organization_id_fkey"
             columns: ["organization_id"]
