@@ -382,7 +382,9 @@ export default function AdminBilling() {
     }
     setIsCreating(true);
     try {
-      const { data: invNum } = await supabase.rpc('generate_invoice_number');
+      const { data: invNum, error: rpcErr } = await supabase.rpc('generate_invoice_number');
+      if (rpcErr) throw rpcErr;
+      if (!invNum) throw new Error('Could not generate invoice number');
       const { error } = await supabase.from('invoices').insert({
         invoice_number: invNum as string,
         organization_id: newInvoice.organization_id,
