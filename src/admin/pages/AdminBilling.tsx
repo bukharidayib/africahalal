@@ -445,10 +445,8 @@ export default function AdminBilling() {
       const { error } = await supabase.from('invoices').update(updateData).eq('id', editInvoice.id);
       if (error) throw error;
       if (editInvoice.application_id && editForm.validity_period) {
-        const appFee = editForm.validity_period === '6_months' ? 1 : editForm.validity_period === '1_year' ? 1 : null;
         await supabase.from('certification_applications').update({
           validity_period: editForm.validity_period,
-          ...(appFee ? { application_fee: appFee } : {}),
         }).eq('id', editInvoice.application_id);
       }
       await supabase.from('invoice_activity_log').insert({
