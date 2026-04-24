@@ -28,7 +28,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Layout } from "@/components/layout/Layout";
 import { SectionHeader } from "@/components/sections/SectionHeader";
 import { SEO } from "@/components/SEO";
-import { BUSINESS_CATEGORY_FEES } from "@/lib/applicationFees";
+
 
 interface BlogPost {
   id: string;
