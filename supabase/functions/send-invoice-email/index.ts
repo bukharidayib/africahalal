@@ -11,11 +11,42 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
+async function logAudit(entry: Record<string, unknown>) {
+  try {
+    await supabase.from('accountant_audit_log').insert(entry);
+  } catch (e) {
+    console.error('audit log insert failed', e);
+  }
+}
+
+// Resolve a recipient email for an organization, falling back to the owner profile.
+// Returns { email, source, missing } where missing describes which field is empty.
+async function resolveRecipient(org: any, organizationId: string) {
+  if (org?.contact_email && String(org.contact_email).trim()) {
+    return { email: String(org.contact_email).trim(), source: 'organizations.contact_email', missing: null as string | null };
+  }
+  // Fall back: profile of any user linked to this organization
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email, full_name')
+    .eq('organization_id', organizationId)
+    .limit(1)
+    .maybeSingle();
+  if (profile?.email && String(profile.email).trim()) {
+    return { email: String(profile.email).trim(), source: 'profiles.email (organization owner)', missing: null };
+  }
+  return {
+    email: null,
+    source: null,
+    missing: 'organizations.contact_email (and no linked profile email found for this organization)',
+  };
+}
+
 // Inline copy of buildInvoicePdf (edge functions can't share imports cleanly)
 async function buildInvoicePdf(invoiceId: string) {
   const { data: inv, error } = await supabase
     .from('invoices')
-    .select('*, organizations(name, address, city, country, contact_email, contact_phone, registration_number)')
+    .select('*, organizations(id, name, address, city, country, contact_email, contact_phone, registration_number)')
     .eq('id', invoiceId)
     .single();
   if (error || !inv) throw new Error(error?.message || 'Invoice not found');
