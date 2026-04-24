@@ -103,18 +103,7 @@ export default function CertificationApplication() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
-    const [paymentInvoice, setPaymentInvoice] = useState<{ id: string; number: string; amount: number } | null>(null);
-    const [paymentPhone, setPaymentPhone] = useState("");
-    const [paymentChannel, setPaymentChannel] = useState("");
-    const [paymentMethod, setPaymentMethod] = useState<"momo" | "card">("momo");
-    const [cardNumber, setCardNumber] = useState("");
-    const [cardExpiryMonth, setCardExpiryMonth] = useState("");
-    const [cardExpiryYear, setCardExpiryYear] = useState("");
-    const [cardCvv, setCardCvv] = useState("");
-    const [paymentState, setPaymentState] = useState<"idle" | "processing" | "pending" | "success" | "error">("idle");
-    const [paymentMessage, setPaymentMessage] = useState("");
-    const [paymentReference, setPaymentReference] = useState("");
-    const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
+    const [submitted, setSubmitted] = useState<{ application_number: string } | null>(null);
     const [ingredientModalOpen, setIngredientModalOpen] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const [businesses, setBusinesses] = useState<{ id: string; entity_name: string; pacra_number: string }[]>([]);
@@ -147,8 +136,7 @@ export default function CertificationApplication() {
         employees: "",
         country: "",
         categories: [] as string[],
-        validity_period: "1_year", // Default to 1 Year
-        application_fee: 0,
+        validity_period: "2_quarter",
         products: [] as ProductItem[],
         uploadedFiles: [] as UploadedFile[],
         declaration_confirmed: false,
