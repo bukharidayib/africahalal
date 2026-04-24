@@ -218,9 +218,46 @@ export default function CertificationApplication() {
         }
     };
 
+    // Ensure the selected business has its own organization row, return its id.
+    const ensureBusinessOrganization = async (businessId: string): Promise<string> => {
+        const { data: biz, error: bizErr } = await supabase
+            .from('client_businesses')
+            .select('id, entity_name, pacra_number, organization_id')
+            .eq('id', businessId)
+            .single();
+        if (bizErr || !biz) throw new Error('Selected business not found.');
+
+        if (biz.organization_id) return biz.organization_id;
+
+        // Try to find an existing organization with the same registration number first
+        const { data: existingOrg } = await supabase
+            .from('organizations')
+            .select('id')
+            .eq('registration_number', biz.pacra_number)
+            .maybeSingle();
+
+        let orgId = existingOrg?.id as string | undefined;
+        if (!orgId) {
+            const newOrgId = crypto.randomUUID();
+            const { error: orgErr } = await supabase.from('organizations').insert({
+                id: newOrgId,
+                name: biz.entity_name,
+                registration_number: biz.pacra_number,
+                sector: formData.categories[0] || 'General',
+                address: formData.address,
+                country: formData.country,
+            });
+            if (orgErr) throw orgErr;
+            orgId = newOrgId;
+        }
+
+        await supabase.from('client_businesses').update({ organization_id: orgId }).eq('id', businessId);
+        return orgId!;
+    };
+
     const handleSaveDraft = async () => {
-        if (!formData.entity_name && !formData.registration_number) {
-            toast({ variant: "destructive", title: "Missing Info", description: "Please fill in at least the business details before saving." });
+        if (!selectedBusinessId) {
+            toast({ variant: "destructive", title: "Select a Business", description: "Please select the business you are applying for." });
             return;
         }
 
@@ -229,31 +266,19 @@ export default function CertificationApplication() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Not authenticated");
 
-            const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single();
-            let organization_id = profile?.organization_id;
+            const organization_id = await ensureBusinessOrganization(selectedBusinessId);
 
-            if (!organization_id) {
-                if (!formData.registration_number) throw new Error("Registration number required");
-                const { data: orgData, error: orgError } = await supabase.from('organizations').select('id').eq('registration_number', formData.registration_number).single();
-                if (orgError && orgError.code === 'PGRST116') {
-                    const newOrgId = crypto.randomUUID();
-                    await supabase.from('organizations').insert({ id: newOrgId, name: formData.entity_name, registration_number: formData.registration_number, sector: formData.categories[0] || "General", address: formData.address, country: formData.country });
-                    organization_id = newOrgId;
-                    await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
-                } else if (orgError) {
-                    throw orgError;
-                } else {
-                    organization_id = orgData.id;
-                }
-            }
+            // Keep profiles.organization_id pointed at the most recently used business org (best-effort; non-blocking)
+            await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
 
             if (draftId) {
                 // Update existing draft
                 await supabase.from('certification_applications').update({
                     scope: formData.categories.join(', '),
                     sector: formData.categories[0] || 'General',
+                    business_id: selectedBusinessId,
                     updated_at: new Date().toISOString(),
-                }).eq('id', draftId);
+                } as any).eq('id', draftId);
 
                 // Delete old products and re-insert
                 await supabase.from('application_products').delete().eq('application_id', draftId);
@@ -266,35 +291,18 @@ export default function CertificationApplication() {
 
                 toast({ title: "Draft Saved", description: "Your application draft has been updated." });
             } else {
-                // Pre-flight: enforce single active application per organization
-                const { data: existingActive } = await supabase
-                    .from('certification_applications')
-                    .select('id, application_number, status')
-                    .eq('organization_id', organization_id)
-                    .not('status', 'in', '(expired,rejected,withdrawn)')
-                    .limit(1);
-                if (existingActive && existingActive.length > 0) {
-                    throw new Error("You already have an active application. You can only create a new one after the current application expires.");
-                }
-
-                // Create new draft
+                // Drafts are unlimited per business — no active-application check here.
                 const { data: appNum } = await supabase.rpc('generate_application_number');
                 const { data: appData, error: appErr } = await supabase.from('certification_applications').insert({
                     organization_id,
+                    business_id: selectedBusinessId,
                     application_type: "Full Certification",
                     sector: formData.categories[0] || "General",
                     scope: formData.categories.join(', '),
                     application_number: appNum || `APP-${Date.now()}`,
                     status: 'draft',
-                }).select('id').single();
-                if (appErr) {
-                    // Friendly mapping of DB trigger error
-                    const msg = (appErr as any).message || '';
-                    if (msg.includes('already have an active application')) {
-                        throw new Error("You already have an active application. You can only create a new one after the current application expires.");
-                    }
-                    throw appErr;
-                }
+                } as any).select('id').single();
+                if (appErr) throw appErr;
 
                 setDraftId(appData.id);
 
