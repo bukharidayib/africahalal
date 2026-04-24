@@ -528,43 +528,29 @@ export default function CertificationApplication() {
             return;
         }
 
+        if (!selectedBusinessId) {
+            toast({ variant: "destructive", title: "Select a Business", description: "Please select the business you are applying for." });
+            return;
+        }
+
         setIsLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not authenticated");
 
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('organization_id')
-                .eq('id', user.id)
-                .single();
+            const organization_id = await ensureBusinessOrganization(selectedBusinessId);
+            await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
 
-            let organization_id = profile?.organization_id;
-
-            if (!organization_id) {
-                const { data: orgData, error: orgError } = await supabase
-                    .from('organizations')
-                    .select('id')
-                    .eq('registration_number', formData.registration_number)
-                    .single();
-
-                if (orgError && orgError.code === 'PGRST116') {
-                    const newOrgId = crypto.randomUUID();
-                    await supabase.from('organizations').insert({
-                        id: newOrgId,
-                        name: formData.entity_name,
-                        registration_number: formData.registration_number,
-                        sector: formData.categories[0] || "General",
-                        address: formData.address,
-                        country: formData.country
-                    });
-                    organization_id = newOrgId;
-                    await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
-                } else if (orgError) {
-                    throw orgError;
-                } else {
-                    organization_id = orgData.id;
-                }
+            // Per-business active-application guard (drafts allowed; final guard is the DB trigger)
+            const { data: blocking } = await supabase
+                .from('certification_applications')
+                .select('id, application_number, status')
+                .eq('business_id', selectedBusinessId)
+                .not('status', 'in', '(draft,expired,rejected,withdrawn)')
+                .neq('id', draftId || '00000000-0000-0000-0000-000000000000')
+                .limit(1);
+            if (blocking && blocking.length > 0) {
+                throw new Error("This business already has an active application. You can apply again once it expires.");
             }
 
             let applicationNumber: string;
@@ -578,12 +564,13 @@ export default function CertificationApplication() {
                     .single();
                 applicationNumber = existingApp?.application_number || `APP-${Date.now()}`;
 
-                // Keep as draft — only update scope/sector
+                // Keep as draft — only update scope/sector/business
                 await supabase.from('certification_applications').update({
                     scope: formData.categories.join(', '),
                     sector: formData.categories[0] || "General",
+                    business_id: selectedBusinessId,
                     updated_at: new Date().toISOString(),
-                }).eq('id', draftId);
+                } as any).eq('id', draftId);
                 appId = draftId;
 
                 await supabase.from('application_products').delete().eq('application_id', draftId);
@@ -595,12 +582,13 @@ export default function CertificationApplication() {
                     .from('certification_applications')
                     .insert({
                         organization_id,
+                        business_id: selectedBusinessId,
                         application_type: "Full Certification",
                         sector: formData.categories[0] || "General",
                         scope: formData.categories.join(', '),
                         application_number: applicationNumber,
                         status: 'draft',
-                    })
+                    } as any)
                     .select('id')
                     .single();
                 if (appError) throw appError;
