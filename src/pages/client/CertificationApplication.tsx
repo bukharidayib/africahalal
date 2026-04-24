@@ -742,12 +742,20 @@ export default function CertificationApplication() {
         try {
             if (!draftId) return;
 
-            // Promote draft to submitted
-            await supabase.from('certification_applications').update({
+            // Promote draft to submitted (DB trigger enforces one-active-per-business)
+            const { error: promoteErr } = await supabase.from('certification_applications').update({
                 status: 'submitted',
                 submitted_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
             }).eq('id', draftId);
+            if (promoteErr) {
+                const msg = promoteErr.message || '';
+                if (msg.includes('active application')) {
+                    toast({ variant: "destructive", title: "Cannot Submit", description: "This business already has an active application. You can apply again once it expires." });
+                    return;
+                }
+                throw promoteErr;
+            }
 
             // Log Audit
             await supabase.rpc('log_audit', {
