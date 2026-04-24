@@ -546,7 +546,8 @@ export default function AdminBilling() {
 
   const feeTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      certification: 'Certification Fee', renewal: 'Renewal Fee',
+      application_fee: 'Application Fee', certification: 'Certification Fee',
+      subscription: 'Subscription Fee', renewal: 'Renewal Fee',
       inspection: 'Inspection Fee', other: 'Service Charge',
     };
     return labels[type] || type;
