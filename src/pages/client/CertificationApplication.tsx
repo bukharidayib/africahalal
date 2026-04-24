@@ -521,7 +521,7 @@ export default function CertificationApplication() {
 
     const selectedProduct = formData.products.find(p => p.id === selectedProductId);
 
-    const handleAdvanceToPayment = async () => {
+    const handleSubmitApplication = async () => {
         if (!formData.declaration_confirmed || !formData.declaration_compliance || !formData.signature) {
             toast({
                 variant: "destructive",
@@ -544,7 +544,7 @@ export default function CertificationApplication() {
             const organization_id = await ensureBusinessOrganization(selectedBusinessId);
             await supabase.from('profiles').update({ organization_id }).eq('id', user.id);
 
-            // Per-business active-application guard (drafts allowed; final guard is the DB trigger)
+            // Per-business active-application guard
             const { data: blocking } = await supabase
                 .from('certification_applications')
                 .select('id, application_number, status')
@@ -567,11 +567,11 @@ export default function CertificationApplication() {
                     .single();
                 applicationNumber = existingApp?.application_number || `APP-${Date.now()}`;
 
-                // Keep as draft — only update scope/sector/business
                 await supabase.from('certification_applications').update({
                     scope: formData.categories.join(', '),
                     sector: formData.categories[0] || "General",
                     business_id: selectedBusinessId,
+                    validity_period: formData.validity_period,
                     updated_at: new Date().toISOString(),
                 } as any).eq('id', draftId);
                 appId = draftId;
@@ -589,6 +589,7 @@ export default function CertificationApplication() {
                         application_type: "Full Certification",
                         sector: formData.categories[0] || "General",
                         scope: formData.categories.join(', '),
+                        validity_period: formData.validity_period,
                         application_number: applicationNumber,
                         status: 'draft',
                     } as any)
@@ -634,165 +635,53 @@ export default function CertificationApplication() {
                 });
             }
 
-            // Create invoice
-            const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number');
-            const validityLabel = formData.validity_period === '6_months' ? '6 Months' : '1 Year';
-            const dueDate = new Date();
-            dueDate.setDate(dueDate.getDate() + 30);
-            const createdInvoiceNumber = invoiceNumber || `AHIS-INV-${Date.now()}`;
-
-            const { data: invoiceData } = await supabase.from('invoices').insert({
-                invoice_number: createdInvoiceNumber,
-                organization_id: organization_id,
-                application_id: appId,
-                fee_type: 'certification',
-                description: `Halal Certification Application Fee - ${validityLabel} Validity (${applicationNumber})`,
-                amount: formData.application_fee,
-                currency: 'ZMW',
-                due_date: dueDate.toISOString().split('T')[0],
-                status: 'pending',
-            }).select('id').single();
-
-            if (!invoiceData) throw new Error("Failed to create invoice");
-
-            setPaymentInvoice({ id: invoiceData.id, number: createdInvoiceNumber, amount: formData.application_fee });
-            setCurrentStep(6);
-
-            toast({ title: "Ready for Payment", description: "Please complete the payment to submit your application." });
-        } catch (error: any) {
-            console.error('Advance to payment error:', error);
-            toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const isPaymentPhoneValid = paymentPhoneSchema.safeParse(paymentPhone).success;
-    const isCardValid = cardPaymentSchema.safeParse({
-        cardNumber: cardNumber.replace(/\s/g, ""),
-        expiryMonth: cardExpiryMonth,
-        expiryYear: cardExpiryYear,
-        cvv: cardCvv,
-    }).success;
-    const isPaymentFormValid = paymentMethod === "momo" ? (isPaymentPhoneValid && paymentChannel !== "") : isCardValid;
-
-    const handlePayment = async () => {
-        if (!isPaymentFormValid || !paymentInvoice) return;
-
-        setPaymentState("processing");
-        setPaymentMessage("");
-
-        try {
-            const paymentBody = paymentMethod === "card"
-                ? {
-                    invoice_id: paymentInvoice.id,
-                    payment_method: "card",
-                    card_number: cardNumber.replace(/\s/g, ""),
-                    expiry_month: cardExpiryMonth,
-                    expiry_year: cardExpiryYear,
-                    cvv: cardCvv,
-                }
-                : {
-                    invoice_id: paymentInvoice.id,
-                    phone_number: paymentPhone,
-                    channel: paymentChannel,
-                };
-
-            const { data, error } = await supabase.functions.invoke("process-momo-payment", {
-                body: paymentBody,
-            });
-
-            if (error) throw error;
-
-            setPaymentMessage(data.message);
-            setPaymentReference(data.reference || "");
-            setPaymentTxId(data.transaction_id);
-
-            if (data.status === "pending") {
-                setPaymentState("pending");
-            } else if (data.status === "completed") {
-                setPaymentState("success");
-                await finalizeSubmission();
-            } else {
-                setPaymentState("error");
-            }
-        } catch (err: any) {
-            setPaymentState("error");
-            setPaymentMessage(err.message || "Payment failed. Please try again.");
-        }
-    };
-
-    const handleCheckPaymentStatus = async () => {
-        if (!paymentTxId) return;
-        try {
-            const { data, error } = await supabase.functions.invoke("check-payment-status", {
-                body: { transaction_id: paymentTxId },
-            });
-            if (error) throw error;
-            setPaymentMessage(data.message);
-            if (data.status === "completed") {
-                setPaymentState("success");
-                await finalizeSubmission();
-            } else if (data.status === "failed") {
-                setPaymentState("error");
-            }
-        } catch (err: any) {
-            toast({ variant: "destructive", title: "Error", description: err.message });
-        }
-    };
-
-    const finalizeSubmission = async () => {
-        try {
-            if (!draftId) return;
-
-            // Promote draft to submitted (DB trigger enforces one-active-per-business)
+            // Promote draft to submitted (admin Accountant will set pricing & email invoice)
             const { error: promoteErr } = await supabase.from('certification_applications').update({
                 status: 'submitted',
                 submitted_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
-            }).eq('id', draftId);
+            }).eq('id', appId);
             if (promoteErr) {
-                const msg = promoteErr.message || '';
-                if (msg.includes('active application')) {
-                    toast({ variant: "destructive", title: "Cannot Submit", description: "This business already has an active application. You can apply again once it expires." });
-                    return;
+                if ((promoteErr.message || '').includes('active application')) {
+                    throw new Error("This business already has an active application. You can apply again once it expires.");
                 }
                 throw promoteErr;
             }
 
-            // Log Audit
             await supabase.rpc('log_audit', {
                 _action: 'application_submitted',
                 _resource_type: 'certification_applications',
-                _resource_id: draftId,
+                _resource_id: appId,
                 _metadata: {
-                    step: 'submission_after_payment',
                     products_count: formData.products.length,
                     documents_count: formData.uploadedFiles.length,
-                    categories: formData.categories
+                    categories: formData.categories,
+                    validity_period: formData.validity_period,
                 }
             });
 
-            // Send submission email (fire and forget)
-            const { data: { user } } = await supabase.auth.getUser();
-            const { data: app } = await supabase.from('certification_applications').select('application_number, organization_id').eq('id', draftId).single();
-            if (app && user) {
-                const { data: org } = await supabase.from('organizations').select('name, contact_email').eq('id', app.organization_id).single();
-                supabase.functions.invoke('send-status-notification', {
-                    body: {
-                        application_id: draftId,
-                        new_status: 'submitted',
-                        application_number: app.application_number,
-                        organization_name: org?.name || formData.entity_name,
-                        contact_email: org?.contact_email || user.email,
-                    }
-                }).catch(console.error);
-            }
+            // Notify admin / client (fire and forget)
+            const { data: org } = await supabase
+                .from('organizations')
+                .select('name, contact_email')
+                .eq('id', organization_id)
+                .single();
+            supabase.functions.invoke('send-status-notification', {
+                body: {
+                    application_id: appId,
+                    new_status: 'submitted',
+                    application_number: applicationNumber,
+                    organization_name: org?.name || formData.entity_name,
+                    contact_email: org?.contact_email || user.email,
+                }
+            }).catch(console.error);
 
-            toast({ title: "Application Submitted!", description: "Your application has been submitted for review." });
-            setTimeout(() => navigate("/client/applications"), 2000);
-        } catch (err: any) {
-            console.error('Finalize submission error:', err);
+            setSubmitted({ application_number: applicationNumber });
+        } catch (error: any) {
+            console.error('Submit application error:', error);
+            toast({ variant: "destructive", title: "Submission Failed", description: error.message || "An unexpected error occurred." });
+        } finally {
+            setIsLoading(false);
         }
     };
 
