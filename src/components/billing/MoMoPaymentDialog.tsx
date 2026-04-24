@@ -10,6 +10,47 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
+/**
+ * Extracts a human-readable error message from a supabase.functions.invoke error.
+ * The SDK wraps non-2xx responses in FunctionsHttpError with a generic message
+ * like "Edge Function returned a non-2xx status code". The real error from the
+ * edge function (and upstream proxy/ZynlePay) lives in err.context (a Response).
+ */
+async function extractFunctionError(err: any, fallback: string): Promise<string> {
+  try {
+    const ctx = err?.context;
+    if (ctx && typeof ctx.json === "function") {
+      // Clone so we can fall back to text() if json() fails
+      const cloned = typeof ctx.clone === "function" ? ctx.clone() : null;
+      try {
+        const body = await ctx.json();
+        const msg =
+          body?.error?.message ||
+          body?.error ||
+          body?.message ||
+          body?.details ||
+          (typeof body === "string" ? body : null);
+        if (msg) return typeof msg === "string" ? msg : JSON.stringify(msg);
+      } catch {
+        if (cloned) {
+          try {
+            const text = await cloned.text();
+            if (text) return text.slice(0, 500);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+    if (err?.message && err.message !== "Edge Function returned a non-2xx status code") {
+      return err.message;
+    }
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
 interface MoMoPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -102,7 +143,10 @@ export function MoMoPaymentDialog({
         body: paymentBody,
       });
 
-      if (error) throw error;
+      if (error) {
+        const realMsg = await extractFunctionError(error, "Payment failed. Please try again.");
+        throw new Error(realMsg);
+      }
 
       setMessage(data.message);
       setReference(data.reference || "");
@@ -115,8 +159,9 @@ export function MoMoPaymentDialog({
       }
     } catch (err: any) {
       setPaymentState("error");
-      setMessage(err.message || "Payment failed. Please try again.");
-      toast({ variant: "destructive", title: "Payment Error", description: err.message });
+      const description = err?.message || "Payment failed. Please try again.";
+      setMessage(description);
+      toast({ variant: "destructive", title: "Payment Error", description });
     }
   };
 
@@ -173,7 +218,10 @@ export function MoMoPaymentDialog({
         body: { transaction_id: transactionId },
       });
 
-      if (error) throw error;
+      if (error) {
+        const realMsg = await extractFunctionError(error, "Could not check payment status.");
+        throw new Error(realMsg);
+      }
 
       setMessage(data.message);
       if (data.status === "completed") {
@@ -183,7 +231,7 @@ export function MoMoPaymentDialog({
         setPaymentState("error");
       }
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Error", description: err.message });
+      toast({ variant: "destructive", title: "Error", description: err?.message || "Status check failed" });
     } finally {
       setIsCheckingStatus(false);
     }
