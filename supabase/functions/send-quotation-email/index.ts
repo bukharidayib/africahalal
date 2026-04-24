@@ -70,8 +70,18 @@ Deno.serve(async (req) => {
     if (!quotation_id) throw new Error('quotation_id required');
 
     const { bytes, quotation } = await buildQuotationPdf(quotation_id);
-    const recipient = quotation.organizations?.contact_email;
-    if (!recipient) throw new Error('Organization has no contact email');
+    let recipient = quotation.organizations?.contact_email as string | null;
+    if (!recipient) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('organization_id', quotation.organization_id)
+        .not('email', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      recipient = prof?.email || null;
+    }
+    if (!recipient) throw new Error('No recipient email found for this organization. Add a contact email on the organization profile.');
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
