@@ -215,6 +215,32 @@ export default function Index() {
               acceptedAnswer: { "@type": "Answer", text: faq.answer },
             })),
           },
+          ...(blogs.length > 0
+            ? [{
+                "@context": "https://schema.org",
+                "@type": "ItemList",
+                name: "Latest Articles from African Halal Institute",
+                itemListElement: blogs.map((blog, idx) => ({
+                  "@type": "ListItem",
+                  position: idx + 1,
+                  url: `https://africanhalaal.com/blog/${blog.slug}`,
+                  item: {
+                    "@type": "BlogPosting",
+                    "@id": `https://africanhalaal.com/blog/${blog.slug}`,
+                    headline: blog.title,
+                    description: blog.excerpt,
+                    image: blog.image_url ? [blog.image_url] : undefined,
+                    datePublished: blog.published_at,
+                    url: `https://africanhalaal.com/blog/${blog.slug}`,
+                    publisher: {
+                      "@type": "Organization",
+                      name: "African Halal Institute",
+                      logo: { "@type": "ImageObject", url: "https://africanhalaal.com/favicon.png" },
+                    },
+                  },
+                })),
+              }]
+            : []),
         ]}
       />
       {/* Hero Section */}
