@@ -485,7 +485,16 @@ export default function AdminBilling() {
     setEmailingId(inv.id);
     try {
       const { data, error } = await supabase.functions.invoke('send-invoice-email', { body: { invoice_id: inv.id } });
-      if (error) throw error;
+      if (error) {
+        const ctx: any = (error as any).context;
+        let detail = error.message;
+        try {
+          const body = await ctx?.json?.();
+          if (body?.missing_field) detail = `Missing field: ${body.missing_field}`;
+          else if (body?.error) detail = body.error;
+        } catch {}
+        throw new Error(detail);
+      }
       toast({ title: 'Email sent', description: `Invoice emailed to ${data?.recipient || 'client'}.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Email failed', description: e.message });
