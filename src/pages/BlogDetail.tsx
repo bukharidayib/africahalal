@@ -10,8 +10,10 @@ interface BlogPost {
     id: string;
     title: string;
     content: string;
+    excerpt?: string;
     image_url: string;
     published_at: string;
+    updated_at?: string;
     author_id: string;
 }
 
@@ -63,7 +65,11 @@ export default function BlogDetail() {
         <Layout>
             <SEO
               title={`${blog.title} | African Halal Institute`}
-              description={blog.title}
+              description={
+                blog.excerpt?.trim() ||
+                blog.content?.replace(/\s+/g, " ").trim().slice(0, 160) ||
+                blog.title
+              }
               canonicalPath={`/blog/${slug}`}
               ogType="article"
               ogImage={blog.image_url}
@@ -71,8 +77,24 @@ export default function BlogDetail() {
                 "@context": "https://schema.org",
                 "@type": "Article",
                 headline: blog.title,
+                description:
+                  blog.excerpt?.trim() ||
+                  blog.content?.replace(/\s+/g, " ").trim().slice(0, 160),
+                image: blog.image_url ? [blog.image_url] : undefined,
                 datePublished: blog.published_at,
-                publisher: { "@type": "Organization", name: "African Halal Institute" },
+                dateModified: blog.updated_at || blog.published_at,
+                mainEntityOfPage: {
+                  "@type": "WebPage",
+                  "@id": `https://africanhalaal.com/blog/${slug}`,
+                },
+                publisher: {
+                  "@type": "Organization",
+                  name: "African Halal Institute",
+                  logo: {
+                    "@type": "ImageObject",
+                    url: "https://africanhalaal.com/favicon.png",
+                  },
+                },
               }}
             />
             <article className="min-h-screen pb-20">
