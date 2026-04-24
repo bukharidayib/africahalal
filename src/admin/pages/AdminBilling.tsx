@@ -1036,7 +1036,9 @@ export default function AdminBilling() {
                 <Select value={editForm.fee_type} onValueChange={(v) => setEditForm(p => ({ ...p, fee_type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="application_fee">Application Fee</SelectItem>
                     <SelectItem value="certification">Certification Fee</SelectItem>
+                    <SelectItem value="subscription">Subscription Fee</SelectItem>
                     <SelectItem value="renewal">Renewal Fee</SelectItem>
                     <SelectItem value="inspection">Inspection Fee</SelectItem>
                     <SelectItem value="other">Other Service Charge</SelectItem>
