@@ -1191,6 +1191,10 @@ export default function CertificationApplication() {
                                         <span className="font-mono text-xs">{paymentInvoice?.number}</span>
                                     </div>
                                     <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Category</span>
+                                        <span>{formData.categories[0] || '—'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
                                         <span className="text-muted-foreground">Validity</span>
                                         <span>{formData.validity_period === '6_months' ? '6 Months' : '1 Year'}</span>
                                     </div>
