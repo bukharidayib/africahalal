@@ -20,7 +20,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
-type ApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'awaiting_inspection' | 'inspection_complete' | 'pending_decision' | 'approved' | 'rejected' | 'suspended' | 'withdrawn';
+type ApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'awaiting_inspection' | 'inspection_complete' | 'pending_decision' | 'approved' | 'rejected' | 'suspended' | 'withdrawn' | 'expired';
+
+const ARCHIVED_STATUSES: ApplicationStatus[] = ['expired', 'rejected', 'withdrawn'];
 
 interface Application {
     id: string;
@@ -47,6 +49,7 @@ const statusConfig: Record<ApplicationStatus, { label: string; color: string; ic
     rejected: { label: "Rejected", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", icon: XCircle },
     suspended: { label: "Suspended", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", icon: AlertCircle },
     withdrawn: { label: "Withdrawn", color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200", icon: XCircle },
+    expired: { label: "Expired", color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300", icon: Clock },
 };
 
 export default function MyApplications() {
