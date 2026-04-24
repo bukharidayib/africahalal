@@ -729,6 +729,12 @@ export default function AdminBilling() {
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenView(inv)} title="View">
                                 <Eye className="h-4 w-4" />
                               </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadInvoicePdf(inv)} title="Download PDF" disabled={downloadingId === inv.id}>
+                                {downloadingId === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleSendInvoiceEmail(inv)} title="Email to client" disabled={emailingId === inv.id}>
+                                {emailingId === inv.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                              </Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEdit(inv)} title="Edit">
                                 <Pencil className="h-4 w-4" />
                               </Button>
