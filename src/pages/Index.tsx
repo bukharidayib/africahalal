@@ -142,9 +142,13 @@ const testimonials = [
 
 export default function Index() {
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     fetchBlogs();
+    supabase.auth.getSession().then(({ data: { session } }) => setIsAuthenticated(!!session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setIsAuthenticated(!!session));
+    return () => subscription.unsubscribe();
   }, []);
 
   const fetchBlogs = async () => {
