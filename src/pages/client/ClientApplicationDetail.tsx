@@ -434,48 +434,15 @@ export default function ClientApplicationDetail() {
                         )}
                     </TabsContent>
 
+                    {/* Chat Tab */}
+                    <TabsContent value="chat" className="space-y-6">
+                        <ApplicationChat applicationId={application.id} viewerRole="client" />
+                    </TabsContent>
+
                     {/* Timeline Tab */}
                     <TabsContent value="timeline" className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Application Timeline</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="relative">
-                                    <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
-                                    <div className="space-y-6">
-                                        {/* Created */}
-                                        <div className="relative pl-10">
-                                            <div className="absolute left-2.5 top-1 w-3 h-3 rounded-full bg-primary border-2 border-background" />
-                                            <div>
-                                                <p className="font-medium">Application Created</p>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {format(new Date(application.created_at), 'dd MMM yyyy, HH:mm')}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        {/* Status History */}
-                                        {statusHistory.map((item) => (
-                                            <div key={item.id} className="relative pl-10">
-                                                <div className="absolute left-2.5 top-1 w-3 h-3 rounded-full bg-secondary border-2 border-background" />
-                                                <div>
-                                                    <p className="font-medium">
-                                                        Status changed to {statusConfig[item.to_status]?.label || item.to_status}
-                                                    </p>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        {format(new Date(item.created_at), 'dd MMM yyyy, HH:mm')}
-                                                    </p>
-                                                    {item.reason && (
-                                                        <p className="text-sm text-muted-foreground mt-1">{item.reason}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <ApplicationTimeline applicationId={application.id} createdAt={application.created_at} />
+                    </TabsContent>
                     </TabsContent>
                 </Tabs>
             </div>
