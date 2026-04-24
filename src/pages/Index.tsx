@@ -20,11 +20,14 @@ import {
   BadgeCheck,
   Eye,
   ChevronDown,
-  Check
+  Check,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Layout } from "@/components/layout/Layout";
 import { SectionHeader } from "@/components/sections/SectionHeader";
 import { SEO } from "@/components/SEO";
