@@ -114,8 +114,8 @@ Deno.serve(async (req) => {
             <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Due Date</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${dueDate}</td></tr>
             <tr><td style="padding: 8px;"><strong>Reference</strong></td><td style="padding: 8px; text-align: right;">${invoice.invoice_number}</td></tr>
           </table>
-          <p>You can pay online via Mobile Money or Card by signing into your client portal:</p>
-          <p><a href="https://africanhalaal.com" style="background: #c79e3b; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Pay Invoice Online</a></p>
+          <p>You can pay online via Mobile Money (MTN / Airtel) or Card from your client portal:</p>
+          <p><a href="${payUrl}" style="background: #c79e3b; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Pay Invoice Now</a></p>
           <p style="color: #777; font-size: 12px; margin-top: 24px;">For any questions, reply to this email or contact accounts@africanhalaal.com.</p>
         </div>
       </div>
