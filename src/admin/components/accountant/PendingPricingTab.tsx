@@ -116,7 +116,9 @@ export default function PendingPricingTab() {
       }).eq('id', pricingApp.id);
 
       // Create application_fee invoice
-      const { data: invNum } = await supabase.rpc('generate_invoice_number');
+      const { data: invNum, error: numErr } = await supabase.rpc('generate_invoice_number');
+      if (numErr) throw numErr;
+      if (!invNum) throw new Error('Could not generate invoice number');
       const { data: createdInv, error: invErr } = await supabase.from('invoices').insert({
         invoice_number: invNum as string,
         organization_id: pricingApp.organization_id,
