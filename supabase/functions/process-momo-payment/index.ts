@@ -41,7 +41,10 @@ Deno.serve(async (req) => {
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await userClient.auth.getUser();
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -62,7 +65,7 @@ Deno.serve(async (req) => {
       if (!phone_number || !phoneRegex.test(phone_number)) {
         return new Response(
           JSON.stringify({ error: "Invalid phone number. Use Zambian format: 09xxxxxxxx or 07xxxxxxxx" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
     } else {
@@ -70,14 +73,14 @@ Deno.serve(async (req) => {
       if (!card_number || !expiry_month || !expiry_year || !cvv) {
         return new Response(
           JSON.stringify({ error: "Card number, expiry month, expiry year, and CVV are required." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
       if (!/^\d{13,19}$/.test(card_number.replace(/\s/g, ""))) {
-        return new Response(
-          JSON.stringify({ error: "Invalid card number." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "Invalid card number." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     }
 
@@ -96,11 +99,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: profile } = await adminClient
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", user.id)
-      .single();
+    const { data: profile } = await adminClient.from("profiles").select("organization_id").eq("id", user.id).single();
 
     if (!profile || profile.organization_id !== invoice.organization_id) {
       return new Response(JSON.stringify({ error: "Unauthorized: invoice does not belong to your organization" }), {
@@ -157,9 +156,10 @@ Deno.serve(async (req) => {
       // MoMo payment via runBillPayment
       const { phone_number, channel: clientChannel } = body;
       const allowedChannels = ["airtel", "mtn", "zamtel", "momo"];
-      const channel = (clientChannel && allowedChannels.includes(clientChannel.toLowerCase()))
-        ? clientChannel.toLowerCase()
-        : (Deno.env.get("ZYNLEPAY_CHANNEL") || "momo");
+      const channel =
+        clientChannel && allowedChannels.includes(clientChannel.toLowerCase())
+          ? clientChannel.toLowerCase()
+          : Deno.env.get("ZYNLEPAY_CHANNEL") || "momo";
 
       zynlePayload = {
         auth: {
@@ -190,12 +190,12 @@ Deno.serve(async (req) => {
 
     const zynleResponse = await fetch(
       //  "https://payments.zynlepay.com/zynlepay/jsonapi/",
-      "https://africanhalaal.com/zynlepayProxy.php",
+      "https://africanhalaal.com/zynlepay-proxy/zynlepayProxy.php",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(zynlePayload),
-      }
+      },
     );
 
     const zynleResult = await zynleResponse.json();
@@ -272,13 +272,13 @@ Deno.serve(async (req) => {
         reference: referenceNo,
         transaction_id: transaction?.id || null,
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
     console.error("Process payment error:", error);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
