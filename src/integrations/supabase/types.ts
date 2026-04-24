@@ -150,6 +150,7 @@ export type Database = {
           id: string
           message: string
           message_type: string
+          sender_role: string
           sent_at: string
           sent_by: string
         }
@@ -158,6 +159,7 @@ export type Database = {
           id?: string
           message: string
           message_type: string
+          sender_role?: string
           sent_at?: string
           sent_by: string
         }
@@ -166,6 +168,7 @@ export type Database = {
           id?: string
           message?: string
           message_type?: string
+          sender_role?: string
           sent_at?: string
           sent_by?: string
         }
@@ -2548,6 +2551,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      expire_lapsed_applications: { Args: never; Returns: number }
       generate_application_number: { Args: never; Returns: string }
       generate_certificate_number: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
@@ -2640,6 +2644,7 @@ export type Database = {
         | "rejected"
         | "suspended"
         | "withdrawn"
+        | "expired"
       approval_status: "pending" | "approved" | "rejected"
       certificate_status: "active" | "suspended" | "revoked" | "expired"
       corrective_action_status:
@@ -2800,6 +2805,7 @@ export const Constants = {
         "rejected",
         "suspended",
         "withdrawn",
+        "expired",
       ],
       approval_status: ["pending", "approved", "rejected"],
       certificate_status: ["active", "suspended", "revoked", "expired"],
