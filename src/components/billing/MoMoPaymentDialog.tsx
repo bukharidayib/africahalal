@@ -143,7 +143,10 @@ export function MoMoPaymentDialog({
         body: paymentBody,
       });
 
-      if (error) throw error;
+      if (error) {
+        const realMsg = await extractFunctionError(error, "Payment failed. Please try again.");
+        throw new Error(realMsg);
+      }
 
       setMessage(data.message);
       setReference(data.reference || "");
@@ -156,8 +159,9 @@ export function MoMoPaymentDialog({
       }
     } catch (err: any) {
       setPaymentState("error");
-      setMessage(err.message || "Payment failed. Please try again.");
-      toast({ variant: "destructive", title: "Payment Error", description: err.message });
+      const description = err?.message || "Payment failed. Please try again.";
+      setMessage(description);
+      toast({ variant: "destructive", title: "Payment Error", description });
     }
   };
 
