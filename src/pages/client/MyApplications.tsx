@@ -139,73 +139,110 @@ export default function MyApplications() {
                     </Tabs>
                 </div>
 
-                {/* Applications List */}
-                <div className="space-y-4">
-                    {loading ? (
-                        Array(3).fill(0).map((_, i) => (
-                            <Card key={i}>
-                                <CardContent className="p-6">
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-2">
-                                            <Skeleton className="h-5 w-40" />
-                                            <Skeleton className="h-4 w-60" />
+                {(() => {
+                    const renderCard = (app: Application) => {
+                        const status = statusConfig[app.status];
+                        const StatusIcon = status.icon;
+                        return (
+                            <Link key={app.id} to={`/client/applications/${app.id}`}>
+                                <Card className="hover:border-primary/50 transition-all duration-200 cursor-pointer group">
+                                    <CardContent className="p-6">
+                                        <div className="flex items-center justify-between">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-3">
+                                                    <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors">
+                                                        {app.application_number}
+                                                    </h3>
+                                                    <Badge className={status.color}>
+                                                        <StatusIcon className="h-3 w-3 mr-1" />
+                                                        {status.label}
+                                                    </Badge>
+                                                </div>
+                                                <p className="text-muted-foreground">
+                                                    {app.application_type} • {app.sector}
+                                                </p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {app.submitted_at
+                                                        ? `Submitted: ${format(new Date(app.submitted_at), 'dd MMM yyyy')}`
+                                                        : `Created: ${format(new Date(app.created_at), 'dd MMM yyyy')}`}
+                                                </p>
+                                            </div>
+                                            <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
                                         </div>
-                                        <Skeleton className="h-6 w-24" />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))
-                    ) : filteredApplications.length === 0 ? (
-                        <Card>
-                            <CardContent className="p-12 text-center">
-                                <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                                <h3 className="font-semibold text-lg mb-2">No Applications Found</h3>
-                                <p className="text-muted-foreground mb-4">
-                                    {filter !== "all" ? "No applications match your filter criteria." : "You haven't submitted any applications yet."}
-                                </p>
-                                <Button asChild>
-                                    <Link to="/client/apply">Start New Application</Link>
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        filteredApplications.map((app) => {
-                            const status = statusConfig[app.status];
-                            const StatusIcon = status.icon;
-                            return (
-                                <Link key={app.id} to={`/client/applications/${app.id}`}>
-                                    <Card className="hover:border-primary/50 transition-all duration-200 cursor-pointer group">
+                                    </CardContent>
+                                </Card>
+                            </Link>
+                        );
+                    };
+
+                    if (loading) {
+                        return (
+                            <div className="space-y-4">
+                                {Array(3).fill(0).map((_, i) => (
+                                    <Card key={i}>
                                         <CardContent className="p-6">
                                             <div className="flex items-center justify-between">
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center gap-3">
-                                                        <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors">
-                                                            {app.application_number}
-                                                        </h3>
-                                                        <Badge className={status.color}>
-                                                            <StatusIcon className="h-3 w-3 mr-1" />
-                                                            {status.label}
-                                                        </Badge>
-                                                    </div>
-                                                    <p className="text-muted-foreground">
-                                                        {app.application_type} • {app.sector}
-                                                    </p>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        {app.submitted_at 
-                                                            ? `Submitted: ${format(new Date(app.submitted_at), 'dd MMM yyyy')}`
-                                                            : `Created: ${format(new Date(app.created_at), 'dd MMM yyyy')}`
-                                                        }
-                                                    </p>
+                                                <div className="space-y-2">
+                                                    <Skeleton className="h-5 w-40" />
+                                                    <Skeleton className="h-4 w-60" />
                                                 </div>
-                                                <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                                                <Skeleton className="h-6 w-24" />
                                             </div>
                                         </CardContent>
                                     </Card>
-                                </Link>
-                            );
-                        })
-                    )}
-                </div>
+                                ))}
+                            </div>
+                        );
+                    }
+
+                    const current = filteredApplications.filter(a => !ARCHIVED_STATUSES.includes(a.status));
+                    const previous = filteredApplications.filter(a => ARCHIVED_STATUSES.includes(a.status));
+
+                    if (filteredApplications.length === 0) {
+                        return (
+                            <Card>
+                                <CardContent className="p-12 text-center">
+                                    <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                                    <h3 className="font-semibold text-lg mb-2">No Applications Found</h3>
+                                    <p className="text-muted-foreground mb-4">
+                                        {filter !== "all" ? "No applications match your filter criteria." : "You haven't submitted any applications yet."}
+                                    </p>
+                                    <Button asChild>
+                                        <Link to="/client/apply">Start New Application</Link>
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        );
+                    }
+
+                    return (
+                        <div className="space-y-8">
+                            <div className="space-y-3">
+                                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                                    Current Application {current.length > 0 && `(${current.length})`}
+                                </h2>
+                                {current.length === 0 ? (
+                                    <Card>
+                                        <CardContent className="p-6 text-sm text-muted-foreground">
+                                            No active application. You can start a new one.
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    <div className="space-y-3">{current.map(renderCard)}</div>
+                                )}
+                            </div>
+
+                            {previous.length > 0 && (
+                                <div className="space-y-3">
+                                    <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                                        Previous Applications ({previous.length})
+                                    </h2>
+                                    <div className="space-y-3">{previous.map(renderCard)}</div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
             </div>
         </ClientLayout>
     );
