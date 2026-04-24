@@ -1149,57 +1149,6 @@ export default function CertificationApplication() {
                         </DialogContent>
                     </Dialog>
                 )}
-                            </div>
-                        )}
-
-                        {/* Navigation Buttons — hidden on step 6 (payment has its own buttons) */}
-                        {currentStep < 6 && (
-                            <div className="flex items-center justify-between mt-12 pt-8 border-t">
-                                <Button
-                                    variant="ghost"
-                                    onClick={handleBack}
-                                    disabled={currentStep === 1 || isLoading}
-                                    className="h-11 font-bold group"
-                                >
-                                    <ChevronLeft className="mr-2 h-5 w-5 group-hover:-translate-x-1 transition-transform" />
-                                    Previous Step
-                                </Button>
-
-                                <div className="flex gap-3">
-                                    <Button
-                                        variant="outline"
-                                        onClick={handleSaveDraft}
-                                        disabled={isLoading || isSavingDraft}
-                                        className="h-11 font-bold"
-                                    >
-                                        {isSavingDraft ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                        Save Draft
-                                    </Button>
-                                    <Button
-                                        onClick={handleNext}
-                                        disabled={isLoading}
-                                        className="h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-bold group"
-                                    >
-                                        {isLoading && currentStep === 5 ? (
-                                            <>
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Preparing...
-                                            </>
-                                        ) : currentStep === 5 ? (
-                                            <>
-                                                Continue to Payment
-                                                <CreditCard className="ml-2 h-4 w-4" />
-                                            </>
-                                        ) : (
-                                            <>
-                                                Continue
-                                                <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                                            </>
-                                        )}
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
                     </CardContent>
                 </Card>
 
