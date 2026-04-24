@@ -1370,7 +1370,9 @@ export type Database = {
           invoice_number: string
           organization_id: string
           paid_at: string | null
+          quotation_id: string | null
           status: string
+          subscription_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1386,7 +1388,9 @@ export type Database = {
           invoice_number: string
           organization_id: string
           paid_at?: string | null
+          quotation_id?: string | null
           status?: string
+          subscription_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1402,7 +1406,9 @@ export type Database = {
           invoice_number?: string
           organization_id?: string
           paid_at?: string | null
+          quotation_id?: string | null
           status?: string
+          subscription_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1793,6 +1799,81 @@ export type Database = {
           },
         ]
       }
+      quotations: {
+        Row: {
+          accepted_at: string | null
+          application_id: string | null
+          business_id: string | null
+          converted_invoice_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          items: Json
+          notes: string | null
+          organization_id: string
+          quotation_number: string
+          rejected_at: string | null
+          sent_at: string | null
+          status: string
+          subtotal: number
+          tax_amount: number
+          tax_rate: number
+          title: string
+          total: number
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          application_id?: string | null
+          business_id?: string | null
+          converted_invoice_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          items?: Json
+          notes?: string | null
+          organization_id: string
+          quotation_number: string
+          rejected_at?: string | null
+          sent_at?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          tax_rate?: number
+          title: string
+          total?: number
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          application_id?: string | null
+          business_id?: string | null
+          converted_invoice_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          items?: Json
+          notes?: string | null
+          organization_id?: string
+          quotation_number?: string
+          rejected_at?: string | null
+          sent_at?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          tax_rate?: number
+          title?: string
+          total?: number
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       role_permissions: {
         Row: {
           created_at: string | null
@@ -1828,6 +1909,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      subscriptions: {
+        Row: {
+          amount: number
+          application_id: string | null
+          billing_cycle: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          end_date: string | null
+          id: string
+          next_billing_date: string | null
+          notes: string | null
+          organization_id: string
+          plan_name: string
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          application_id?: string | null
+          billing_cycle: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          end_date?: string | null
+          id?: string
+          next_billing_date?: string | null
+          notes?: string | null
+          organization_id: string
+          plan_name: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          application_id?: string | null
+          billing_cycle?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          end_date?: string | null
+          id?: string
+          next_billing_date?: string | null
+          notes?: string | null
+          organization_id?: string
+          plan_name?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       supervisor_activity_log: {
         Row: {
@@ -2613,6 +2748,7 @@ export type Database = {
       generate_invoice_number: { Args: never; Returns: string }
       generate_ncn_number: { Args: never; Returns: string }
       generate_ncr_supervisor_number: { Args: never; Returns: string }
+      generate_quotation_number: { Args: never; Returns: string }
       generate_supervisor_incident_number: { Args: never; Returns: string }
       generate_ticket_number: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: string[] }
