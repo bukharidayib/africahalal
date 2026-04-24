@@ -93,13 +93,42 @@ async function buildQuotationPdf(quotationId: string) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  let quotation_id: string | undefined;
+  let actor_user_id: string | null = null;
+  let actor_email: string | null = null;
   try {
-    const { quotation_id } = await req.json();
+    const body = await req.json();
+    quotation_id = body.quotation_id;
     if (!quotation_id) throw new Error('quotation_id required');
 
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const { data } = await supabase.auth.getUser(token);
+      actor_user_id = data?.user?.id || null;
+      actor_email = data?.user?.email || null;
+    }
+
     const { bytes, quotation } = await buildQuotationPdf(quotation_id);
-    const recipient = quotation.organizations?.contact_email;
-    if (!recipient) throw new Error('Organization has no contact email');
+    const recipientInfo = await resolveRecipient(quotation.organizations, quotation.organization_id);
+
+    if (!recipientInfo.email) {
+      const msg = `Cannot send quotation: missing ${recipientInfo.missing}`;
+      await logAudit({
+        event_type: 'quotation_send_failed',
+        actor_user_id, actor_email,
+        quotation_id,
+        organization_id: quotation.organization_id,
+        status: 'error',
+        error_message: msg,
+        metadata: { missing_field: recipientInfo.missing },
+      });
+      return new Response(
+        JSON.stringify({ error: msg, missing_field: recipientInfo.missing }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    const recipient = recipientInfo.email;
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
@@ -135,14 +164,50 @@ Deno.serve(async (req) => {
       }),
     });
     const respBody = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(`Email send failed: ${respBody?.message || resp.statusText}`);
+    if (!resp.ok) {
+      const msg = `Email send failed: ${respBody?.message || resp.statusText}`;
+      await logAudit({
+        event_type: 'quotation_send_failed',
+        actor_user_id, actor_email,
+        quotation_id,
+        organization_id: quotation.organization_id,
+        recipient_email: recipient,
+        status: 'error',
+        error_message: msg,
+        metadata: { resend_status: resp.status, recipient_source: recipientInfo.source },
+      });
+      throw new Error(msg);
+    }
 
     await supabase.from('quotations').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', quotation_id);
 
-    return new Response(JSON.stringify({ success: true, recipient }), {
+    await logAudit({
+      event_type: 'quotation_sent',
+      actor_user_id, actor_email,
+      quotation_id,
+      organization_id: quotation.organization_id,
+      recipient_email: recipient,
+      status: 'success',
+      metadata: {
+        quotation_number: quotation.quotation_number,
+        total: quotation.total,
+        currency: quotation.currency,
+        recipient_source: recipientInfo.source,
+        resend_id: respBody?.id || null,
+      },
+    });
+
+    return new Response(JSON.stringify({ success: true, recipient, recipient_source: recipientInfo.source }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e: any) {
+    await logAudit({
+      event_type: 'quotation_send_failed',
+      actor_user_id, actor_email,
+      quotation_id: quotation_id || null,
+      status: 'error',
+      error_message: e.message,
+    });
     return new Response(JSON.stringify({ error: e.message }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
