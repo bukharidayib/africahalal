@@ -146,9 +146,7 @@ export default function SubscriptionsTab() {
   const handleGenerateInvoice = async (s: Subscription) => {
     setGenerating(s.id);
     try {
-      const { data: invNum, error: numErr } = await supabase.rpc('generate_invoice_number');
-      if (numErr) throw numErr;
-      if (!invNum) throw new Error('Could not generate invoice number');
+      const { data: invNum } = await supabase.rpc('generate_invoice_number');
       const due = new Date(); due.setDate(due.getDate() + 7);
       const { data: inv, error } = await supabase.from('invoices').insert({
         invoice_number: invNum as string,

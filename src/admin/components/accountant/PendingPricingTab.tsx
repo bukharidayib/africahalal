@@ -116,9 +116,7 @@ export default function PendingPricingTab() {
       }).eq('id', pricingApp.id);
 
       // Create application_fee invoice
-      const { data: invNum, error: numErr } = await supabase.rpc('generate_invoice_number');
-      if (numErr) throw numErr;
-      if (!invNum) throw new Error('Could not generate invoice number');
+      const { data: invNum } = await supabase.rpc('generate_invoice_number');
       const { data: createdInv, error: invErr } = await supabase.from('invoices').insert({
         invoice_number: invNum as string,
         organization_id: pricingApp.organization_id,
@@ -150,9 +148,7 @@ export default function PendingPricingTab() {
         }).select('id').single();
         if (subErr) throw subErr;
 
-        const { data: subInvNum, error: subNumErr } = await supabase.rpc('generate_invoice_number');
-        if (subNumErr) throw subNumErr;
-        if (!subInvNum) throw new Error('Could not generate subscription invoice number');
+        const { data: subInvNum } = await supabase.rpc('generate_invoice_number');
         const { data: subInv, error: subInvErr } = await supabase.from('invoices').insert({
           invoice_number: subInvNum as string,
           organization_id: pricingApp.organization_id,
