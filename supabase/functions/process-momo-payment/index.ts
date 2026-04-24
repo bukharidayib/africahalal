@@ -294,6 +294,35 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Audit log: payment event
+    try {
+      await adminClient.from("accountant_audit_log").insert({
+        event_type:
+          txStatus === "completed"
+            ? "invoice_payment_completed"
+            : txStatus === "pending"
+              ? "invoice_payment_initiated"
+              : "invoice_payment_failed",
+        actor_user_id: user.id,
+        actor_email: user.email || null,
+        invoice_id: invoice.id,
+        organization_id: invoice.organization_id,
+        status: txStatus === "failed" ? "error" : "success",
+        error_message: txStatus === "failed" ? message : null,
+        metadata: {
+          payment_method: isCard ? "card" : "mobile_money",
+          amount: invoice.amount,
+          currency: invoice.currency,
+          reference: referenceNo,
+          transaction_id: transaction?.id || null,
+          response_code: responseCode,
+          invoice_number: invoice.invoice_number,
+        },
+      });
+    } catch (e) {
+      console.error("audit log failed:", e);
+    }
+
     return new Response(
       JSON.stringify({
         success: txStatus !== "failed",
