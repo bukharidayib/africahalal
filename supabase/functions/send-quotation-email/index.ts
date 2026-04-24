@@ -11,10 +11,38 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
+async function logAudit(entry: Record<string, unknown>) {
+  try {
+    await supabase.from('accountant_audit_log').insert(entry);
+  } catch (e) {
+    console.error('audit log insert failed', e);
+  }
+}
+
+async function resolveRecipient(org: any, organizationId: string) {
+  if (org?.contact_email && String(org.contact_email).trim()) {
+    return { email: String(org.contact_email).trim(), source: 'organizations.contact_email', missing: null as string | null };
+  }
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('organization_id', organizationId)
+    .limit(1)
+    .maybeSingle();
+  if (profile?.email && String(profile.email).trim()) {
+    return { email: String(profile.email).trim(), source: 'profiles.email (organization owner)', missing: null };
+  }
+  return {
+    email: null,
+    source: null,
+    missing: 'organizations.contact_email (and no linked profile email found for this organization)',
+  };
+}
+
 async function buildQuotationPdf(quotationId: string) {
   const { data: q, error } = await supabase
     .from('quotations')
-    .select('*, organizations(name, contact_email)')
+    .select('*, organizations(id, name, contact_email)')
     .eq('id', quotationId)
     .single();
   if (error || !q) throw new Error(error?.message || 'Quotation not found');
