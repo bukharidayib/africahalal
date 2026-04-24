@@ -98,7 +98,9 @@ export default function QuotationsTab() {
     }
     setSaving(true);
     try {
-      const { data: qNum } = await supabase.rpc('generate_quotation_number');
+      const { data: qNum, error: numErr } = await supabase.rpc('generate_quotation_number');
+      if (numErr) throw numErr;
+      if (!qNum) throw new Error('Could not generate quotation number');
       const { error } = await supabase.from('quotations').insert({
         quotation_number: qNum as string,
         organization_id: form.organization_id,
@@ -125,19 +127,28 @@ export default function QuotationsTab() {
   const handleSend = async (q: Quotation) => {
     setActingId(q.id);
     try {
-      const { error } = await supabase.functions.invoke('send-quotation-email', { body: { quotation_id: q.id } });
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('send-quotation-email', { body: { quotation_id: q.id } });
+      if (error) {
+        // Try to surface the function's JSON error message
+        const ctx: any = (error as any).context;
+        let detail = error.message;
+        try { const body = await ctx?.json?.(); if (body?.error) detail = body.error; } catch {}
+        throw new Error(detail);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
       toast({ title: 'Sent', description: 'Quotation emailed to client.' });
       fetchData();
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
+      toast({ variant: 'destructive', title: 'Send failed', description: e.message });
     } finally { setActingId(null); }
   };
 
   const handleConvert = async (q: Quotation) => {
     setActingId(q.id);
     try {
-      const { data: invNum } = await supabase.rpc('generate_invoice_number');
+      const { data: invNum, error: numErr } = await supabase.rpc('generate_invoice_number');
+      if (numErr) throw numErr;
+      if (!invNum) throw new Error('Could not generate invoice number');
       const due = new Date(); due.setDate(due.getDate() + 14);
       const { data: inv, error } = await supabase.from('invoices').insert({
         invoice_number: invNum as string,

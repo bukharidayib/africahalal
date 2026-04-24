@@ -76,8 +76,19 @@ Deno.serve(async (req) => {
     if (!invoice_id) throw new Error('invoice_id required');
 
     const { bytes, invoice } = await buildInvoicePdf(invoice_id);
-    const recipient = invoice.organizations?.contact_email;
-    if (!recipient) throw new Error('Organization has no contact email');
+    let recipient = invoice.organizations?.contact_email as string | null;
+    if (!recipient) {
+      // Fallback: any profile linked to this organization
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('organization_id', invoice.organization_id)
+        .not('email', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      recipient = prof?.email || null;
+    }
+    if (!recipient) throw new Error('No recipient email found for this organization. Add a contact email on the organization profile.');
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
@@ -86,6 +97,7 @@ Deno.serve(async (req) => {
     const orgName = invoice.organizations?.name || 'Client';
     const dueDate = new Date(invoice.due_date).toLocaleDateString('en-GB');
     const amount = `${invoice.currency} ${Number(invoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    const payUrl = `https://africahalal.lovable.app/client/billing/invoices/${invoice_id}`;
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
@@ -102,8 +114,8 @@ Deno.serve(async (req) => {
             <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Due Date</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${dueDate}</td></tr>
             <tr><td style="padding: 8px;"><strong>Reference</strong></td><td style="padding: 8px; text-align: right;">${invoice.invoice_number}</td></tr>
           </table>
-          <p>You can pay online via Mobile Money or Card by signing into your client portal:</p>
-          <p><a href="https://africanhalaal.com" style="background: #c79e3b; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Pay Invoice Online</a></p>
+          <p>You can pay online via Mobile Money (MTN / Airtel) or Card from your client portal:</p>
+          <p><a href="${payUrl}" style="background: #c79e3b; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Pay Invoice Now</a></p>
           <p style="color: #777; font-size: 12px; margin-top: 24px;">For any questions, reply to this email or contact accounts@africanhalaal.com.</p>
         </div>
       </div>
