@@ -95,7 +95,21 @@ export default function Directory() {
         .order('issue_date', { ascending: false });
 
       if (error) throw error;
-      setInstitutions((data as any) || []);
+
+      // Auto-expire any active certificates whose expiry has passed (best-effort, ignore errors)
+      try { await supabase.rpc('expire_lapsed_applications' as any); } catch {}
+
+      // Dedup: keep only the most recent certificate per organization
+      const rows = (data as any[]) || [];
+      const seen = new Set<string>();
+      const deduped: CertifiedCompany[] = [];
+      for (const r of rows) {
+        const orgKey = r.organizations?.name || r.id;
+        if (seen.has(orgKey)) continue;
+        seen.add(orgKey);
+        deduped.push(r);
+      }
+      setInstitutions(deduped);
     } catch (error) {
       console.error('Error fetching directory:', error);
     } finally {
