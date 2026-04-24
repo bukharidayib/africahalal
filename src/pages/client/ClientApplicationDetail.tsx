@@ -436,7 +436,22 @@ export default function ClientApplicationDetail() {
 
                     {/* Chat Tab */}
                     <TabsContent value="chat" className="space-y-6">
-                        <ApplicationChat applicationId={application.id} viewerRole="client" />
+                        <ApplicationChat
+                            applicationId={application.id}
+                            viewerRole="client"
+                            participants={[
+                                {
+                                    name: application.organization?.name || 'Your Business',
+                                    role: 'client',
+                                    subtitle: application.organization?.registration_number || undefined,
+                                },
+                                {
+                                    name: 'AHIS Certification Team',
+                                    role: 'admin',
+                                    subtitle: 'Officers & Reviewers',
+                                },
+                            ]}
+                        />
                     </TabsContent>
 
                     {/* Timeline Tab */}
