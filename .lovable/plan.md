@@ -1,73 +1,135 @@
-# Admin Portal Fixes — Plan
+# RBAC Deep Audit — Findings & Remediation Plan
 
-## 1. Certificate Details — fix "Page not found"
+## Audit Summary
 
-**Cause:** `Certificates.tsx` row link points to `/admin/certificates/:id`, but no route or page exists in `src/App.tsx` or `src/admin/pages/`.
+I audited the admin RBAC end-to-end across the database, auth context, sidebar, and every admin page. The **foundation is solid** (DB-driven roles/permissions, RLS on all RBAC tables, security-definer functions, workflow stage engine), but **enforcement is inconsistent at the page level** — many pages render and execute mutations without checking permissions.
 
-**Fix:**
-- Create `src/admin/pages/CertificateDetail.tsx` showing:
-  - Certificate number, status badge (active / suspended / revoked / expired)
-  - Organization, scope, sector, issue date, expiry date, validity countdown
-  - Issued by / approved by (admin names)
-  - Linked application + linked invoice (if any)
-  - QR hash + a "Download Certificate PDF" button (re-using existing `CertificateTemplate` / `CertificateDownloader`)
-  - Certificate History timeline (from `certificate_history` table)
-  - Admin actions: Suspend / Revoke / Reinstate (writes `certificates.status` + `certificate_history` row), gated by `certificates.update` permission
-- Register route in `src/App.tsx` inside the admin protected block:
-  `<Route path="certificates/:id" element={<CertificateDetail />} />`
+### What Works Well
+- `permissions` table fully populated (64 permissions across 13 categories).
+- `has_permission`, `get_user_permissions`, `can_perform_workflow_action`, `check_self_approval`, `validate_stage_progression` all present and security-definer.
+- RLS enabled on `admin_roles`, `user_roles`, `permissions`, `role_permissions`, `workflow_stages`, `workflow_stage_permissions`.
+- `useAdminAuth` correctly fetches role + permissions from DB, blocks suspended roles, and refreshes on auth events.
+- Workflow engine (`workflowEngine.ts`) correctly delegates to RPCs; self-approval prevention exists.
+- Sidebar filters nav items by permission key.
 
-## 2. Applications page — remove "New Application" button
+### Critical Gaps Found
 
-In `src/admin/pages/Applications.tsx` delete the `<Button>` block that renders "New Application" in the header (lines ~123–126). Keep the title/description.
+**1. Role coverage is dangerously thin.** Only `super_admin` has the full 64 permissions. `cido` has 15, `finance` has 6, `inspection_manager` has 9. Many real-world flows will silently fail for non-super-admin users.
 
-## 3. Pending Approvals — make it work smoothly
+**2. 15 of 21 admin pages have zero permission checks.** They rely solely on the sidebar hiding the link, which is **not security** — anyone can deep-link the URL. Affected pages:
+```
+AdminBilling, Applications, AuditLogs, Blogs, Certificates,
+CertificateDetail, Enforcement (already ok via sidebar?), IngredientTracker,
+InspectionDetail, Inspectors, Supervisors, AdminSupportCenter,
+AdminSupportTickets, AdminSupportChats, AdminSupervisorReportDetail
+```
 
-Current issues found in `PendingApprovals.tsx`:
-- Joins `recommender` but never selects it — the `recommender_id` is shown raw. Fix by joining `profiles` via `recommender_id` for the recommender name/email.
-- `handleAction` updates `approval_requests` but does **not** advance the parent application or trigger certificate issuance. Add: on approve, set `certification_applications.status = 'approved'` for the linked application; on reject, set to `'rejected'` and write `application_status_history`.
-- Add empty-state polish, loading skeleton, and a refresh button.
-- Surface dual-control violation inline (disable Approve button if `recommender_id === user.id` instead of only toasting).
-- Wrap `log_audit` in try/catch so a logging failure doesn't break the action.
+**3. Sidebar key mismatches.**
+- "Pending Approvals" gated on `canIssueCertificates` — should be `canApproveApplications`.
+- "Ingredient Tracker" gated on `canViewApplications` — no dedicated permission exists.
+- "Blog CMS" gated on `canManageSettings` — no `blogs.*` permission category exists.
+- "Supervisors" reuses `canManageUsers` — no `supervisors.*` permission exists.
 
-## 4. Inspector dialogues — remove Specializations & Regions
+**4. Missing permission categories in DB.** `blogs.*`, `supervisors.*`, `ingredients.*`, `quotations.*`, `invoices.*` do not exist as discrete permissions, so the matrix in Roles & Permissions cannot grant fine-grained access for these modules.
 
-In `src/admin/pages/Inspectors.tsx`:
-- Remove the Specializations and Regions blocks from both the **Invite Inspector** form (~lines 605–635) and the **Edit Inspector** dialogue (~lines 480–510).
-- Remove the fields from `form` initial state, from the invite payload sent to `send-inspector-invitation`, and from the update payload to `inspectors` table.
-- Remove the columns from the inspector list/table display if shown.
-- Edge function `send-inspector-invitation` and `accept-inspector-invitation`: stop requiring/writing `specializations` and `regions` (leave DB columns intact, just default to empty arrays for backward compatibility).
+**5. Action-level checks missing on mutations.** Buttons that issue/revoke certificates, approve applications, send invoices, schedule inspections, suspend users etc. are rendered unconditionally inside pages and rely on RLS at the DB layer (which is the right backstop, but UX-wise users see buttons that 403).
 
-## 5. Ingredient Tracker — make it work end-to-end
+**6. Workflow stage permissions only configured for `super_admin` and partially `cido`.** `finance` and `inspection_manager` have NO workflow stage assignments → `can_perform_workflow_action` will return false for every stage transition for them.
 
-**Current wiring (verified):**
-- Tables `supervisor_ingredient_collections` and `supervisor_collected_ingredients` exist but are **empty** (0 rows).
-- Supervisors create collections via `src/pages/supervisor/SupervisorIngredientForm.tsx` → `SupervisorIngredients.tsx`.
-- Admin page `IngredientTracker.tsx` reads those collections and calls `analyze-ingredients` edge function (Lovable AI) to classify each ingredient as halal / haram / mashbooh.
+**7. `inspection_manager` role display name has typo** ("inspection Manager" — lower-case i).
 
-**Why it appears broken:** No supervisor has submitted a collection yet, so the admin list is empty — not a bug, but the UX gives no guidance.
+---
 
-**Fixes:**
-- In `IngredientTracker.tsx`:
-  - Improve empty state: explain that collections are created by supervisors during inspections, with a link to Supervisors page.
-  - Add a status filter that actually works (currently `statusFilter` state exists but isn't applied to the query).
-  - Show product/brand/organization, ingredient counts, and last-analyzed timestamp in the table.
-  - In the detail dialog, show each ingredient with classification badge, confidence, source notes, and an "Re-analyze" button per ingredient.
-  - After AI analysis, persist the classification to `supervisor_collected_ingredients` (`classification`, `confidence`, `notes`) and update the parent collection's `status` to `analyzed` or `flagged` (if any haram).
-- In `analyze-ingredients` edge function: confirm it returns per-ingredient results and writes them back; if not, add an upsert step using service role.
-- Add a "Send to Supervisor" action that creates a row in `inspection_notifications` so the supervisor sees the AI verdict.
-- Verify RLS on both tables allows admin SELECT (and admin UPDATE for writing classifications).
+## Remediation Plan (build mode)
 
-## Technical Notes
+### Phase A — Database hardening (1 migration)
 
-- Files to create:
-  - `src/admin/pages/CertificateDetail.tsx`
-- Files to edit:
-  - `src/App.tsx` (new route)
-  - `src/admin/pages/Applications.tsx` (remove button)
-  - `src/admin/pages/PendingApprovals.tsx` (joins, app status update, UX)
-  - `src/admin/pages/Inspectors.tsx` (drop specializations/regions UI + payloads)
-  - `src/admin/pages/IngredientTracker.tsx` (filter, empty state, persist results, notify)
-  - `supabase/functions/send-inspector-invitation/index.ts` (drop fields)
-  - `supabase/functions/accept-inspector-invitation/index.ts` (drop fields)
-  - `supabase/functions/analyze-ingredients/index.ts` (persist classifications)
-- DB: no schema changes required. RLS on `certificates` already allows `certificates.update` permission for status changes; ingredient tables already allow admin access.
+1. **Add missing permission categories** (idempotent INSERTs):
+   - `blogs.view`, `blogs.create`, `blogs.update`, `blogs.delete`, `blogs.publish`
+   - `supervisors.view`, `supervisors.manage`, `supervisors.invite`, `supervisors.delete`
+   - `ingredients.view`, `ingredients.analyze`, `ingredients.manage`
+   - `quotations.view`, `quotations.create`, `quotations.send`, `quotations.approve`
+   - `invoices.view`, `invoices.create`, `invoices.send`, `invoices.void`
+   - `payments.view`, `payments.record`, `payments.refund`
+   - `dashboard.view` (baseline for all admin roles)
+
+2. **Seed sensible defaults for existing non-super roles** so they are usable out of the box:
+   - `cido` (Chief Inspection & Documentation Officer): full applications, documentation, inspections, certificates, enforcement, blogs.view, dashboard.view, audit_logs.view, supervisors.view.
+   - `finance`: full finance/quotations/invoices/payments + applications.view, certificates.view, dashboard.view.
+   - `inspection_manager`: full inspections + inspectors.manage, supervisors.manage, applications.view, dashboard.view, audit_logs.view.
+
+3. **Seed workflow_stage_permissions** for `cido`, `finance`, `inspection_manager` across all 7 stages so the workflow engine returns true where appropriate.
+
+4. **Fix typo**: update `admin_roles.display_name` for `inspection_manager` → "Inspection Manager".
+
+### Phase B — Permission map & UI gating
+
+5. **Extend `src/admin/lib/permissions.ts`**:
+   - Add `Permission` keys for new categories (canViewBlogs, canManageBlogs, canViewSupervisors, canManageSupervisors, canViewIngredients, canManageIngredients, canViewQuotations, canCreateQuotations, canViewInvoices, canCreateInvoices, canViewPayments, canViewDashboard).
+   - Add corresponding entries in `CODE_TO_KEY`.
+
+6. **Fix sidebar gating** (`AdminSidebar.tsx`):
+   - Pending Approvals → `canApproveApplications`
+   - Ingredient Tracker → `canViewIngredients`
+   - Blog CMS → `canViewBlogs`
+   - Supervisors → `canViewSupervisors`
+   - Accountant → `canViewFinance` (unchanged, already correct)
+
+### Phase C — Page-level guards (the critical UX/security fix)
+
+7. **Create reusable guard component** `src/admin/components/PermissionGate.tsx`:
+   ```tsx
+   <PermissionGate require="canViewCertificates" fallback={<AccessDenied/>}>
+     {children}
+   </PermissionGate>
+   ```
+   And `src/admin/components/AccessDenied.tsx` (consistent 403 screen).
+
+8. **Wrap every admin page top-level** with the appropriate permission requirement:
+   | Page | Required |
+   |---|---|
+   | Applications, ApplicationDetail | canViewApplications |
+   | Certificates, CertificateDetail | canViewCertificates |
+   | Inspections, InspectionDetail | canViewInspections |
+   | Inspectors | canManageInspectors |
+   | Supervisors | canViewSupervisors |
+   | Enforcement | canViewEnforcement |
+   | AdminBilling | canViewFinance |
+   | AuditLogs | canViewAuditLogs |
+   | Blogs | canViewBlogs |
+   | IngredientTracker | canViewIngredients |
+   | AdminSupport* | canViewSupport |
+   | PendingApprovals | canApproveApplications |
+   | AdminSupervisorReportDetail | canViewSupervisors |
+
+9. **Action-level button gating** on mutation buttons inside pages (hide or disable with tooltip):
+   - Issue / Revoke / Suspend on `CertificateDetail` → `canIssueCertificates` / `canRevokeCertificates`.
+   - Approve / Reject on `PendingApprovals` and `ApplicationDetail` → `canApproveApplications` / `canRejectApplications`.
+   - Schedule inspection on `Inspections` → `canScheduleInspections`.
+   - Invite/Edit/Remove inspector on `Inspectors` → `canManageInspectors`.
+   - Create/Send invoice / quotation / record payment in `AdminBilling` tabs → respective new permissions.
+   - Publish blog in `Blogs` → `canManageBlogs` (or new `blogs.publish`).
+
+### Phase D — Verification
+
+10. **Manual matrix test** with the existing `cido` user after Phase A seeding: log in, walk every sidebar item, confirm correct access vs. denial.
+11. **Run Supabase linter** to catch any RLS regression introduced by the migration.
+12. **Add an "Effective Permissions" panel** on `RolesPermissions` page (read-only summary of what a role can do, derived from `permissions` + `role_permissions` + `workflow_stage_permissions`) — so admins can audit roles visually.
+
+---
+
+## Out of Scope (for this pass)
+- Re-architecting workflow stages (current 7-stage model is sufficient).
+- Migrating to Clerk JWT (memory note exists; not requested here).
+- Client/Inspector/Supervisor portal RBAC (those use separate guards; this audit is admin-only as requested).
+
+---
+
+## Deliverables
+- 1 SQL migration (Phase A).
+- Updated `permissions.ts`, `AdminSidebar.tsx` (Phase B).
+- New `PermissionGate.tsx` + `AccessDenied.tsx`, page wrappers across ~15 pages, action-level guards on ~10 buttons (Phase C).
+- Fix `inspection_manager` display name typo.
+- Brief verification notes after implementation.
+
+Approve to proceed and I'll implement Phases A–C in one pass, then verify.
