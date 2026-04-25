@@ -33,6 +33,7 @@ import PendingPricingTab from '../components/accountant/PendingPricingTab';
 import SubscriptionsTab from '../components/accountant/SubscriptionsTab';
 import QuotationsTab from '../components/accountant/QuotationsTab';
 import { OrgCombobox } from '../components/OrgCombobox';
+import { InvoiceFormDialog } from '../components/billing/InvoiceFormDialog';
 
 // --- Validity helpers ---
 const VALIDITY_MONTHS: Record<string, number> = {
@@ -487,118 +488,15 @@ export default function AdminBilling() {
             <h1 className="text-2xl font-bold font-serif flex items-center gap-2"><Calculator className="h-6 w-6" /> Accountant</h1>
             <p className="text-muted-foreground">Pricing, invoices, subscriptions, quotations and payment reconciliation.</p>
           </div>
-          <Dialog open={showCreate} onOpenChange={setShowCreate}>
-            <DialogTrigger asChild>
-              <Button><Plus className="mr-2 h-4 w-4" /> Create Invoice</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>Create New Invoice</DialogTitle></DialogHeader>
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label>Organization *</Label>
-                  <OrgCombobox
-                    options={orgs}
-                    value={newInvoice.organization_id}
-                    onChange={(v) => setNewInvoice(p => ({ ...p, organization_id: v }))}
-                  />
-                </div>
-                <div>
-                  <Label>Fee Type *</Label>
-                  <Select
-                    value={newInvoice.fee_type}
-                    onValueChange={(v) => setNewInvoice(p => {
-                      const next = { ...p, fee_type: v };
-                      if (!needsValidity(v)) {
-                        next.validity_period = '';
-                        next.expiry_date = '';
-                      } else if (!next.start_date) {
-                        next.start_date = todayStr();
-                      }
-                      return next;
-                    })}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="application_fee">Application Fee</SelectItem>
-                      <SelectItem value="inspection">Inspection Fee</SelectItem>
-                      <SelectItem value="certification">Certification Fee</SelectItem>
-                      <SelectItem value="subscription">Subscription Fee</SelectItem>
-                      <SelectItem value="other">Other Services Charge</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {needsValidity(newInvoice.fee_type) && (
-                  <>
-                    <div>
-                      <Label>Validity Period *</Label>
-                      <Select
-                        value={newInvoice.validity_period}
-                        onValueChange={(v) => setNewInvoice(p => ({
-                          ...p,
-                          validity_period: v,
-                          expiry_date: addMonthsStr(p.start_date || todayStr(), VALIDITY_MONTHS[v] || 0),
-                        }))}
-                      >
-                        <SelectTrigger><SelectValue placeholder="Select validity period" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1_quarter">1 Quarter (3 months)</SelectItem>
-                          <SelectItem value="2_quarter">2 Quarters (6 months)</SelectItem>
-                          <SelectItem value="3_quarter">3 Quarters (9 months)</SelectItem>
-                          <SelectItem value="4_quarter">4 Quarters (12 months)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label>Start Date *</Label>
-                        <Input
-                          type="date"
-                          value={newInvoice.start_date}
-                          onChange={(e) => setNewInvoice(p => ({
-                            ...p,
-                            start_date: e.target.value,
-                            expiry_date: p.validity_period
-                              ? addMonthsStr(e.target.value, VALIDITY_MONTHS[p.validity_period] || 0)
-                              : p.expiry_date,
-                          }))}
-                        />
-                      </div>
-                      <div>
-                        <Label>Expiry Date *</Label>
-                        <Input
-                          type="date"
-                          value={newInvoice.expiry_date}
-                          onChange={(e) => setNewInvoice(p => ({ ...p, expiry_date: e.target.value }))}
-                        />
-                        <p className="text-[11px] text-muted-foreground mt-1">Auto-filled. Editable.</p>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div>
-                  <Label>Amount (ZMW) *</Label>
-                  <Input type="number" step="0.01" min="0" value={newInvoice.amount} onChange={(e) => setNewInvoice(p => ({ ...p, amount: e.target.value }))} />
-                </div>
-                <div>
-                  <Label>Due Date *</Label>
-                  <Input type="date" value={newInvoice.due_date} onChange={(e) => setNewInvoice(p => ({ ...p, due_date: e.target.value }))} />
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <Textarea value={newInvoice.description} onChange={(e) => setNewInvoice(p => ({ ...p, description: e.target.value }))} placeholder="Optional description..." />
-                </div>
-              </div>
-              <DialogFooter>
-                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                <Button onClick={handleCreateInvoice} disabled={isCreating}>
-                  {isCreating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Create Invoice
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Create Invoice
+          </Button>
+          <InvoiceFormDialog
+            open={showCreate}
+            onOpenChange={setShowCreate}
+            orgs={orgs}
+            onSaved={fetchData}
+          />
         </div>
 
         {/* Stats */}
@@ -864,127 +762,13 @@ export default function AdminBilling() {
           </DialogContent>
         </Dialog>
 
-        {/* Edit Invoice Dialog */}
-        <Dialog open={!!editInvoice} onOpenChange={(open) => !open && setEditInvoice(null)}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Edit Invoice</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label>Organization *</Label>
-                <OrgCombobox
-                  options={orgs}
-                  value={editForm.organization_id}
-                  onChange={(v) => setEditForm(p => ({ ...p, organization_id: v }))}
-                />
-              </div>
-              <div>
-                <Label>Fee Type *</Label>
-                <Select
-                  value={editForm.fee_type}
-                  onValueChange={(v) => setEditForm(p => {
-                    const next = { ...p, fee_type: v };
-                    if (!needsValidity(v)) {
-                      next.validity_period = '';
-                      next.expiry_date = '';
-                    } else if (!next.start_date) {
-                      next.start_date = todayStr();
-                    }
-                    return next;
-                  })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="application_fee">Application Fee</SelectItem>
-                    <SelectItem value="inspection">Inspection Fee</SelectItem>
-                    <SelectItem value="certification">Certification Fee</SelectItem>
-                    <SelectItem value="subscription">Subscription Fee</SelectItem>
-                    <SelectItem value="other">Other Services Charge</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {needsValidity(editForm.fee_type) && (
-                <>
-                  <div>
-                    <Label>Validity Period *</Label>
-                    <Select
-                      value={editForm.validity_period}
-                      onValueChange={(v) => setEditForm(p => ({
-                        ...p,
-                        validity_period: v,
-                        expiry_date: addMonthsStr(p.start_date || todayStr(), VALIDITY_MONTHS[v] || 0),
-                      }))}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Select validity period" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1_quarter">1 Quarter (3 months)</SelectItem>
-                        <SelectItem value="2_quarter">2 Quarters (6 months)</SelectItem>
-                        <SelectItem value="3_quarter">3 Quarters (9 months)</SelectItem>
-                        <SelectItem value="4_quarter">4 Quarters (12 months)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label>Start Date *</Label>
-                      <Input
-                        type="date"
-                        value={editForm.start_date}
-                        onChange={(e) => setEditForm(p => ({
-                          ...p,
-                          start_date: e.target.value,
-                          expiry_date: p.validity_period
-                            ? addMonthsStr(e.target.value, VALIDITY_MONTHS[p.validity_period] || 0)
-                            : p.expiry_date,
-                        }))}
-                      />
-                    </div>
-                    <div>
-                      <Label>Expiry Date *</Label>
-                      <Input
-                        type="date"
-                        value={editForm.expiry_date}
-                        onChange={(e) => setEditForm(p => ({ ...p, expiry_date: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <div>
-                <Label>Amount (ZMW) *</Label>
-                <Input type="number" step="0.01" min="0" value={editForm.amount} onChange={(e) => setEditForm(p => ({ ...p, amount: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Due Date *</Label>
-                <Input type="date" value={editForm.due_date} onChange={(e) => setEditForm(p => ({ ...p, due_date: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Status *</Label>
-                <Select value={editForm.status} onValueChange={(v) => setEditForm(p => ({ ...p, status: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Description</Label>
-                <Textarea value={editForm.description} onChange={(e) => setEditForm(p => ({ ...p, description: e.target.value }))} placeholder="Optional description..." />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditInvoice(null)}>Cancel</Button>
-              <Button onClick={handleSaveEdit} disabled={isSaving}>
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Save Changes
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <InvoiceFormDialog
+          open={!!editInvoice}
+          onOpenChange={(open) => !open && setEditInvoice(null)}
+          orgs={orgs}
+          invoiceId={editInvoice?.id || null}
+          onSaved={fetchData}
+        />
 
         {/* Delete Confirmation */}
         <AlertDialog open={!!deleteInvoice} onOpenChange={(open) => !open && setDeleteInvoice(null)}>
