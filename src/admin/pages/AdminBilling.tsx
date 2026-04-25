@@ -478,6 +478,7 @@ export default function AdminBilling() {
     if (!editInvoice) return;
     setIsSaving(true);
     try {
+      const usesValidity = needsValidity(editForm.fee_type);
       const updateData: any = {
         organization_id: editForm.organization_id,
         fee_type: editForm.fee_type,
@@ -485,8 +486,12 @@ export default function AdminBilling() {
         amount: parseFloat(editForm.amount),
         due_date: editForm.due_date,
         status: editForm.status,
+        validity_period: usesValidity ? (editForm.validity_period || null) : null,
+        start_date: usesValidity ? (editForm.start_date || null) : null,
+        expiry_date: usesValidity ? (editForm.expiry_date || null) : null,
       };
-      if (editForm.status === 'paid' && editInvoice.status !== 'paid') updateData.paid_at = new Date().toISOString();
+      const becamePaid = editForm.status === 'paid' && editInvoice.status !== 'paid';
+      if (becamePaid) updateData.paid_at = new Date().toISOString();
       const { error } = await supabase.from('invoices').update(updateData).eq('id', editInvoice.id);
       if (error) throw error;
       if (editInvoice.application_id && editForm.validity_period) {
@@ -500,6 +505,7 @@ export default function AdminBilling() {
         performed_by: (await supabase.auth.getUser()).data.user?.id,
         metadata: { changes: editForm },
       });
+      if (becamePaid) await triggerCertificateIssuance(editInvoice.id);
       toast({ title: 'Updated', description: 'Invoice updated successfully.' });
       setEditInvoice(null);
       fetchData();
