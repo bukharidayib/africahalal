@@ -149,49 +149,6 @@ export function MoMoPaymentDialog({
     }
   };
 
-  const handleOfflineSubmit = async () => {
-    if (!offlineFile) return;
-    setIsSubmittingOffline(true);
-    setPaymentState("processing");
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("You must be logged in.");
-
-      const fileExt = offlineFile.name.split('.').pop();
-      const filePath = `${user.id}/offline-payments/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("application-documents")
-        .upload(filePath, offlineFile, { upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const { error: insertError } = await supabase
-        .from("offline_payments")
-        .insert({
-          invoice_id: invoiceId,
-          sender_name: offlineSenderName.trim(),
-          sender_phone: offlineSenderPhone.trim(),
-          amount,
-          transaction_reference: offlineTxRef.trim() || null,
-          screenshot_path: filePath,
-          notes: offlineNotes.trim() || null,
-          submitted_by: user.id,
-        });
-
-      if (insertError) throw insertError;
-
-      setPaymentState("success");
-      setMessage("Your payment proof has been submitted for review. You will be notified once it's approved.");
-    } catch (err: any) {
-      setPaymentState("error");
-      setMessage(err.message || "Failed to submit payment proof.");
-      toast({ variant: "destructive", title: "Submission Error", description: err.message });
-    } finally {
-      setIsSubmittingOffline(false);
-    }
-  };
 
   const handleCheckStatus = async () => {
     if (!transactionId || isCheckingStatus) return;
