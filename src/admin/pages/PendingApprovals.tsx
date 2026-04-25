@@ -255,7 +255,7 @@ export default function PendingApprovals() {
                     <div className="text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <User className="h-4 w-4" />
-                        Recommended {format(new Date(approval.created_at), 'dd MMM yyyy HH:mm')}
+                        Recommended by {approval.recommender?.full_name || approval.recommender?.email || 'Unknown'} · {format(new Date(approval.created_at), 'dd MMM yyyy HH:mm')}
                       </span>
                     </div>
 
