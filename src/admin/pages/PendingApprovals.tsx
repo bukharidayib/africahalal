@@ -163,11 +163,16 @@ export default function PendingApprovals() {
     <AdminLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold font-serif">Pending Approvals</h1>
-          <p className="text-muted-foreground">
-            Dual-control approval queue for certificate issuance
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold font-serif">Pending Approvals</h1>
+            <p className="text-muted-foreground">
+              Dual-control approval queue for certificate issuance
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchApprovals} disabled={isLoading}>
+            <Clock className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
         </div>
 
         {/* Info Card */}
