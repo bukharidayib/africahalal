@@ -374,117 +374,16 @@ export function MoMoPaymentDialog({
               </>
             )}
 
-            {/* Offline / Manual Payment Form */}
-            {paymentMethod === "offline" && (
-              <div className="space-y-3">
-                {/* Compact merchant info */}
-                <div className="flex items-center gap-3 rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
-                  <Banknote className="h-4 w-4 text-primary shrink-0" />
-                  <p className="text-xs text-foreground">
-                    Send to: <span className="font-semibold">African Halal</span> — Acc: <span className="font-mono font-bold">1092045</span>
-                  </p>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto shrink-0" onClick={() => copyToClipboard("1092045")}>
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-
-                {/* Two-column layout for name & phone */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Sender Name *</Label>
-                    <Input
-                      placeholder="Full name"
-                      value={offlineSenderName}
-                      onChange={(e) => setOfflineSenderName(e.target.value.slice(0, 100))}
-                      maxLength={100}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Phone Number *</Label>
-                    <Input
-                      placeholder="Phone number"
-                      value={offlineSenderPhone}
-                      onChange={(e) => setOfflineSenderPhone(e.target.value.replace(/[^0-9+\-\s]/g, "").slice(0, 20))}
-                      maxLength={20}
-                    />
-                  </div>
-                </div>
-
-                {/* Two-column: amount & reference */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Amount</Label>
-                    <Input
-                      value={`${currency} ${Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
-                      disabled
-                      className="bg-muted"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Reference (optional)</Label>
-                    <Input
-                      placeholder="Confirmation code"
-                      value={offlineTxRef}
-                      onChange={(e) => setOfflineTxRef(e.target.value.slice(0, 100))}
-                      maxLength={100}
-                    />
-                  </div>
-                </div>
-
-                {/* Notes - single row */}
-                <div className="space-y-1">
-                  <Label className="text-xs">Notes (optional)</Label>
-                  <Input
-                    placeholder="Any additional details"
-                    value={offlineNotes}
-                    onChange={(e) => setOfflineNotes(e.target.value.slice(0, 500))}
-                    maxLength={500}
-                  />
-                </div>
-
-                {/* File upload - compact */}
-                <div className="space-y-1">
-                  <Label className="text-xs">Payment Screenshot *</Label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*,.pdf"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file && file.size <= 5 * 1024 * 1024) {
-                        setOfflineFile(file);
-                      } else if (file) {
-                        toast({ variant: "destructive", title: "File too large", description: "Max 5MB." });
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {offlineFile ? offlineFile.name : "Upload screenshot or receipt"}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">Accepted: images or PDF, max 5MB</p>
-                </div>
+            <div className="rounded-lg bg-muted/50 p-3 text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Amount</span>
+                <span className="font-semibold">{currency} {Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
               </div>
-            )}
-
-            {paymentMethod !== "offline" && (
-              <div className="rounded-lg bg-muted/50 p-3 text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount</span>
-                  <span className="font-semibold">{currency} {Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Invoice</span>
-                  <span className="font-mono text-xs">{invoiceNumber}</span>
-                </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Invoice</span>
+                <span className="font-mono text-xs">{invoiceNumber}</span>
               </div>
-            )}
+            </div>
           </div>
         )}
 
