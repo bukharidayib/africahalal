@@ -103,6 +103,9 @@ interface Invoice {
   paid_at: string | null;
   organization_id: string;
   application_id: string | null;
+  start_date?: string | null;
+  expiry_date?: string | null;
+  validity_period?: string | null;
   organizations?: { name: string } | null;
   certification_applications?: { application_number: string; validity_period: string | null } | null;
 }
