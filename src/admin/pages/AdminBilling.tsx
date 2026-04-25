@@ -328,17 +328,6 @@ export default function AdminBilling() {
 
   const handleOpenEdit = (inv: Invoice) => {
     setEditInvoice(inv);
-    setEditForm({
-      organization_id: inv.organization_id,
-      fee_type: inv.fee_type,
-      description: inv.description || '',
-      amount: String(inv.amount),
-      due_date: inv.due_date,
-      status: inv.status,
-      validity_period: inv.validity_period || inv.certification_applications?.validity_period || '',
-      start_date: inv.start_date || todayStr(),
-      expiry_date: inv.expiry_date || '',
-    });
   };
 
   const handleSaveEdit = async () => {
