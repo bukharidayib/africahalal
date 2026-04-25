@@ -174,20 +174,63 @@ export default function BusinessDetail() {
                   )}
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader><CardTitle>Owner</CardTitle></CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  {owner ? (
-                    <>
-                      <Field label="Full Name" value={owner.full_name || '—'} />
-                      <Field icon={Mail} label="Email" value={owner.email} />
-                      <Field label="Account Created" value={format(new Date(biz.created_at), 'dd MMM yyyy')} />
-                    </>
-                  ) : (
-                    <p className="text-muted-foreground">No owner record found.</p>
-                  )}
-                </CardContent>
-              </Card>
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader><CardTitle>Owner</CardTitle></CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    {owner ? (
+                      <>
+                        <Field label="Full Name" value={owner.full_name || '—'} />
+                        <Field icon={Mail} label="Email" value={owner.email} />
+                        <Field label="Account Created" value={format(new Date(biz.created_at), 'dd MMM yyyy')} />
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground">No owner record found.</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Manual Subscription / Validity Panel */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CalendarDays className="h-5 w-5 text-primary" /> Subscription / Validity
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const active = certs.find((c) => c.status === 'active');
+                      if (!active) {
+                        return <p className="text-sm text-muted-foreground">No active certificate. Issue a certificate from the Applications tab to start a subscription.</p>;
+                      }
+                      const daysLeft = Math.ceil((new Date(active.expiry_date).getTime() - Date.now()) / 86400000);
+                      return (
+                        <div className="space-y-3 text-sm">
+                          <Field icon={Award} label="Active Certificate" value={<span className="font-mono">{active.certificate_number}</span>} />
+                          <div className="grid grid-cols-2 gap-3">
+                            <Field label="Issued" value={format(new Date(active.issue_date), 'dd MMM yyyy')} />
+                            <Field label="Expires" value={
+                              <span className={daysLeft < 30 ? 'text-destructive font-semibold' : ''}>
+                                {format(new Date(active.expiry_date), 'dd MMM yyyy')} ({daysLeft}d)
+                              </span>
+                            } />
+                          </div>
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setEditValidity({
+                              id: active.id, issue_date: active.issue_date,
+                              expiry_date: active.expiry_date, status: active.status,
+                            })}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" /> Set / Extend Validity
+                          </Button>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
 
