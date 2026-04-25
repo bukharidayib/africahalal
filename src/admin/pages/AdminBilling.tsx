@@ -32,6 +32,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PendingPricingTab from '../components/accountant/PendingPricingTab';
 import SubscriptionsTab from '../components/accountant/SubscriptionsTab';
 import QuotationsTab from '../components/accountant/QuotationsTab';
+import { OrgCombobox } from '../components/OrgCombobox';
+
+// --- Validity helpers ---
+const VALIDITY_MONTHS: Record<string, number> = {
+  '1_quarter': 3, '2_quarter': 6, '3_quarter': 9, '4_quarter': 12,
+};
+const validityLabel = (v: string) => ({
+  '1_quarter': '1 Quarter (3 months)',
+  '2_quarter': '2 Quarters (6 months)',
+  '3_quarter': '3 Quarters (9 months)',
+  '4_quarter': '4 Quarters (12 months)',
+} as Record<string, string>)[v] || v;
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const addMonthsStr = (dateStr: string, months: number) => {
+  if (!dateStr || !months) return '';
+  const d = new Date(dateStr);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+};
+const needsValidity = (feeType: string) =>
+  feeType === 'certification' || feeType === 'subscription';
 
 // --- ZynlePay response code map ---
 const ZYNLE_CODES: Record<string, { description: string; color: 'green' | 'yellow' | 'red' }> = {
@@ -82,6 +103,9 @@ interface Invoice {
   paid_at: string | null;
   organization_id: string;
   application_id: string | null;
+  start_date?: string | null;
+  expiry_date?: string | null;
+  validity_period?: string | null;
   organizations?: { name: string } | null;
   certification_applications?: { application_number: string; validity_period: string | null } | null;
 }
@@ -127,6 +151,8 @@ export default function AdminBilling() {
     amount: '',
     due_date: '',
     validity_period: '',
+    start_date: todayStr(),
+    expiry_date: '',
   });
   const [isCreating, setIsCreating] = useState(false);
 
@@ -137,7 +163,7 @@ export default function AdminBilling() {
 
   // Edit dialog
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
-  const [editForm, setEditForm] = useState({ organization_id: '', fee_type: '', description: '', amount: '', due_date: '', status: '', validity_period: '' });
+  const [editForm, setEditForm] = useState({ organization_id: '', fee_type: '', description: '', amount: '', due_date: '', status: '', validity_period: '', start_date: '', expiry_date: '' });
   const [isSaving, setIsSaving] = useState(false);
 
   // Delete dialog
@@ -331,6 +357,13 @@ export default function AdminBilling() {
           performed_by: user?.id,
           metadata: { offline_payment_id: reviewingPayment.id, sender_name: reviewingPayment.sender_name },
         });
+
+        // Trigger certificate issuance + receipt/cert emails for certification invoices
+        try {
+          await supabase.functions.invoke('issue-certificate-on-payment', {
+            body: { invoice_id: reviewingPayment.invoice_id },
+          });
+        } catch (e) { console.warn('issue-certificate-on-payment failed', e); }
       }
 
       toast({ title: reviewAction === 'approve' ? 'Payment Approved' : 'Payment Rejected', description: `Offline payment has been ${reviewAction === 'approve' ? 'approved' : 'rejected'}.` });
@@ -375,14 +408,28 @@ export default function AdminBilling() {
     }
   };
 
+  // Helper: invoke certificate issuance after a payment
+  const triggerCertificateIssuance = async (invoiceId: string) => {
+    try {
+      await supabase.functions.invoke('issue-certificate-on-payment', { body: { invoice_id: invoiceId } });
+    } catch (e) {
+      console.warn('issue-certificate-on-payment failed', e);
+    }
+  };
+
   const handleCreateInvoice = async () => {
     if (!newInvoice.organization_id || !newInvoice.amount || !newInvoice.due_date) {
       toast({ variant: 'destructive', title: 'Missing fields', description: 'Please fill all required fields.' });
       return;
     }
+    if (needsValidity(newInvoice.fee_type) && !newInvoice.validity_period) {
+      toast({ variant: 'destructive', title: 'Missing fields', description: 'Validity period is required for this fee type.' });
+      return;
+    }
     setIsCreating(true);
     try {
       const { data: invNum } = await supabase.rpc('generate_invoice_number');
+      const usesValidity = needsValidity(newInvoice.fee_type);
       const { error } = await supabase.from('invoices').insert({
         invoice_number: invNum as string,
         organization_id: newInvoice.organization_id,
@@ -390,11 +437,14 @@ export default function AdminBilling() {
         description: newInvoice.description || null,
         amount: parseFloat(newInvoice.amount),
         due_date: newInvoice.due_date,
+        validity_period: usesValidity ? newInvoice.validity_period : null,
+        start_date: usesValidity ? (newInvoice.start_date || todayStr()) : null,
+        expiry_date: usesValidity ? (newInvoice.expiry_date || null) : null,
       });
       if (error) throw error;
       toast({ title: 'Invoice Created', description: `Invoice ${invNum} has been created.` });
       setShowCreate(false);
-      setNewInvoice({ organization_id: '', fee_type: 'certification', description: '', amount: '', due_date: '', validity_period: '' });
+      setNewInvoice({ organization_id: '', fee_type: 'certification', description: '', amount: '', due_date: '', validity_period: '', start_date: todayStr(), expiry_date: '' });
       fetchData();
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -425,7 +475,9 @@ export default function AdminBilling() {
       amount: String(inv.amount),
       due_date: inv.due_date,
       status: inv.status,
-      validity_period: inv.certification_applications?.validity_period || '',
+      validity_period: inv.validity_period || inv.certification_applications?.validity_period || '',
+      start_date: inv.start_date || todayStr(),
+      expiry_date: inv.expiry_date || '',
     });
   };
 
@@ -433,6 +485,7 @@ export default function AdminBilling() {
     if (!editInvoice) return;
     setIsSaving(true);
     try {
+      const usesValidity = needsValidity(editForm.fee_type);
       const updateData: any = {
         organization_id: editForm.organization_id,
         fee_type: editForm.fee_type,
@@ -440,8 +493,12 @@ export default function AdminBilling() {
         amount: parseFloat(editForm.amount),
         due_date: editForm.due_date,
         status: editForm.status,
+        validity_period: usesValidity ? (editForm.validity_period || null) : null,
+        start_date: usesValidity ? (editForm.start_date || null) : null,
+        expiry_date: usesValidity ? (editForm.expiry_date || null) : null,
       };
-      if (editForm.status === 'paid' && editInvoice.status !== 'paid') updateData.paid_at = new Date().toISOString();
+      const becamePaid = editForm.status === 'paid' && editInvoice.status !== 'paid';
+      if (becamePaid) updateData.paid_at = new Date().toISOString();
       const { error } = await supabase.from('invoices').update(updateData).eq('id', editInvoice.id);
       if (error) throw error;
       if (editInvoice.application_id && editForm.validity_period) {
@@ -455,6 +512,7 @@ export default function AdminBilling() {
         performed_by: (await supabase.auth.getUser()).data.user?.id,
         metadata: { changes: editForm },
       });
+      if (becamePaid) await triggerCertificateIssuance(editInvoice.id);
       toast({ title: 'Updated', description: 'Invoice updated successfully.' });
       setEditInvoice(null);
       fetchData();
@@ -557,7 +615,7 @@ export default function AdminBilling() {
     const labels: Record<string, string> = {
       application_fee: 'Application Fee', certification: 'Certification Fee',
       subscription: 'Subscription Fee', renewal: 'Renewal Fee',
-      inspection: 'Inspection Fee', other: 'Service Charge',
+      inspection: 'Inspection Fee', other: 'Other Services Charge',
     };
     return labels[type] || type;
   };
@@ -574,42 +632,92 @@ export default function AdminBilling() {
             <DialogTrigger asChild>
               <Button><Plus className="mr-2 h-4 w-4" /> Create Invoice</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Create New Invoice</DialogTitle></DialogHeader>
               <div className="space-y-4 py-4">
                 <div>
                   <Label>Organization *</Label>
-                  <Select value={newInvoice.organization_id} onValueChange={(v) => setNewInvoice(p => ({ ...p, organization_id: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select organization" /></SelectTrigger>
-                    <SelectContent>{orgs.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <OrgCombobox
+                    options={orgs}
+                    value={newInvoice.organization_id}
+                    onChange={(v) => setNewInvoice(p => ({ ...p, organization_id: v }))}
+                  />
                 </div>
                 <div>
                   <Label>Fee Type *</Label>
-                  <Select value={newInvoice.fee_type} onValueChange={(v) => setNewInvoice(p => ({ ...p, fee_type: v }))}>
+                  <Select
+                    value={newInvoice.fee_type}
+                    onValueChange={(v) => setNewInvoice(p => {
+                      const next = { ...p, fee_type: v };
+                      if (!needsValidity(v)) {
+                        next.validity_period = '';
+                        next.expiry_date = '';
+                      } else if (!next.start_date) {
+                        next.start_date = todayStr();
+                      }
+                      return next;
+                    })}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="application_fee">Application Fee</SelectItem>
+                      <SelectItem value="inspection">Inspection Fee</SelectItem>
                       <SelectItem value="certification">Certification Fee</SelectItem>
                       <SelectItem value="subscription">Subscription Fee</SelectItem>
-                      <SelectItem value="renewal">Renewal Fee</SelectItem>
-                      <SelectItem value="inspection">Inspection Fee</SelectItem>
-                      <SelectItem value="other">Other Service Charge</SelectItem>
+                      <SelectItem value="other">Other Services Charge</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label>Certification Validity Period</Label>
-                  <Select value={newInvoice.validity_period} onValueChange={(v) => setNewInvoice(p => ({ ...p, validity_period: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select validity period (optional)" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1_quarter">1 Quarter (3 months)</SelectItem>
-                      <SelectItem value="2_quarter">2 Quarters (6 months)</SelectItem>
-                      <SelectItem value="3_quarter">3 Quarters (9 months)</SelectItem>
-                      <SelectItem value="4_quarter">4 Quarters (12 months)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                {needsValidity(newInvoice.fee_type) && (
+                  <>
+                    <div>
+                      <Label>Validity Period *</Label>
+                      <Select
+                        value={newInvoice.validity_period}
+                        onValueChange={(v) => setNewInvoice(p => ({
+                          ...p,
+                          validity_period: v,
+                          expiry_date: addMonthsStr(p.start_date || todayStr(), VALIDITY_MONTHS[v] || 0),
+                        }))}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Select validity period" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1_quarter">1 Quarter (3 months)</SelectItem>
+                          <SelectItem value="2_quarter">2 Quarters (6 months)</SelectItem>
+                          <SelectItem value="3_quarter">3 Quarters (9 months)</SelectItem>
+                          <SelectItem value="4_quarter">4 Quarters (12 months)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Start Date *</Label>
+                        <Input
+                          type="date"
+                          value={newInvoice.start_date}
+                          onChange={(e) => setNewInvoice(p => ({
+                            ...p,
+                            start_date: e.target.value,
+                            expiry_date: p.validity_period
+                              ? addMonthsStr(e.target.value, VALIDITY_MONTHS[p.validity_period] || 0)
+                              : p.expiry_date,
+                          }))}
+                        />
+                      </div>
+                      <div>
+                        <Label>Expiry Date *</Label>
+                        <Input
+                          type="date"
+                          value={newInvoice.expiry_date}
+                          onChange={(e) => setNewInvoice(p => ({ ...p, expiry_date: e.target.value }))}
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1">Auto-filled. Editable.</p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <div>
                   <Label>Amount (ZMW) *</Label>
                   <Input type="number" step="0.01" min="0" value={newInvoice.amount} onChange={(e) => setNewInvoice(p => ({ ...p, amount: e.target.value }))} />
@@ -1031,42 +1139,91 @@ export default function AdminBilling() {
 
         {/* Edit Invoice Dialog */}
         <Dialog open={!!editInvoice} onOpenChange={(open) => !open && setEditInvoice(null)}>
-          <DialogContent>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Edit Invoice</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div>
                 <Label>Organization *</Label>
-                <Select value={editForm.organization_id} onValueChange={(v) => setEditForm(p => ({ ...p, organization_id: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{orgs.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent>
-                </Select>
+                <OrgCombobox
+                  options={orgs}
+                  value={editForm.organization_id}
+                  onChange={(v) => setEditForm(p => ({ ...p, organization_id: v }))}
+                />
               </div>
               <div>
                 <Label>Fee Type *</Label>
-                <Select value={editForm.fee_type} onValueChange={(v) => setEditForm(p => ({ ...p, fee_type: v }))}>
+                <Select
+                  value={editForm.fee_type}
+                  onValueChange={(v) => setEditForm(p => {
+                    const next = { ...p, fee_type: v };
+                    if (!needsValidity(v)) {
+                      next.validity_period = '';
+                      next.expiry_date = '';
+                    } else if (!next.start_date) {
+                      next.start_date = todayStr();
+                    }
+                    return next;
+                  })}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="application_fee">Application Fee</SelectItem>
+                    <SelectItem value="inspection">Inspection Fee</SelectItem>
                     <SelectItem value="certification">Certification Fee</SelectItem>
                     <SelectItem value="subscription">Subscription Fee</SelectItem>
-                    <SelectItem value="renewal">Renewal Fee</SelectItem>
-                    <SelectItem value="inspection">Inspection Fee</SelectItem>
-                    <SelectItem value="other">Other Service Charge</SelectItem>
+                    <SelectItem value="other">Other Services Charge</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Certification Validity Period</Label>
-                <Select value={editForm.validity_period} onValueChange={(v) => setEditForm(p => ({ ...p, validity_period: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select validity period (optional)" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1_quarter">1 Quarter (3 months)</SelectItem>
-                    <SelectItem value="2_quarter">2 Quarters (6 months)</SelectItem>
-                    <SelectItem value="3_quarter">3 Quarters (9 months)</SelectItem>
-                    <SelectItem value="4_quarter">4 Quarters (12 months)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
+              {needsValidity(editForm.fee_type) && (
+                <>
+                  <div>
+                    <Label>Validity Period *</Label>
+                    <Select
+                      value={editForm.validity_period}
+                      onValueChange={(v) => setEditForm(p => ({
+                        ...p,
+                        validity_period: v,
+                        expiry_date: addMonthsStr(p.start_date || todayStr(), VALIDITY_MONTHS[v] || 0),
+                      }))}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Select validity period" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1_quarter">1 Quarter (3 months)</SelectItem>
+                        <SelectItem value="2_quarter">2 Quarters (6 months)</SelectItem>
+                        <SelectItem value="3_quarter">3 Quarters (9 months)</SelectItem>
+                        <SelectItem value="4_quarter">4 Quarters (12 months)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Start Date *</Label>
+                      <Input
+                        type="date"
+                        value={editForm.start_date}
+                        onChange={(e) => setEditForm(p => ({
+                          ...p,
+                          start_date: e.target.value,
+                          expiry_date: p.validity_period
+                            ? addMonthsStr(e.target.value, VALIDITY_MONTHS[p.validity_period] || 0)
+                            : p.expiry_date,
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Expiry Date *</Label>
+                      <Input
+                        type="date"
+                        value={editForm.expiry_date}
+                        onChange={(e) => setEditForm(p => ({ ...p, expiry_date: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div>
                 <Label>Amount (ZMW) *</Label>
                 <Input type="number" step="0.01" min="0" value={editForm.amount} onChange={(e) => setEditForm(p => ({ ...p, amount: e.target.value }))} />

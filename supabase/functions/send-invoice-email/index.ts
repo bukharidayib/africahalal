@@ -108,85 +108,61 @@ function buildInvoiceEmailHtml(opts: {
   amount: string;
   dueDate: string;
   payUrl: string;
+  mode: 'invoice' | 'receipt';
 }) {
-  const { invoice, orgName, amount, dueDate, payUrl } = opts;
+  const { invoice, orgName, amount, dueDate, payUrl, mode } = opts;
+  const isReceipt = mode === 'receipt';
   const issueDate = new Date(invoice.created_at || Date.now()).toLocaleDateString('en-GB');
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Invoice ${invoice.invoice_number}</title>
-</head>
-<body style="margin:0;padding:0;background:#f5f5f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f4;padding:32px 12px;">
-  <tr><td align="center">
-    <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(15,46,87,0.08);">
-      <tr><td style="background:#0f2e57;padding:28px 32px;">
-        <table width="100%"><tr>
-          <td style="color:#fff;font-size:18px;font-weight:700;letter-spacing:0.3px;">AFRICAN HALAL INSTITUTE</td>
-          <td align="right" style="color:#c79e3b;font-size:11px;font-weight:600;letter-spacing:1.5px;">INVOICE</td>
-        </tr></table>
-      </td></tr>
-      <tr><td style="height:4px;background:linear-gradient(90deg,#c79e3b 0%,#e7c674 100%);"></td></tr>
-      <tr><td style="padding:36px 32px 8px;">
-        <p style="margin:0 0 4px;color:#6b7280;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Invoice</p>
-        <h1 style="margin:0 0 24px;font-size:26px;color:#0f2e57;font-weight:700;">${invoice.invoice_number}</h1>
-        <p style="margin:0 0 8px;font-size:15px;">Dear <strong>${orgName}</strong>,</p>
-        <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#374151;">
-          Thank you for choosing the African Halal Institute. Please find your invoice attached as a PDF.
-          A summary of charges is shown below.
-        </p>
-      </td></tr>
-      <tr><td style="padding:0 32px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:10px;border:1px solid #eef2f7;">
-          <tr>
-            <td style="padding:18px 22px;border-bottom:1px solid #eef2f7;">
-              <p style="margin:0;color:#6b7280;font-size:11px;letter-spacing:0.8px;text-transform:uppercase;">Amount Due</p>
-              <p style="margin:4px 0 0;color:#c79e3b;font-size:28px;font-weight:700;">${amount}</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:14px 22px;">
-              <table width="100%" style="font-size:13px;color:#374151;">
-                <tr><td style="padding:4px 0;color:#6b7280;">Issue Date</td><td align="right" style="padding:4px 0;font-weight:600;">${issueDate}</td></tr>
-                <tr><td style="padding:4px 0;color:#6b7280;">Due Date</td><td align="right" style="padding:4px 0;font-weight:600;color:#0f2e57;">${dueDate}</td></tr>
-                <tr><td style="padding:4px 0;color:#6b7280;">Reference</td><td align="right" style="padding:4px 0;font-weight:600;font-family:monospace;">${invoice.invoice_number}</td></tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </td></tr>
-      <tr><td style="padding:28px 32px 8px;" align="center">
-        <a href="${payUrl}" style="display:inline-block;background:#c79e3b;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600;font-size:14px;letter-spacing:0.3px;box-shadow:0 4px 12px rgba(199,158,59,0.35);">
-          Pay Invoice Online
-        </a>
-        <p style="margin:14px 0 0;font-size:12px;color:#6b7280;">Mobile Money &middot; Card &middot; Bank Transfer</p>
-      </td></tr>
-      <tr><td style="padding:24px 32px 8px;">
-        <p style="margin:0;font-size:13px;line-height:1.6;color:#4b5563;">
-          You can also sign in to your client portal to track payments, download receipts and manage your certification.
-        </p>
-      </td></tr>
-      <tr><td style="padding:28px 32px 32px;">
-        <table width="100%" style="border-top:1px solid #eef2f7;padding-top:20px;">
-          <tr>
-            <td style="font-size:12px;color:#6b7280;line-height:1.6;">
-              <strong style="color:#0f2e57;">African Halal Institute</strong><br/>
-              Lusaka, Zambia &middot; <a href="mailto:accounts@africanhalaal.com" style="color:#c79e3b;text-decoration:none;">accounts@africanhalaal.com</a><br/>
-              <a href="https://africanhalaal.com" style="color:#c79e3b;text-decoration:none;">africanhalaal.com</a>
-            </td>
-          </tr>
-        </table>
-        <p style="margin:18px 0 0;font-size:11px;color:#9ca3af;text-align:center;">
-          This is an automated message. For queries, reply to this email.
-        </p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
+  const paidDate = invoice.paid_at ? new Date(invoice.paid_at).toLocaleDateString('en-GB') : issueDate;
+  const headerLabel = isReceipt ? 'PAYMENT RECEIPT' : 'INVOICE';
+  const greenAccent = '#1a5c33';
+  const indigoAccent = '#5b5bf2';
+  const intro = isReceipt
+    ? `We've received your payment. Thank you, <strong>${orgName}</strong>! A copy of your receipt is attached.`
+    : `Dear <strong>${orgName}</strong>, please find your invoice attached. A summary of charges is shown below.`;
+
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f4;padding:32px 12px;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(15,46,87,0.08);">
+<tr><td style="background:${greenAccent};padding:28px 32px;color:#fff;">
+  <table width="100%"><tr>
+    <td style="font-size:18px;font-weight:700;letter-spacing:0.3px;">AFRICAN HALAL INSTITUTE</td>
+    <td align="right" style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#fff;opacity:0.95;">${headerLabel}</td>
+  </tr></table>
+</td></tr>
+<tr><td style="height:4px;background:linear-gradient(90deg,${indigoAccent},#8a8aff);"></td></tr>
+<tr><td style="padding:36px 32px 8px;">
+  <p style="margin:0 0 4px;color:#6b7280;font-size:12px;letter-spacing:1px;text-transform:uppercase;">${isReceipt ? 'Receipt' : 'Invoice'}</p>
+  <h1 style="margin:0 0 20px;font-size:26px;color:${greenAccent};font-weight:700;">${invoice.invoice_number}</h1>
+  ${isReceipt ? `<div style="display:inline-block;background:#dcfce7;color:#166534;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;letter-spacing:1px;margin-bottom:14px;">PAID</div>` : ''}
+  <p style="margin:0 0 24px;font-size:14px;line-height:1.65;color:#374151;">${intro}</p>
+</td></tr>
+<tr><td style="padding:0 32px;">
+  <table width="100%" style="background:#f9fafb;border:1px solid #eef2f7;border-radius:10px;">
+    <tr><td style="padding:18px 22px;border-bottom:1px solid #eef2f7;">
+      <p style="margin:0;color:#6b7280;font-size:11px;letter-spacing:0.8px;text-transform:uppercase;">${isReceipt ? 'Amount Paid' : 'Amount Due'}</p>
+      <p style="margin:4px 0 0;color:${indigoAccent};font-size:28px;font-weight:700;">${amount}</p>
+    </td></tr>
+    <tr><td style="padding:14px 22px;">
+      <table width="100%" style="font-size:13px;color:#374151;">
+        <tr><td style="padding:4px 0;color:#6b7280;">Issue Date</td><td align="right" style="padding:4px 0;font-weight:600;">${issueDate}</td></tr>
+        ${isReceipt
+          ? `<tr><td style="padding:4px 0;color:#6b7280;">Paid On</td><td align="right" style="padding:4px 0;font-weight:600;color:${greenAccent};">${paidDate}</td></tr>`
+          : `<tr><td style="padding:4px 0;color:#6b7280;">Due Date</td><td align="right" style="padding:4px 0;font-weight:600;color:${greenAccent};">${dueDate}</td></tr>`}
+        <tr><td style="padding:4px 0;color:#6b7280;">Reference</td><td align="right" style="padding:4px 0;font-weight:600;font-family:monospace;">${invoice.invoice_number}</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</td></tr>
+${isReceipt ? '' : `<tr><td align="center" style="padding:28px 32px 8px;">
+  <a href="${payUrl}" style="display:inline-block;background:${indigoAccent};color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600;font-size:14px;box-shadow:0 4px 12px rgba(91,91,242,0.35);">Pay Invoice Online</a>
+  <p style="margin:14px 0 0;font-size:12px;color:#6b7280;">Mobile Money | Card | Bank Transfer</p>
+</td></tr>`}
+<tr><td style="padding:24px 32px 32px;border-top:1px solid #eef2f7;margin-top:20px;">
+  <p style="margin:0;font-size:12px;color:#6b7280;line-height:1.6;"><strong style="color:${greenAccent};">African Halal Institute</strong><br/>Lusaka, Zambia | <a href="mailto:accounts@africanhalaal.com" style="color:${greenAccent};text-decoration:none;">accounts@africanhalaal.com</a></p>
+  <p style="margin:14px 0 0;font-size:11px;color:#9ca3af;text-align:center;">This is an automated message. For queries, reply to this email.</p>
+</td></tr>
+</table></td></tr></table></body></html>`;
 }
 
 Deno.serve(async (req) => {
