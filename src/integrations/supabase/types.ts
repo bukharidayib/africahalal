@@ -1410,15 +1410,18 @@ export type Database = {
           currency: string
           description: string | null
           due_date: string
+          expiry_date: string | null
           fee_type: string
           id: string
           invoice_number: string
           organization_id: string
           paid_at: string | null
           quotation_id: string | null
+          start_date: string | null
           status: string
           subscription_id: string | null
           updated_at: string
+          validity_period: string | null
         }
         Insert: {
           amount: number
@@ -1428,15 +1431,18 @@ export type Database = {
           currency?: string
           description?: string | null
           due_date: string
+          expiry_date?: string | null
           fee_type: string
           id?: string
           invoice_number: string
           organization_id: string
           paid_at?: string | null
           quotation_id?: string | null
+          start_date?: string | null
           status?: string
           subscription_id?: string | null
           updated_at?: string
+          validity_period?: string | null
         }
         Update: {
           amount?: number
@@ -1446,15 +1452,18 @@ export type Database = {
           currency?: string
           description?: string | null
           due_date?: string
+          expiry_date?: string | null
           fee_type?: string
           id?: string
           invoice_number?: string
           organization_id?: string
           paid_at?: string | null
           quotation_id?: string | null
+          start_date?: string | null
           status?: string
           subscription_id?: string | null
           updated_at?: string
+          validity_period?: string | null
         }
         Relationships: [
           {
