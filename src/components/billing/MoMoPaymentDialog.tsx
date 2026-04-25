@@ -78,7 +78,7 @@ export function MoMoPaymentDialog({
   currency,
   onPaymentComplete,
 }: MoMoPaymentDialogProps) {
-  const [paymentMethod, setPaymentMethod] = useState<"momo" | "card" | "offline">("momo");
+  const [paymentMethod, setPaymentMethod] = useState<"momo" | "card">("momo");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [channel, setChannel] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -95,26 +95,14 @@ export function MoMoPaymentDialog({
   const pollStartRef = useRef<number | null>(null);
   const POLL_TIMEOUT_MS = 120_000;
 
-  // Offline payment state
-  const [offlineSenderName, setOfflineSenderName] = useState("");
-  const [offlineSenderPhone, setOfflineSenderPhone] = useState("");
-  const [offlineTxRef, setOfflineTxRef] = useState("");
-  const [offlineNotes, setOfflineNotes] = useState("");
-  const [offlineFile, setOfflineFile] = useState<File | null>(null);
-  const [isSubmittingOffline, setIsSubmittingOffline] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const { toast } = useToast();
 
   const phoneRegex = /^0[79]\d{8}$/;
   const isPhoneValid = phoneRegex.test(phoneNumber);
   const isCardValid = cardNumber.replace(/\s/g, "").length >= 13 && cardExpiryMonth.length === 2 && cardExpiryYear.length >= 2 && cardCvv.length >= 3;
-  const isOfflineValid = offlineSenderName.trim().length >= 2 && offlineSenderPhone.trim().length >= 5 && !!offlineFile;
   const isFormValid = paymentMethod === "momo"
     ? (isPhoneValid && channel !== "")
-    : paymentMethod === "card"
-      ? isCardValid
-      : isOfflineValid;
+    : isCardValid;
 
   const handlePayment = async () => {
     if (!isFormValid) return;
