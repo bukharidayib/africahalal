@@ -205,7 +205,7 @@ async function buildInvoicePdf(invoiceId: string): Promise<Uint8Array> {
   page.drawLine({ start: { x: M, y: 130 }, end: { x: W - M, y: 130 }, thickness: 0.5, color: line });
 
   page.drawText('Payment Terms:', { x: M, y: 110, size: 10, font: bold, color: ink });
-  const terms = `Payment is due by ${new Date(inv.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}. Pay via your AHI client portal (Billing → Pay Now) or contact accounts@africanhalaal.com for offline options. Please reference invoice #${inv.invoice_number} on all payments.`;
+  const terms = `Payment is due by ${new Date(inv.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}. Pay via your AHI client portal (Billing > Pay Now) or contact accounts@africanhalaal.com for offline options. Please reference invoice #${inv.invoice_number} on all payments.`;
   let ty = 95;
   for (const ln of wrap(terms, 95)) {
     page.drawText(ln, { x: M, y: ty, size: 10, font, color: muted });
@@ -213,7 +213,7 @@ async function buildInvoicePdf(invoiceId: string): Promise<Uint8Array> {
   }
   page.drawText('Thank you for your business!', { x: M, y: ty - 6, size: 10, font: bold, color: ink });
 
-  page.drawText('African Halal Institute · Lusaka, Zambia · accounts@africanhalaal.com', {
+  page.drawText('African Halal Institute | Lusaka, Zambia | accounts@africanhalaal.com', {
     x: M, y: 36, size: 8, font, color: muted,
   });
   page.drawText('This is a computer-generated invoice. No signature required.', {
