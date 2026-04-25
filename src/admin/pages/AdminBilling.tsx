@@ -357,6 +357,13 @@ export default function AdminBilling() {
           performed_by: user?.id,
           metadata: { offline_payment_id: reviewingPayment.id, sender_name: reviewingPayment.sender_name },
         });
+
+        // Trigger certificate issuance + receipt/cert emails for certification invoices
+        try {
+          await supabase.functions.invoke('issue-certificate-on-payment', {
+            body: { invoice_id: reviewingPayment.invoice_id },
+          });
+        } catch (e) { console.warn('issue-certificate-on-payment failed', e); }
       }
 
       toast({ title: reviewAction === 'approve' ? 'Payment Approved' : 'Payment Rejected', description: `Offline payment has been ${reviewAction === 'approve' ? 'approved' : 'rejected'}.` });
