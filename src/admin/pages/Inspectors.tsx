@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Plus, MapPin, Edit, Trash2, ShieldCheck, Mail, RefreshCw, X, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Users, Search, Plus, Edit, Trash2, ShieldCheck, Mail, RefreshCw, X, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -26,8 +26,6 @@ interface Inspector {
   address: string | null;
   is_active: boolean;
   is_manager: boolean;
-  specializations: string[] | null;
-  regions: string[] | null;
   created_at: string;
   profiles?: { email: string; full_name: string };
   business_count?: number;
@@ -40,13 +38,10 @@ interface Invitation {
   organization_ids: string[] | null;
 }
 
-const SPECIALIZATIONS = ['Food Processing', 'Slaughterhouse', 'Cosmetics', 'Pharmaceuticals', 'Logistics', 'Retail'];
-const REGIONS = ['Lusaka', 'Copperbelt', 'Central', 'Eastern', 'Western', 'Northern', 'Southern', 'Muchinga', 'North-Western', 'Luapula'];
-
 const emptyForm = {
   email: '', full_name: '', nrc_number: '', address: '',
   organization_ids: [] as string[], managed_inspector_ids: [] as string[],
-  specializations: [] as string[], regions: [] as string[], is_manager: false,
+  is_manager: false,
 };
 
 export default function Inspectors() {
@@ -138,8 +133,6 @@ export default function Inspectors() {
           address: form.address.trim() || null,
           organization_ids: form.organization_ids,
           managed_inspector_ids: isManager ? form.managed_inspector_ids : [],
-          specializations: form.specializations,
-          regions: form.regions,
           is_manager: isManager,
           invited_by: user.id,
         })
@@ -226,7 +219,6 @@ export default function Inspectors() {
     try {
       const { error: upErr } = await supabase.from('inspectors').update({
         full_name: editing.full_name, nrc_number: editing.nrc_number, address: editing.address,
-        specializations: editing.specializations, regions: editing.regions,
         is_manager: editing.is_manager, is_active: editing.is_active,
       }).eq('id', editing.id);
       if (upErr) throw upErr;
