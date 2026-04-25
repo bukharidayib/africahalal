@@ -34,6 +34,12 @@ async function buildInvoicePdf(invoiceId: string): Promise<Uint8Array> {
     .single();
   if (error || !inv) throw new Error(error?.message || 'Invoice not found');
 
+  const { data: lineItems } = await supabase
+    .from('invoice_items')
+    .select('description, quantity, unit_price, line_total, sort_order')
+    .eq('invoice_id', invoiceId)
+    .order('sort_order', { ascending: true });
+
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([595, 842]); // A4
   const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -122,8 +128,14 @@ async function buildInvoicePdf(invoiceId: string): Promise<Uint8Array> {
     renewal: 'Renewal Fee',
     other: 'Service Charge',
   };
-  const items = Array.isArray((inv as any).items) && (inv as any).items.length
-    ? (inv as any).items
+  const items = (lineItems && lineItems.length)
+    ? lineItems.map((li: any) => ({
+        label: li.description,
+        description: '',
+        qty: Number(li.quantity || 1),
+        unit_price: Number(li.unit_price || 0),
+        total: Number(li.line_total ?? Number(li.quantity || 1) * Number(li.unit_price || 0)),
+      }))
     : [{
         label: feeLabel[inv.fee_type] || inv.fee_type,
         description: inv.description || '',
@@ -162,10 +174,12 @@ async function buildInvoicePdf(invoiceId: string): Promise<Uint8Array> {
 
   // ── Totals (right aligned) ──
   y -= 14;
-  const subtotal = items.reduce((s: number, it: any) => s + Number(it.total ?? 0), 0);
+  const computedSubtotal = items.reduce((s: number, it: any) => s + Number(it.total ?? 0), 0);
+  const subtotal = Number((inv as any).subtotal ?? computedSubtotal);
   const taxRate = Number((inv as any).tax_rate ?? 0);
   const taxAmount = Number((inv as any).tax_amount ?? (subtotal * taxRate / 100));
-  const grand = Number(inv.amount ?? subtotal + taxAmount);
+  const discount = Number((inv as any).discount ?? 0);
+  const grand = Number((inv as any).total ?? inv.amount ?? (subtotal + taxAmount - discount));
 
   const labelRightX = W - M - 160;
   const valueRightX = W - M;
