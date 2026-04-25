@@ -281,7 +281,16 @@ export default function BusinessDetail() {
                         <TableCell><Badge variant={c.status === 'active' ? 'default' : 'outline'} className="capitalize">{c.status}</Badge></TableCell>
                         <TableCell>{format(new Date(c.issue_date), 'dd MMM yyyy')}</TableCell>
                         <TableCell>{format(new Date(c.expiry_date), 'dd MMM yyyy')}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right space-x-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditValidity({
+                              id: c.id, issue_date: c.issue_date, expiry_date: c.expiry_date, status: c.status,
+                            })}
+                          >
+                            <Pencil className="h-4 w-4 mr-1" /> Edit Validity
+                          </Button>
                           <Button asChild variant="ghost" size="sm"><Link to={`/admin/certificates/${c.id}`}><Eye className="h-4 w-4" /></Link></Button>
                         </TableCell>
                       </TableRow>
