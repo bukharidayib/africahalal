@@ -401,14 +401,28 @@ export default function AdminBilling() {
     }
   };
 
+  // Helper: invoke certificate issuance after a payment
+  const triggerCertificateIssuance = async (invoiceId: string) => {
+    try {
+      await supabase.functions.invoke('issue-certificate-on-payment', { body: { invoice_id: invoiceId } });
+    } catch (e) {
+      console.warn('issue-certificate-on-payment failed', e);
+    }
+  };
+
   const handleCreateInvoice = async () => {
     if (!newInvoice.organization_id || !newInvoice.amount || !newInvoice.due_date) {
       toast({ variant: 'destructive', title: 'Missing fields', description: 'Please fill all required fields.' });
       return;
     }
+    if (needsValidity(newInvoice.fee_type) && !newInvoice.validity_period) {
+      toast({ variant: 'destructive', title: 'Missing fields', description: 'Validity period is required for this fee type.' });
+      return;
+    }
     setIsCreating(true);
     try {
       const { data: invNum } = await supabase.rpc('generate_invoice_number');
+      const usesValidity = needsValidity(newInvoice.fee_type);
       const { error } = await supabase.from('invoices').insert({
         invoice_number: invNum as string,
         organization_id: newInvoice.organization_id,
@@ -416,11 +430,14 @@ export default function AdminBilling() {
         description: newInvoice.description || null,
         amount: parseFloat(newInvoice.amount),
         due_date: newInvoice.due_date,
+        validity_period: usesValidity ? newInvoice.validity_period : null,
+        start_date: usesValidity ? (newInvoice.start_date || todayStr()) : null,
+        expiry_date: usesValidity ? (newInvoice.expiry_date || null) : null,
       });
       if (error) throw error;
       toast({ title: 'Invoice Created', description: `Invoice ${invNum} has been created.` });
       setShowCreate(false);
-      setNewInvoice({ organization_id: '', fee_type: 'certification', description: '', amount: '', due_date: '', validity_period: '' });
+      setNewInvoice({ organization_id: '', fee_type: 'certification', description: '', amount: '', due_date: '', validity_period: '', start_date: todayStr(), expiry_date: '' });
       fetchData();
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -451,7 +468,9 @@ export default function AdminBilling() {
       amount: String(inv.amount),
       due_date: inv.due_date,
       status: inv.status,
-      validity_period: inv.certification_applications?.validity_period || '',
+      validity_period: inv.validity_period || inv.certification_applications?.validity_period || '',
+      start_date: inv.start_date || todayStr(),
+      expiry_date: inv.expiry_date || '',
     });
   };
 
