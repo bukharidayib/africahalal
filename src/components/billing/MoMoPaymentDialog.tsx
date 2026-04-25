@@ -244,7 +244,7 @@ export function MoMoPaymentDialog({
         {paymentState === "idle" && (
           <div className="space-y-4 py-2">
             {/* Payment Method Tabs */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setPaymentMethod("momo")}
@@ -268,18 +268,6 @@ export function MoMoPaymentDialog({
               >
                 <CreditCard className="h-4 w-4" />
                 Bank Card
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("offline")}
-                className={`flex items-center justify-center gap-1.5 rounded-lg border-2 p-3 text-xs font-semibold transition-all ${
-                  paymentMethod === "offline"
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-border bg-background text-muted-foreground hover:border-primary/50"
-                }`}
-              >
-                <Banknote className="h-4 w-4" />
-                Offline
               </button>
             </div>
 
