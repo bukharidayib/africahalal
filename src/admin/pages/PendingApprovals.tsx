@@ -37,14 +37,9 @@ interface ApprovalRequest {
     application_number: string;
     scope: string;
     sector: string;
-    organizations?: {
-      name: string;
-    };
+    organizations?: { name: string };
   };
-  recommender?: {
-    full_name: string;
-    email: string;
-  };
+  recommender?: { full_name: string | null; email: string | null };
 }
 
 export default function PendingApprovals() {
@@ -61,6 +56,7 @@ export default function PendingApprovals() {
   }, []);
 
   async function fetchApprovals() {
+    setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('approval_requests')
@@ -70,18 +66,25 @@ export default function PendingApprovals() {
             application_number,
             scope,
             sector,
-            organizations (
-              name
-            )
+            organizations ( name )
           )
         `)
         .eq('status', 'pending')
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setApprovals(data || []);
+
+      const recIds = Array.from(new Set((data || []).map((a: any) => a.recommender_id).filter(Boolean)));
+      let recMap = new Map<string, any>();
+      if (recIds.length) {
+        const { data: profs } = await supabase
+          .from('profiles').select('id, full_name, email').in('id', recIds);
+        recMap = new Map((profs || []).map((p: any) => [p.id, p]));
+      }
+      setApprovals((data || []).map((a: any) => ({ ...a, recommender: recMap.get(a.recommender_id) })));
     } catch (error) {
       console.error('Error fetching approvals:', error);
+      toast.error('Failed to load approvals');
     } finally {
       setIsLoading(false);
     }
