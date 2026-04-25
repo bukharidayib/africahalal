@@ -107,10 +107,6 @@ export function MoMoPaymentDialog({
   const handlePayment = async () => {
     if (!isFormValid) return;
 
-    if (paymentMethod === "offline") {
-      await handleOfflineSubmit();
-      return;
-    }
 
     setPaymentState("processing");
     setMessage("");
