@@ -80,6 +80,8 @@ import AdminSupportChatSession from "./admin/pages/AdminSupportChatSession";
 import RolesPermissions from "./admin/pages/RolesPermissions";
 import RoleEditor from "./admin/pages/RoleEditor";
 import AdminBilling from "./admin/pages/AdminBilling";
+import Businesses from "./admin/pages/Businesses";
+import BusinessDetail from "./admin/pages/BusinessDetail";
 import IngredientTracker from "./admin/pages/IngredientTracker";
 import AdminSupervisorReportDetail from "./admin/pages/AdminSupervisorReportDetail";
 import { AdminProtectedRoute } from "./admin/components/AdminProtectedRoute";
