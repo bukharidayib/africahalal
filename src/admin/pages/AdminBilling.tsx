@@ -160,7 +160,7 @@ export default function AdminBilling() {
 
   // Edit dialog
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
-  const [editForm, setEditForm] = useState({ organization_id: '', fee_type: '', description: '', amount: '', due_date: '', status: '', validity_period: '' });
+  const [editForm, setEditForm] = useState({ organization_id: '', fee_type: '', description: '', amount: '', due_date: '', status: '', validity_period: '', start_date: '', expiry_date: '' });
   const [isSaving, setIsSaving] = useState(false);
 
   // Delete dialog
