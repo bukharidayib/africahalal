@@ -78,7 +78,7 @@ const navItems: NavItem[] = [
     title: 'Pending Approvals',
     href: '/admin/approvals',
     icon: CheckSquare,
-    permission: 'canIssueCertificates',
+    permission: 'canApproveApplications',
   },
   {
     title: 'Certificates',
@@ -120,7 +120,7 @@ const navItems: NavItem[] = [
     title: 'Ingredient Tracker',
     href: '/admin/ingredients',
     icon: FlaskConical,
-    permission: 'canViewApplications',
+    permission: 'canViewIngredients',
   },
   {
     title: 'Audit Logs',
@@ -144,13 +144,13 @@ const navItems: NavItem[] = [
     title: 'Supervisors',
     href: '/admin/supervisors',
     icon: Users,
-    permission: 'canManageUsers',
+    permission: 'canViewSupervisors',
   },
   {
     title: 'Blog CMS',
     href: '/admin/blogs',
     icon: FileText,
-    permission: 'canManageSettings',
+    permission: 'canViewBlogs',
   },
   {
     title: 'Settings',
