@@ -522,6 +522,8 @@ export type Database = {
           id: string
           issue_date: string
           issued_by: string
+          issued_notes: string | null
+          manually_issued: boolean | null
           organization_id: string
           qr_hash: string
           scope: string
@@ -536,6 +538,8 @@ export type Database = {
           id?: string
           issue_date: string
           issued_by: string
+          issued_notes?: string | null
+          manually_issued?: boolean | null
           organization_id: string
           qr_hash: string
           scope: string
@@ -550,6 +554,8 @@ export type Database = {
           id?: string
           issue_date?: string
           issued_by?: string
+          issued_notes?: string | null
+          manually_issued?: boolean | null
           organization_id?: string
           qr_hash?: string
           scope?: string
@@ -1401,6 +1407,47 @@ export type Database = {
           },
         ]
       }
+      invoice_items: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          invoice_id: string
+          line_total: number | null
+          quantity: number
+          sort_order: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          invoice_id: string
+          line_total?: number | null
+          quantity?: number
+          sort_order?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          invoice_id?: string
+          line_total?: number | null
+          quantity?: number
+          sort_order?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount: number
@@ -1409,17 +1456,25 @@ export type Database = {
           created_at: string
           currency: string
           description: string | null
+          discount: number | null
           due_date: string
           expiry_date: string | null
           fee_type: string
           id: string
           invoice_number: string
+          issue_date: string | null
+          notes: string | null
           organization_id: string
           paid_at: string | null
           quotation_id: string | null
+          recipient_emails: string[] | null
           start_date: string | null
           status: string
           subscription_id: string | null
+          subtotal: number | null
+          tax_amount: number | null
+          tax_rate: number | null
+          total: number | null
           updated_at: string
           validity_period: string | null
         }
@@ -1430,17 +1485,25 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          discount?: number | null
           due_date: string
           expiry_date?: string | null
           fee_type: string
           id?: string
           invoice_number: string
+          issue_date?: string | null
+          notes?: string | null
           organization_id: string
           paid_at?: string | null
           quotation_id?: string | null
+          recipient_emails?: string[] | null
           start_date?: string | null
           status?: string
           subscription_id?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          total?: number | null
           updated_at?: string
           validity_period?: string | null
         }
@@ -1451,17 +1514,25 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          discount?: number | null
           due_date?: string
           expiry_date?: string | null
           fee_type?: string
           id?: string
           invoice_number?: string
+          issue_date?: string | null
+          notes?: string | null
           organization_id?: string
           paid_at?: string | null
           quotation_id?: string | null
+          recipient_emails?: string[] | null
           start_date?: string | null
           status?: string
           subscription_id?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          total?: number | null
           updated_at?: string
           validity_period?: string | null
         }
