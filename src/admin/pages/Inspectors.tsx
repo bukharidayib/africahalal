@@ -574,29 +574,6 @@ function SharedInspectorFields({ form, setForm, organizations, orgSearch, setOrg
         {form.organization_ids.length > 0 && <p className="text-xs text-muted-foreground">{form.organization_ids.length} business(es) selected</p>}
       </div>
 
-      <div className="space-y-2">
-        <Label>Specializations</Label>
-        <div className="flex flex-wrap gap-2">
-          {SPECIALIZATIONS.map(s => (
-            <Badge key={s} variant={form.specializations.includes(s) ? 'default' : 'outline'} className="cursor-pointer"
-              onClick={() => setForm({ ...form, specializations: form.specializations.includes(s) ? form.specializations.filter((x: string) => x !== s) : [...form.specializations, s] })}>
-              {s}
-            </Badge>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Regions</Label>
-        <div className="flex flex-wrap gap-2">
-          {REGIONS.map(r => (
-            <Badge key={r} variant={form.regions.includes(r) ? 'default' : 'outline'} className="cursor-pointer gap-1"
-              onClick={() => setForm({ ...form, regions: form.regions.includes(r) ? form.regions.filter((x: string) => x !== r) : [...form.regions, r] })}>
-              <MapPin className="h-3 w-3" />{r}
-            </Badge>
-          ))}
-        </div>
-      </div>
     </>
   );
 }
