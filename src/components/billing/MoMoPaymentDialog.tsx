@@ -222,11 +222,6 @@ export function MoMoPaymentDialog({
       setMessage("");
       setReference("");
       setTransactionId(null);
-      setOfflineSenderName("");
-      setOfflineSenderPhone("");
-      setOfflineTxRef("");
-      setOfflineNotes("");
-      setOfflineFile(null);
       onOpenChange(false);
     }
   };
