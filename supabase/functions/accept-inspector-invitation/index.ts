@@ -102,8 +102,8 @@ serve(async (req: Request) => {
           full_name: invitation.full_name,
           nrc_number: invitation.nrc_number,
           address: invitation.address,
-          specializations: invitation.specializations || [],
-          regions: invitation.regions || [],
+          specializations: [],
+          regions: [],
           is_active: true,
           is_manager: !!invitation.is_manager,
         })
