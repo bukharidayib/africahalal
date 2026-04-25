@@ -198,6 +198,10 @@ async function buildInvoicePdf(invoiceId: string): Promise<Uint8Array> {
     drawRow(`Tax (${taxRate}%):`, `${inv.currency} ${fmt(taxAmount)}`, { bold: true });
     y -= 18;
   }
+  if (discount > 0) {
+    drawRow('Discount:', `- ${inv.currency} ${fmt(discount)}`, { bold: true });
+    y -= 18;
+  }
   // Divider before total
   page.drawLine({ start: { x: labelRightX - 80, y: y + 6 }, end: { x: valueRightX, y: y + 6 }, thickness: 0.5, color: line });
   y -= 6;
