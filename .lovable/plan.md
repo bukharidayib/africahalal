@@ -1,77 +1,73 @@
-## Root cause of the invoice errors
+# Admin Portal Fixes — Plan
 
-The `invoices.fee_type` CHECK constraint currently only allows:
-`'certification' | 'renewal' | 'inspection' | 'other'`
+## 1. Certificate Details — fix "Page not found"
 
-But the code inserts these values:
-- `PendingPricingTab` → `'application_fee'` and `'subscription'`
-- `SubscriptionsTab` → `'subscription'`
-- `QuotationsTab` → `'other'` (this one passes)
-- `AdminBilling` "Create New Invoice" → defaults to `'certification'` (passes), but the **same insert silently allows** other unsupported flows
+**Cause:** `Certificates.tsx` row link points to `/admin/certificates/:id`, but no route or page exists in `src/App.tsx` or `src/admin/pages/`.
 
-That mismatch produces `invoices_fee_type_check` violations on every Set Pricing, Subscription "Invoice Now" and bundled-subscription action.
+**Fix:**
+- Create `src/admin/pages/CertificateDetail.tsx` showing:
+  - Certificate number, status badge (active / suspended / revoked / expired)
+  - Organization, scope, sector, issue date, expiry date, validity countdown
+  - Issued by / approved by (admin names)
+  - Linked application + linked invoice (if any)
+  - QR hash + a "Download Certificate PDF" button (re-using existing `CertificateTemplate` / `CertificateDownloader`)
+  - Certificate History timeline (from `certificate_history` table)
+  - Admin actions: Suspend / Revoke / Reinstate (writes `certificates.status` + `certificate_history` row), gated by `certificates.update` permission
+- Register route in `src/App.tsx` inside the admin protected block:
+  `<Route path="certificates/:id" element={<CertificateDetail />} />`
 
-## Fix plan
+## 2. Applications page — remove "New Application" button
 
-### 1. Database migration — widen the `fee_type` constraint
-Drop the existing CHECK and recreate with the full set of values used by the app:
-```sql
-ALTER TABLE public.invoices DROP CONSTRAINT invoices_fee_type_check;
-ALTER TABLE public.invoices ADD CONSTRAINT invoices_fee_type_check
-  CHECK (fee_type IN (
-    'application_fee','certification','renewal',
-    'inspection','subscription','quotation','other'
-  ));
-```
-No data backfill needed (existing rows already use the legacy values).
+In `src/admin/pages/Applications.tsx` delete the `<Button>` block that renders "New Application" in the header (lines ~123–126). Keep the title/description.
 
-### 2. Redesign the "Set Pricing" dialog (`PendingPricingTab.tsx`)
+## 3. Pending Approvals — make it work smoothly
 
-New form fields in this order:
-1. **Business Name** — read-only input, auto-populated from `pricingApp.organizations.name`.
-2. **Recipient Emails** — multi-email input (chip-style: type/paste, press Enter or comma to add; backspace removes). Pre-fills with `organizations.contact_email` if present. Validates each entry as email. At least one required.
-3. **Validity Period** — dropdown using existing `VALIDITY_OPTIONS` (1–4 quarters). Labeled clearly as "Certificate Validity Period (once issued)".
-4. **Application Fee (ZMW)** — numeric input with `ZMW` prefix adornment.
-5. **Start Date** — date input, defaults to today (`new Date().toISOString().slice(0,10)`). Used as the invoice issue/start date and stored on the application as `pricing_start_date` (or surfaced via existing `created_at`; we'll keep it on the invoice description metadata to avoid schema bloat unless you want a dedicated column).
-6. **Due Date** — kept (defaults to start date + 7 days, recomputes when Start Date changes).
-7. **Description** — textarea, prefilled with `Halal certification application fee — {application_number}`.
+Current issues found in `PendingApprovals.tsx`:
+- Joins `recommender` but never selects it — the `recommender_id` is shown raw. Fix by joining `profiles` via `recommender_id` for the recommender name/email.
+- `handleAction` updates `approval_requests` but does **not** advance the parent application or trigger certificate issuance. Add: on approve, set `certification_applications.status = 'approved'` for the linked application; on reject, set to `'rejected'` and write `application_status_history`.
+- Add empty-state polish, loading skeleton, and a refresh button.
+- Surface dual-control violation inline (disable Approve button if `recommender_id === user.id` instead of only toasting).
+- Wrap `log_audit` in try/catch so a logging failure doesn't break the action.
 
-Removed:
-- The entire "Bundle a recurring subscription" block and its sub-fields.
-- The single contact-email preview chip (replaced by the multi-email field).
+## 4. Inspector dialogues — remove Specializations & Regions
 
-Submission changes:
-- Insert one invoice with `fee_type: 'application_fee'` (now allowed by the new constraint).
-- Pass the multi-email list to `send-invoice-email` as `recipient_emails: string[]` (override). Edge function will use that list when provided, falling back to organization/profile resolution otherwise.
+In `src/admin/pages/Inspectors.tsx`:
+- Remove the Specializations and Regions blocks from both the **Invite Inspector** form (~lines 605–635) and the **Edit Inspector** dialogue (~lines 480–510).
+- Remove the fields from `form` initial state, from the invite payload sent to `send-inspector-invitation`, and from the update payload to `inspectors` table.
+- Remove the columns from the inspector list/table display if shown.
+- Edge function `send-inspector-invitation` and `accept-inspector-invitation`: stop requiring/writing `specializations` and `regions` (leave DB columns intact, just default to empty arrays for backward compatibility).
 
-### 3. Edge function update — `send-invoice-email`
-- Accept optional `recipient_emails: string[]` in the request body.
-- If provided and non-empty, validate each, dedupe, and use as `to` (skip the `resolveRecipient` fallback). Audit log records the explicit list and source `'manual_override'`.
-- Keep existing behavior when not provided.
+## 5. Ingredient Tracker — make it work end-to-end
 
-### 4. Modern, clean email templates (HTML)
-Rebuild the HTML in both `send-invoice-email` and `send-quotation-email` with a unified, premium, mobile-friendly layout:
-- 600px centered card on a soft neutral background (`#f5f5f4`)
-- Navy header (`#0f2e57`) with AHI wordmark + small tagline
-- Gold accent bar (`#c79e3b`) under the header
-- Clear "Invoice Summary" / "Quotation Summary" panel: Invoice #, Date, Due/Valid Until, Amount (large, gold)
-- Itemized table for quotation items
-- Prominent CTA button ("Pay Invoice" → links to client billing portal; "Review Quotation" → client portal)
-- Footer: contact details, address, automated-message disclaimer
-- Inline CSS only (Gmail/Outlook safe), table-based structure for compatibility, alt text on logo, dark-mode color hints via `@media (prefers-color-scheme: dark)`
+**Current wiring (verified):**
+- Tables `supervisor_ingredient_collections` and `supervisor_collected_ingredients` exist but are **empty** (0 rows).
+- Supervisors create collections via `src/pages/supervisor/SupervisorIngredientForm.tsx` → `SupervisorIngredients.tsx`.
+- Admin page `IngredientTracker.tsx` reads those collections and calls `analyze-ingredients` edge function (Lovable AI) to classify each ingredient as halal / haram / mashbooh.
 
-### 5. Verification
-- After migration, retry: Set Pricing → Create Invoice; Subscriptions → Invoice Now; Create New Invoice. All should succeed.
-- Quotations sending continues to work and uses the new template.
-- Audit log entries include the recipient list and source.
+**Why it appears broken:** No supervisor has submitted a collection yet, so the admin list is empty — not a bug, but the UX gives no guidance.
 
-## Files to change
-- `supabase/migrations/<new>.sql` — widen CHECK constraint
-- `src/admin/components/accountant/PendingPricingTab.tsx` — new form (multi-email chip input, business name read-only, start date, removed subscription bundle)
-- `supabase/functions/send-invoice-email/index.ts` — accept `recipient_emails`, new HTML template
-- `supabase/functions/send-quotation-email/index.ts` — new HTML template (matching style)
+**Fixes:**
+- In `IngredientTracker.tsx`:
+  - Improve empty state: explain that collections are created by supervisors during inspections, with a link to Supervisors page.
+  - Add a status filter that actually works (currently `statusFilter` state exists but isn't applied to the query).
+  - Show product/brand/organization, ingredient counts, and last-analyzed timestamp in the table.
+  - In the detail dialog, show each ingredient with classification badge, confidence, source notes, and an "Re-analyze" button per ingredient.
+  - After AI analysis, persist the classification to `supervisor_collected_ingredients` (`classification`, `confidence`, `notes`) and update the parent collection's `status` to `analyzed` or `flagged` (if any haram).
+- In `analyze-ingredients` edge function: confirm it returns per-ingredient results and writes them back; if not, add an upsert step using service role.
+- Add a "Send to Supervisor" action that creates a row in `inspection_notifications` so the supervisor sees the AI verdict.
+- Verify RLS on both tables allows admin SELECT (and admin UPDATE for writing classifications).
 
-No changes needed to `SubscriptionsTab` or `AdminBilling` create-invoice — the constraint widening alone unblocks them.
+## Technical Notes
 
-## Open question
-The "Start Date" you described — should it be persisted as a dedicated `start_date` column on `invoices`, or is it acceptable to use it only as the invoice issue date (stored implicitly via `created_at` and shown in the description)? I'll go with the implicit approach unless you say otherwise, to avoid extra schema churn.
+- Files to create:
+  - `src/admin/pages/CertificateDetail.tsx`
+- Files to edit:
+  - `src/App.tsx` (new route)
+  - `src/admin/pages/Applications.tsx` (remove button)
+  - `src/admin/pages/PendingApprovals.tsx` (joins, app status update, UX)
+  - `src/admin/pages/Inspectors.tsx` (drop specializations/regions UI + payloads)
+  - `src/admin/pages/IngredientTracker.tsx` (filter, empty state, persist results, notify)
+  - `supabase/functions/send-inspector-invitation/index.ts` (drop fields)
+  - `supabase/functions/accept-inspector-invitation/index.ts` (drop fields)
+  - `supabase/functions/analyze-ingredients/index.ts` (persist classifications)
+- DB: no schema changes required. RLS on `certificates` already allows `certificates.update` permission for status changes; ingredient tables already allow admin access.
