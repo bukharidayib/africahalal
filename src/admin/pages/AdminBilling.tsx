@@ -615,7 +615,7 @@ export default function AdminBilling() {
     const labels: Record<string, string> = {
       application_fee: 'Application Fee', certification: 'Certification Fee',
       subscription: 'Subscription Fee', renewal: 'Renewal Fee',
-      inspection: 'Inspection Fee', other: 'Service Charge',
+      inspection: 'Inspection Fee', other: 'Other Services Charge',
     };
     return labels[type] || type;
   };
