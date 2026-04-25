@@ -378,6 +378,17 @@ export default function BusinessDetail() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {issueFor && org?.id && (
+        <IssueCertificateDialog
+          open={!!issueFor}
+          onOpenChange={(o) => !o && setIssueFor(null)}
+          applicationId={issueFor.applicationId}
+          organizationId={org.id}
+          defaultScope={issueFor.scope}
+          onIssued={() => { setIssueFor(null); void load(); }}
+        />
+      )}
     </AdminLayout>
   );
 }
