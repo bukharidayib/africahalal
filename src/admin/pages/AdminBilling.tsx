@@ -32,6 +32,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PendingPricingTab from '../components/accountant/PendingPricingTab';
 import SubscriptionsTab from '../components/accountant/SubscriptionsTab';
 import QuotationsTab from '../components/accountant/QuotationsTab';
+import { OrgCombobox } from '../components/OrgCombobox';
+
+// --- Validity helpers ---
+const VALIDITY_MONTHS: Record<string, number> = {
+  '1_quarter': 3, '2_quarter': 6, '3_quarter': 9, '4_quarter': 12,
+};
+const validityLabel = (v: string) => ({
+  '1_quarter': '1 Quarter (3 months)',
+  '2_quarter': '2 Quarters (6 months)',
+  '3_quarter': '3 Quarters (9 months)',
+  '4_quarter': '4 Quarters (12 months)',
+} as Record<string, string>)[v] || v;
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const addMonthsStr = (dateStr: string, months: number) => {
+  if (!dateStr || !months) return '';
+  const d = new Date(dateStr);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+};
+const needsValidity = (feeType: string) =>
+  feeType === 'certification' || feeType === 'subscription';
 
 // --- ZynlePay response code map ---
 const ZYNLE_CODES: Record<string, { description: string; color: 'green' | 'yellow' | 'red' }> = {
