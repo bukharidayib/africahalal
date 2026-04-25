@@ -421,9 +421,7 @@ export function MoMoPaymentDialog({
             <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/30">
               <AlertTriangle className="h-6 w-6 text-red-600" />
             </div>
-            <p className="font-medium">
-              {paymentMethod === "offline" ? "Submission Failed" : "Payment Failed"}
-            </p>
+            <p className="font-medium">Payment Failed</p>
             <p className="text-sm text-muted-foreground">{message}</p>
           </div>
         )}
