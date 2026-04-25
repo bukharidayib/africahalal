@@ -184,10 +184,10 @@ async function buildQuotationPdf(quotationId: string): Promise<Uint8Array> {
   page.drawText('This quotation is non-binding until accepted and converted to an invoice.', {
     x: M, y: 50, size: 9, font: bold, color: ink,
   });
-  page.drawText('African Halal Institute · accounts@africanhalaal.com · Lusaka, Zambia', {
+  page.drawText('African Halal Institute | accounts@africanhalaal.com | Lusaka, Zambia', {
     x: M, y: 36, size: 8, font, color: muted,
   });
-  page.drawText(`Quotation ${q.quotation_number} · Status: ${String(q.status).toUpperCase()}`, {
+  page.drawText(`Quotation ${q.quotation_number} | Status: ${String(q.status).toUpperCase()}`, {
     x: M, y: 24, size: 8, font, color: muted,
   });
 
