@@ -83,6 +83,7 @@ import AdminBilling from "./admin/pages/AdminBilling";
 import IngredientTracker from "./admin/pages/IngredientTracker";
 import AdminSupervisorReportDetail from "./admin/pages/AdminSupervisorReportDetail";
 import { AdminProtectedRoute } from "./admin/components/AdminProtectedRoute";
+import { PermissionGate } from "./admin/components/PermissionGate";
 
 // Supervisor Portal
 import { SupervisorProtectedRoute } from "./components/auth/SupervisorProtectedRoute";
@@ -213,30 +214,30 @@ const App = () => (
               {/* Protected admin routes — guarded centrally */}
               <Route element={<AdminProtectedRoute><Outlet /></AdminProtectedRoute>}>
                 <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="applications" element={<Applications />} />
-                <Route path="applications/:id" element={<ApplicationDetail />} />
-                <Route path="certificates" element={<Certificates />} />
-                <Route path="certificates/:id" element={<CertificateDetail />} />
-                <Route path="inspections" element={<Inspections />} />
-                <Route path="inspections/:id" element={<AdminInspectionDetail />} />
-                <Route path="approvals" element={<PendingApprovals />} />
-                <Route path="audit-logs" element={<AuditLogs />} />
-                <Route path="users" element={<UserManagement />} />
-                <Route path="supervisors" element={<Supervisors />} />
-                <Route path="blogs" element={<Blogs />} />
-                <Route path="enforcement" element={<Enforcement />} />
-                <Route path="inspectors" element={<Inspectors />} />
-                <Route path="settings" element={<AdminSettings />} />
-                <Route path="support" element={<AdminSupportCenter />} />
-                <Route path="support/tickets" element={<AdminSupportTickets />} />
-                <Route path="support/tickets/:id" element={<AdminSupportTicketDetail />} />
-                <Route path="support/chats" element={<AdminSupportChats />} />
-                <Route path="support/chats/:id" element={<AdminSupportChatSession />} />
-                <Route path="roles" element={<RolesPermissions />} />
-                <Route path="roles/:id" element={<RoleEditor />} />
-                <Route path="billing" element={<AdminBilling />} />
-                <Route path="ingredients" element={<IngredientTracker />} />
-                <Route path="supervisor-reports/:id" element={<AdminSupervisorReportDetail />} />
+                <Route path="applications" element={<PermissionGate require="canViewApplications"><Applications /></PermissionGate>} />
+                <Route path="applications/:id" element={<PermissionGate require="canViewApplications"><ApplicationDetail /></PermissionGate>} />
+                <Route path="certificates" element={<PermissionGate require="canViewCertificates"><Certificates /></PermissionGate>} />
+                <Route path="certificates/:id" element={<PermissionGate require="canViewCertificates"><CertificateDetail /></PermissionGate>} />
+                <Route path="inspections" element={<PermissionGate require="canViewInspections"><Inspections /></PermissionGate>} />
+                <Route path="inspections/:id" element={<PermissionGate require="canViewInspections"><AdminInspectionDetail /></PermissionGate>} />
+                <Route path="approvals" element={<PermissionGate require="canApproveApplications"><PendingApprovals /></PermissionGate>} />
+                <Route path="audit-logs" element={<PermissionGate require="canViewAuditLogs"><AuditLogs /></PermissionGate>} />
+                <Route path="users" element={<PermissionGate require="canManageUsers"><UserManagement /></PermissionGate>} />
+                <Route path="supervisors" element={<PermissionGate require="canViewSupervisors"><Supervisors /></PermissionGate>} />
+                <Route path="blogs" element={<PermissionGate require="canViewBlogs"><Blogs /></PermissionGate>} />
+                <Route path="enforcement" element={<PermissionGate require="canViewEnforcement"><Enforcement /></PermissionGate>} />
+                <Route path="inspectors" element={<PermissionGate require="canManageInspectors"><Inspectors /></PermissionGate>} />
+                <Route path="settings" element={<PermissionGate require="canManageSettings"><AdminSettings /></PermissionGate>} />
+                <Route path="support" element={<PermissionGate require="canViewSupport"><AdminSupportCenter /></PermissionGate>} />
+                <Route path="support/tickets" element={<PermissionGate require="canViewSupport"><AdminSupportTickets /></PermissionGate>} />
+                <Route path="support/tickets/:id" element={<PermissionGate require="canViewSupport"><AdminSupportTicketDetail /></PermissionGate>} />
+                <Route path="support/chats" element={<PermissionGate require="canViewSupport"><AdminSupportChats /></PermissionGate>} />
+                <Route path="support/chats/:id" element={<PermissionGate require="canViewSupport"><AdminSupportChatSession /></PermissionGate>} />
+                <Route path="roles" element={<PermissionGate requireAny={["canManageRoles","canManageUsers"]}><RolesPermissions /></PermissionGate>} />
+                <Route path="roles/:id" element={<PermissionGate requireAny={["canManageRoles","canManageUsers"]}><RoleEditor /></PermissionGate>} />
+                <Route path="billing" element={<PermissionGate require="canViewFinance"><AdminBilling /></PermissionGate>} />
+                <Route path="ingredients" element={<PermissionGate require="canViewIngredients"><IngredientTracker /></PermissionGate>} />
+                <Route path="supervisor-reports/:id" element={<PermissionGate require="canViewSupervisors"><AdminSupervisorReportDetail /></PermissionGate>} />
               </Route>
             </Route>
 

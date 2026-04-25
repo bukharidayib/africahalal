@@ -79,6 +79,37 @@ export interface Permission {
   canViewSettings: boolean;
   canUpdateSettings: boolean;
   canManageSettings: boolean;
+  // Dashboard
+  canViewDashboard: boolean;
+  // Blogs
+  canViewBlogs: boolean;
+  canCreateBlogs: boolean;
+  canUpdateBlogs: boolean;
+  canDeleteBlogs: boolean;
+  canPublishBlogs: boolean;
+  // Supervisors
+  canViewSupervisors: boolean;
+  canManageSupervisors: boolean;
+  canInviteSupervisors: boolean;
+  canDeleteSupervisors: boolean;
+  // Ingredients
+  canViewIngredients: boolean;
+  canAnalyzeIngredients: boolean;
+  canManageIngredients: boolean;
+  // Quotations
+  canViewQuotations: boolean;
+  canCreateQuotations: boolean;
+  canSendQuotations: boolean;
+  canApproveQuotations: boolean;
+  // Invoices
+  canViewInvoices: boolean;
+  canCreateInvoices: boolean;
+  canSendInvoices: boolean;
+  canVoidInvoices: boolean;
+  // Payments
+  canViewPayments: boolean;
+  canRecordPayments: boolean;
+  canRefundPayments: boolean;
 }
 
 /** Build a zero-permission object */
@@ -104,6 +135,13 @@ function emptyPermissions(): Permission {
     canCreateReports: false, canViewReports: false, canDeleteReports: false, canExportReports: false,
     canViewInspectors: false, canManageInspectors: false,
     canViewSettings: false, canUpdateSettings: false, canManageSettings: false,
+    canViewDashboard: false,
+    canViewBlogs: false, canCreateBlogs: false, canUpdateBlogs: false, canDeleteBlogs: false, canPublishBlogs: false,
+    canViewSupervisors: false, canManageSupervisors: false, canInviteSupervisors: false, canDeleteSupervisors: false,
+    canViewIngredients: false, canAnalyzeIngredients: false, canManageIngredients: false,
+    canViewQuotations: false, canCreateQuotations: false, canSendQuotations: false, canApproveQuotations: false,
+    canViewInvoices: false, canCreateInvoices: false, canSendInvoices: false, canVoidInvoices: false,
+    canViewPayments: false, canRecordPayments: false, canRefundPayments: false,
   };
 }
 
@@ -173,6 +211,30 @@ const CODE_TO_KEY: Record<string, keyof Permission> = {
   'settings.manage': 'canManageSettings',
   'inspectors.view': 'canViewInspectors',
   'inspectors.manage': 'canManageInspectors',
+  'dashboard.view': 'canViewDashboard',
+  'blogs.view': 'canViewBlogs',
+  'blogs.create': 'canCreateBlogs',
+  'blogs.update': 'canUpdateBlogs',
+  'blogs.delete': 'canDeleteBlogs',
+  'blogs.publish': 'canPublishBlogs',
+  'supervisors.view': 'canViewSupervisors',
+  'supervisors.manage': 'canManageSupervisors',
+  'supervisors.invite': 'canInviteSupervisors',
+  'supervisors.delete': 'canDeleteSupervisors',
+  'ingredients.view': 'canViewIngredients',
+  'ingredients.analyze': 'canAnalyzeIngredients',
+  'ingredients.manage': 'canManageIngredients',
+  'quotations.view': 'canViewQuotations',
+  'quotations.create': 'canCreateQuotations',
+  'quotations.send': 'canSendQuotations',
+  'quotations.approve': 'canApproveQuotations',
+  'invoices.view': 'canViewInvoices',
+  'invoices.create': 'canCreateInvoices',
+  'invoices.send': 'canSendInvoices',
+  'invoices.void': 'canVoidInvoices',
+  'payments.view': 'canViewPayments',
+  'payments.record': 'canRecordPayments',
+  'payments.refund': 'canRefundPayments',
 };
 
 /** Convert an array of permission codes from the DB into the Permission object */
