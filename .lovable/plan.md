@@ -1,135 +1,121 @@
-# RBAC Deep Audit — Findings & Remediation Plan
+## Overview
 
-## Audit Summary
+Tighten the Admin → Billing → Create Invoice flow, automate certificate issuance on payment for certification invoices, and update the client-facing invoice email template.
 
-I audited the admin RBAC end-to-end across the database, auth context, sidebar, and every admin page. The **foundation is solid** (DB-driven roles/permissions, RLS on all RBAC tables, security-definer functions, workflow stage engine), but **enforcement is inconsistent at the page level** — many pages render and execute mutations without checking permissions.
+---
 
-### What Works Well
-- `permissions` table fully populated (64 permissions across 13 categories).
-- `has_permission`, `get_user_permissions`, `can_perform_workflow_action`, `check_self_approval`, `validate_stage_progression` all present and security-definer.
-- RLS enabled on `admin_roles`, `user_roles`, `permissions`, `role_permissions`, `workflow_stages`, `workflow_stage_permissions`.
-- `useAdminAuth` correctly fetches role + permissions from DB, blocks suspended roles, and refreshes on auth events.
-- Workflow engine (`workflowEngine.ts`) correctly delegates to RPCs; self-approval prevention exists.
-- Sidebar filters nav items by permission key.
+## 1. Create New Invoice dialog (`src/admin/pages/AdminBilling.tsx`)
 
-### Critical Gaps Found
+**Searchable organization dropdown**
+- Replace the current `Select` with a `Popover + Command` combobox (shadcn pattern using `cmdk`), giving a search box that filters the org list as the admin types. Same for the Edit Invoice dialog.
 
-**1. Role coverage is dangerously thin.** Only `super_admin` has the full 64 permissions. `cido` has 15, `finance` has 6, `inspection_manager` has 9. Many real-world flows will silently fail for non-super-admin users.
+**Simplified fee types**
+- Reduce the Fee Type list to exactly:
+  - `application_fee` — Application Fee
+  - `inspection` — Inspection Fee
+  - `certification` — Certification Fee
+  - `subscription` — Subscription Fee
+  - `other` — Other Service Charge
+- Remove "Renewal Fee".
+- Update `feeTypeLabel()` to match.
 
-**2. 15 of 21 admin pages have zero permission checks.** They rely solely on the sidebar hiding the link, which is **not security** — anyone can deep-link the URL. Affected pages:
+**Validity Period (only for Certification & Subscription)**
+- Show the Validity Period selector only when `fee_type === 'certification' || 'subscription'`. Required in those cases.
+- Options: 3 / 6 / 9 / 12 months (mapped to `1_quarter` … `4_quarter`).
+
+**Auto Start Date / Expiry Date**
+- Add two date fields: `start_date` (defaults to today) and `expiry_date` (auto-computed from `start_date + validity_period`). Both are editable so the admin can override.
+- These are surfaced only for Certification/Subscription fee types.
+- Persist `start_date` and `expiry_date` on the invoice (new columns) so they can be reused when issuing the certificate.
+
+**Database migration**
+- Add two nullable columns to `public.invoices`:
+  - `start_date date`
+  - `expiry_date date`
+  - `validity_period text` (so it's stored on the invoice itself, decoupled from any application).
+
+---
+
+## 2. Auto-generate certificate on payment (Certification fee only)
+
+Trigger points (any time an invoice transitions to `paid`):
+- `supabase/functions/zynlepay-momo-callback/index.ts` (online MoMo)
+- `supabase/functions/check-payment-status/index.ts` (manual status poll)
+- `AdminBilling.tsx → handleReviewOfflinePayment` (offline approval)
+- `AdminBilling.tsx → handleSaveEdit` (admin marks paid manually)
+
+**New shared edge function: `issue-certificate-on-payment`**
+Input: `{ invoice_id }`
+Logic:
+1. Load invoice (+ organization, application).
+2. If `fee_type !== 'certification'` → return `{skipped: true}`.
+3. If a certificate already exists for this `application_id` / `organization_id` → skip (idempotent).
+4. Generate `certificate_number` via `rpc('generate_certificate_number')`.
+5. Resolve `issue_date = invoice.start_date || today` and `expiry_date = invoice.expiry_date || derive(validity_period)`.
+6. Build `qr_hash` (sha256 of cert number + org id).
+7. Insert into `certificates` with status `active`, scope from application or org name fallback.
+8. Insert `certificate_history` entry (`issued_on_payment`).
+9. Call two email functions in parallel:
+   - `send-invoice-email` → existing function, but augment to include "Payment received — Receipt" mode (see §3).
+   - `send-certificate-email` (NEW) → branded thank-you + certificate PDF attachment + verification link.
+
+Trigger callers: After each "marked as paid" update, the client/edge function calls `supabase.functions.invoke('issue-certificate-on-payment', { body: { invoice_id }})`.
+
+---
+
+## 3. Email templates — refresh
+
+**`send-invoice-email/index.ts`**
+- Add an optional `mode` param: `'invoice' | 'receipt'`.
+- `'invoice'` (default) → keep current "Invoice" subject + Pay button, but redesign the HTML to match the new modern professional template (matches the PDF style — green band header, indigo accents, clean item table, totals box, ZMW formatting, payment terms footer).
+- `'receipt'` → subject `Payment received — Receipt {invoice_number}`, removes Pay button, shows "PAID" badge, payment date, amount, transaction reference, and attaches the same invoice PDF marked as receipt.
+- Replace inline `buildInvoicePdf` with the same look as `generate-invoice-pdf` for visual consistency.
+
+**NEW `send-certificate-email/index.ts`**
+- Generates / fetches the certificate PDF (reuse logic from `CertificateTemplate` server-side or call existing PDF endpoint if present; otherwise build a clean PDF via pdf-lib mirroring `CertificateTemplate.tsx`).
+- Sends a branded email:
+  - Subject: `Your Halal Certificate — {certificate_number}`
+  - Body: Thank-you message, certificate summary (number, scope, issue/expiry, validity), a "Verify Certificate" button → `https://africanhalaal.com/verify/{certificate_number}`, and the certificate PDF attached.
+  - Reuses the same green-banded header, indigo accents, ZMW brand palette already used in invoice/quotation PDFs.
+
+---
+
+## 4. Wiring summary
+
+```text
+[Invoice marked PAID]
+        │
+        ▼
+issue-certificate-on-payment(invoice_id)
+        │
+        ├── if certification → create certificate + history
+        │           │
+        │           ├── send-invoice-email(mode=receipt) → client gets RECEIPT email
+        │           └── send-certificate-email           → client gets CERTIFICATE email + PDF
+        │
+        └── else → no-op
 ```
-AdminBilling, Applications, AuditLogs, Blogs, Certificates,
-CertificateDetail, Enforcement (already ok via sidebar?), IngredientTracker,
-InspectionDetail, Inspectors, Supervisors, AdminSupportCenter,
-AdminSupportTickets, AdminSupportChats, AdminSupervisorReportDetail
-```
-
-**3. Sidebar key mismatches.**
-- "Pending Approvals" gated on `canIssueCertificates` — should be `canApproveApplications`.
-- "Ingredient Tracker" gated on `canViewApplications` — no dedicated permission exists.
-- "Blog CMS" gated on `canManageSettings` — no `blogs.*` permission category exists.
-- "Supervisors" reuses `canManageUsers` — no `supervisors.*` permission exists.
-
-**4. Missing permission categories in DB.** `blogs.*`, `supervisors.*`, `ingredients.*`, `quotations.*`, `invoices.*` do not exist as discrete permissions, so the matrix in Roles & Permissions cannot grant fine-grained access for these modules.
-
-**5. Action-level checks missing on mutations.** Buttons that issue/revoke certificates, approve applications, send invoices, schedule inspections, suspend users etc. are rendered unconditionally inside pages and rely on RLS at the DB layer (which is the right backstop, but UX-wise users see buttons that 403).
-
-**6. Workflow stage permissions only configured for `super_admin` and partially `cido`.** `finance` and `inspection_manager` have NO workflow stage assignments → `can_perform_workflow_action` will return false for every stage transition for them.
-
-**7. `inspection_manager` role display name has typo** ("inspection Manager" — lower-case i).
 
 ---
 
-## Remediation Plan (build mode)
+## Files
 
-### Phase A — Database hardening (1 migration)
+**Modified**
+- `src/admin/pages/AdminBilling.tsx` — combobox org picker, fee-type list, conditional validity/start/expiry fields, auto compute, persist new fields, hook auto-cert call after manual paid/offline-approve.
+- `supabase/functions/send-invoice-email/index.ts` — `mode` param, redesigned HTML, modernized PDF.
+- `supabase/functions/zynlepay-momo-callback/index.ts` — invoke `issue-certificate-on-payment` when `newStatus === 'completed'`.
+- `supabase/functions/check-payment-status/index.ts` — same hook on success.
 
-1. **Add missing permission categories** (idempotent INSERTs):
-   - `blogs.view`, `blogs.create`, `blogs.update`, `blogs.delete`, `blogs.publish`
-   - `supervisors.view`, `supervisors.manage`, `supervisors.invite`, `supervisors.delete`
-   - `ingredients.view`, `ingredients.analyze`, `ingredients.manage`
-   - `quotations.view`, `quotations.create`, `quotations.send`, `quotations.approve`
-   - `invoices.view`, `invoices.create`, `invoices.send`, `invoices.void`
-   - `payments.view`, `payments.record`, `payments.refund`
-   - `dashboard.view` (baseline for all admin roles)
-
-2. **Seed sensible defaults for existing non-super roles** so they are usable out of the box:
-   - `cido` (Chief Inspection & Documentation Officer): full applications, documentation, inspections, certificates, enforcement, blogs.view, dashboard.view, audit_logs.view, supervisors.view.
-   - `finance`: full finance/quotations/invoices/payments + applications.view, certificates.view, dashboard.view.
-   - `inspection_manager`: full inspections + inspectors.manage, supervisors.manage, applications.view, dashboard.view, audit_logs.view.
-
-3. **Seed workflow_stage_permissions** for `cido`, `finance`, `inspection_manager` across all 7 stages so the workflow engine returns true where appropriate.
-
-4. **Fix typo**: update `admin_roles.display_name` for `inspection_manager` → "Inspection Manager".
-
-### Phase B — Permission map & UI gating
-
-5. **Extend `src/admin/lib/permissions.ts`**:
-   - Add `Permission` keys for new categories (canViewBlogs, canManageBlogs, canViewSupervisors, canManageSupervisors, canViewIngredients, canManageIngredients, canViewQuotations, canCreateQuotations, canViewInvoices, canCreateInvoices, canViewPayments, canViewDashboard).
-   - Add corresponding entries in `CODE_TO_KEY`.
-
-6. **Fix sidebar gating** (`AdminSidebar.tsx`):
-   - Pending Approvals → `canApproveApplications`
-   - Ingredient Tracker → `canViewIngredients`
-   - Blog CMS → `canViewBlogs`
-   - Supervisors → `canViewSupervisors`
-   - Accountant → `canViewFinance` (unchanged, already correct)
-
-### Phase C — Page-level guards (the critical UX/security fix)
-
-7. **Create reusable guard component** `src/admin/components/PermissionGate.tsx`:
-   ```tsx
-   <PermissionGate require="canViewCertificates" fallback={<AccessDenied/>}>
-     {children}
-   </PermissionGate>
-   ```
-   And `src/admin/components/AccessDenied.tsx` (consistent 403 screen).
-
-8. **Wrap every admin page top-level** with the appropriate permission requirement:
-   | Page | Required |
-   |---|---|
-   | Applications, ApplicationDetail | canViewApplications |
-   | Certificates, CertificateDetail | canViewCertificates |
-   | Inspections, InspectionDetail | canViewInspections |
-   | Inspectors | canManageInspectors |
-   | Supervisors | canViewSupervisors |
-   | Enforcement | canViewEnforcement |
-   | AdminBilling | canViewFinance |
-   | AuditLogs | canViewAuditLogs |
-   | Blogs | canViewBlogs |
-   | IngredientTracker | canViewIngredients |
-   | AdminSupport* | canViewSupport |
-   | PendingApprovals | canApproveApplications |
-   | AdminSupervisorReportDetail | canViewSupervisors |
-
-9. **Action-level button gating** on mutation buttons inside pages (hide or disable with tooltip):
-   - Issue / Revoke / Suspend on `CertificateDetail` → `canIssueCertificates` / `canRevokeCertificates`.
-   - Approve / Reject on `PendingApprovals` and `ApplicationDetail` → `canApproveApplications` / `canRejectApplications`.
-   - Schedule inspection on `Inspections` → `canScheduleInspections`.
-   - Invite/Edit/Remove inspector on `Inspectors` → `canManageInspectors`.
-   - Create/Send invoice / quotation / record payment in `AdminBilling` tabs → respective new permissions.
-   - Publish blog in `Blogs` → `canManageBlogs` (or new `blogs.publish`).
-
-### Phase D — Verification
-
-10. **Manual matrix test** with the existing `cido` user after Phase A seeding: log in, walk every sidebar item, confirm correct access vs. denial.
-11. **Run Supabase linter** to catch any RLS regression introduced by the migration.
-12. **Add an "Effective Permissions" panel** on `RolesPermissions` page (read-only summary of what a role can do, derived from `permissions` + `role_permissions` + `workflow_stage_permissions`) — so admins can audit roles visually.
+**Created**
+- `supabase/functions/issue-certificate-on-payment/index.ts` — orchestrator described above.
+- `supabase/functions/send-certificate-email/index.ts` — new branded certificate email + PDF.
+- `supabase/migrations/<ts>_invoices_validity_dates.sql` — add `start_date`, `expiry_date`, `validity_period` to `public.invoices`.
 
 ---
 
-## Out of Scope (for this pass)
-- Re-architecting workflow stages (current 7-stage model is sufficient).
-- Migrating to Clerk JWT (memory note exists; not requested here).
-- Client/Inspector/Supervisor portal RBAC (those use separate guards; this audit is admin-only as requested).
+## Notes / decisions
 
----
-
-## Deliverables
-- 1 SQL migration (Phase A).
-- Updated `permissions.ts`, `AdminSidebar.tsx` (Phase B).
-- New `PermissionGate.tsx` + `AccessDenied.tsx`, page wrappers across ~15 pages, action-level guards on ~10 buttons (Phase C).
-- Fix `inspection_manager` display name typo.
-- Brief verification notes after implementation.
-
-Approve to proceed and I'll implement Phases A–C in one pass, then verify.
+- All PDFs continue using `pdf-lib` and ASCII-safe glyphs (no `→`, `·`).
+- Idempotency: the orchestrator checks for existing certificate per application/organization before creating a new one, so duplicate paid-events never produce duplicate certificates.
+- If an invoice has no `application_id`, certification-fee invoices still produce a certificate tied to the organization (scope falls back to the org's primary sector/name).
+- Currency stays ZMW; date format stays `dd MMM yyyy`.
