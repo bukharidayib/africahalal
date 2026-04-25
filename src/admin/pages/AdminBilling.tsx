@@ -148,6 +148,8 @@ export default function AdminBilling() {
     amount: '',
     due_date: '',
     validity_period: '',
+    start_date: todayStr(),
+    expiry_date: '',
   });
   const [isCreating, setIsCreating] = useState(false);
 
