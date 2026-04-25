@@ -470,29 +470,7 @@ export default function Inspectors() {
               </div>
               <div className="space-y-2"><Label>Address</Label><Textarea value={editing.address || ''} onChange={(e) => setEditing({ ...editing, address: e.target.value })} rows={2} /></div>
 
-              <div className="space-y-2">
-                <Label>Specializations</Label>
-                <div className="flex flex-wrap gap-2">
-                  {SPECIALIZATIONS.map(s => (
-                    <Badge key={s} variant={editing.specializations?.includes(s) ? 'default' : 'outline'} className="cursor-pointer"
-                      onClick={() => setEditing({ ...editing, specializations: editing.specializations?.includes(s) ? editing.specializations.filter(x => x !== s) : [...(editing.specializations || []), s] })}>
-                      {s}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Regions</Label>
-                <div className="flex flex-wrap gap-2">
-                  {REGIONS.map(r => (
-                    <Badge key={r} variant={editing.regions?.includes(r) ? 'default' : 'outline'} className="cursor-pointer gap-1"
-                      onClick={() => setEditing({ ...editing, regions: editing.regions?.includes(r) ? editing.regions.filter(x => x !== r) : [...(editing.regions || []), r] })}>
-                      <MapPin className="h-3 w-3" />{r}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
 
               <div className="space-y-2">
                 <Label>Assigned Businesses</Label>
