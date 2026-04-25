@@ -93,7 +93,6 @@ export default function PendingApprovals() {
   async function handleAction() {
     if (!selectedApproval || !actionType || !user) return;
 
-    // Validate dual-control: approver cannot be the recommender
     if (selectedApproval.recommender_id === user.id) {
       toast.error('Dual-Control Violation', {
         description: 'You cannot approve your own recommendation.',
@@ -103,30 +102,42 @@ export default function PendingApprovals() {
 
     setIsSubmitting(true);
     try {
+      const newApprovalStatus = actionType === 'approve' ? 'approved' : 'rejected';
       const { error } = await supabase
         .from('approval_requests')
         .update({
-          status: actionType === 'approve' ? 'approved' : 'rejected',
+          status: newApprovalStatus,
           approver_id: user.id,
-          approval_notes: notes,
+          approval_notes: notes || null,
           resolved_at: new Date().toISOString(),
         })
         .eq('id', selectedApproval.id);
-
       if (error) throw error;
 
-      // Log the action
-      await supabase.rpc('log_audit', {
-        _action: actionType === 'approve' ? 'approval_granted' : 'approval_rejected',
-        _resource_type: 'approval_request',
-        _resource_id: selectedApproval.id,
-        _reason_code: actionType,
-        _metadata: { notes, application_id: selectedApproval.application_id },
-      });
+      // Advance the parent application status
+      const newAppStatus = actionType === 'approve' ? 'approved' : 'rejected';
+      const { error: appErr } = await supabase
+        .from('certification_applications')
+        .update({ status: newAppStatus as any })
+        .eq('id', selectedApproval.application_id);
+      if (appErr) console.warn('Failed to update application status:', appErr);
+
+      // Best-effort audit log
+      try {
+        await supabase.rpc('log_audit', {
+          _action: actionType === 'approve' ? 'approval_granted' : 'approval_rejected',
+          _resource_type: 'approval_request',
+          _resource_id: selectedApproval.id,
+          _reason_code: actionType,
+          _metadata: { notes, application_id: selectedApproval.application_id },
+        });
+      } catch (logErr) {
+        console.warn('Audit log failed (non-fatal):', logErr);
+      }
 
       toast.success(actionType === 'approve' ? 'Approved Successfully' : 'Rejected', {
-        description: actionType === 'approve' 
-          ? 'The certificate can now be issued.' 
+        description: actionType === 'approve'
+          ? 'The application has been approved and the certificate can now be issued.'
           : 'The approval request has been rejected.',
       });
 
