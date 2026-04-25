@@ -653,7 +653,7 @@ export default function AdminBilling() {
             <TabsTrigger value="subscriptions" className="gap-2"><Repeat className="h-4 w-4" /> Subscriptions</TabsTrigger>
             <TabsTrigger value="quotations" className="gap-2"><FileText className="h-4 w-4" /> Quotations</TabsTrigger>
             <TabsTrigger value="transactions" className="gap-2"><CreditCard className="h-4 w-4" /> Payment Transactions</TabsTrigger>
-            <TabsTrigger value="offline" className="gap-2"><Banknote className="h-4 w-4" /> Offline Payments</TabsTrigger>
+            
           </TabsList>
 
           <TabsContent value="pending"><PendingPricingTab /></TabsContent>
