@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Building2, FileText, Award, Receipt, MessageSquare, History,
-  FolderOpen, DollarSign, Loader2, Eye, Mail, Phone, MapPin, Hash, Plus,
+  FolderOpen, DollarSign, Loader2, Eye, Mail, Phone, MapPin, Hash,
+  CalendarDays, Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { AdminLayout } from '../components/layout/AdminLayout';
@@ -17,6 +18,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { IssueCertificateDialog } from '../components/billing/IssueCertificateDialog';
+import { EditValidityDialog } from '../components/billing/EditValidityDialog';
 
 export default function BusinessDetail() {
   const { id } = useParams();
@@ -36,6 +38,7 @@ export default function BusinessDetail() {
   const [chats, setChats] = useState<any[]>([]);
   const [audits, setAudits] = useState<any[]>([]);
   const [issueFor, setIssueFor] = useState<{ applicationId: string; scope?: string } | null>(null);
+  const [editValidity, setEditValidity] = useState<{ id: string; issue_date: string; expiry_date: string; status: string } | null>(null);
 
   useEffect(() => { if (id) void load(); }, [id]);
 
