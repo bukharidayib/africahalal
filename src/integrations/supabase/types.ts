@@ -1563,65 +1563,6 @@ export type Database = {
           },
         ]
       }
-      offline_payments: {
-        Row: {
-          amount: number
-          created_at: string
-          id: string
-          invoice_id: string
-          notes: string | null
-          review_notes: string | null
-          reviewed_at: string | null
-          reviewed_by: string | null
-          screenshot_path: string
-          sender_name: string
-          sender_phone: string
-          status: string
-          submitted_by: string
-          transaction_reference: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          id?: string
-          invoice_id: string
-          notes?: string | null
-          review_notes?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          screenshot_path: string
-          sender_name: string
-          sender_phone: string
-          status?: string
-          submitted_by: string
-          transaction_reference?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          id?: string
-          invoice_id?: string
-          notes?: string | null
-          review_notes?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          screenshot_path?: string
-          sender_name?: string
-          sender_phone?: string
-          status?: string
-          submitted_by?: string
-          transaction_reference?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "offline_payments_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       organization_supervisors: {
         Row: {
           assigned_at: string | null

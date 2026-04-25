@@ -8,8 +8,8 @@ import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, Clock, AlertTriangle, CheckCircle2, Loader2, Search,
-  Receipt, Plus, Eye, Pencil, Trash2, RefreshCw, CreditCard, Banknote,
-  Image, XCircle, CheckCircle, Calculator, Send, FileText, Repeat, Download
+  Receipt, Plus, Eye, Pencil, Trash2, RefreshCw, CreditCard,
+  Calculator, Send, FileText, Repeat, Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -178,36 +178,7 @@ export default function AdminBilling() {
   const [txStatusFilter, setTxStatusFilter] = useState('all');
   const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
 
-  // Offline payments state
-  interface OfflinePayment {
-    id: string;
-    invoice_id: string;
-    sender_name: string;
-    sender_phone: string;
-    amount: number;
-    transaction_reference: string | null;
-    screenshot_path: string;
-    notes: string | null;
-    status: string;
-    submitted_by: string;
-    reviewed_by: string | null;
-    reviewed_at: string | null;
-    review_notes: string | null;
-    created_at: string;
-    invoices?: { invoice_number: string; organizations?: { name: string } | null } | null;
-  }
-  const [offlinePayments, setOfflinePayments] = useState<OfflinePayment[]>([]);
-  const [offlineLoading, setOfflineLoading] = useState(true);
-  const [offlineSearch, setOfflineSearch] = useState('');
-  const [offlineStatusFilter, setOfflineStatusFilter] = useState('all');
-  const [filteredOffline, setFilteredOffline] = useState<OfflinePayment[]>([]);
-  const [reviewingPayment, setReviewingPayment] = useState<OfflinePayment | null>(null);
-  const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | null>(null);
-  const [reviewNotes, setReviewNotes] = useState('');
-  const [isReviewing, setIsReviewing] = useState(false);
-  const [viewingScreenshot, setViewingScreenshot] = useState<string | null>(null);
-
-  useEffect(() => { fetchData(); fetchTransactions(); fetchOfflinePayments(); }, []);
+  useEffect(() => { fetchData(); fetchTransactions(); }, []);
 
   useEffect(() => {
     let result = invoices;
@@ -222,21 +193,6 @@ export default function AdminBilling() {
     }
     setFiltered(result);
   }, [invoices, search, statusFilter]);
-
-  useEffect(() => {
-    let result = offlinePayments;
-    if (offlineStatusFilter !== 'all') result = result.filter(o => o.status === offlineStatusFilter);
-    if (offlineSearch) {
-      const s = offlineSearch.toLowerCase();
-      result = result.filter(o =>
-        o.sender_name.toLowerCase().includes(s) ||
-        o.sender_phone.includes(s) ||
-        (o.invoices?.invoice_number || '').toLowerCase().includes(s) ||
-        (o.invoices?.organizations?.name || '').toLowerCase().includes(s)
-      );
-    }
-    setFilteredOffline(result);
-  }, [offlinePayments, offlineSearch, offlineStatusFilter]);
 
   useEffect(() => {
     let result = transactions;
@@ -291,103 +247,6 @@ export default function AdminBilling() {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     } finally {
       setTxLoading(false);
-    }
-  };
-
-  const fetchOfflinePayments = async () => {
-    setOfflineLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('offline_payments')
-        .select('*, invoices(invoice_number, organizations(name))')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setOfflinePayments((data || []) as OfflinePayment[]);
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
-    } finally {
-      setOfflineLoading(false);
-    }
-  };
-
-  const handleReviewOfflinePayment = async () => {
-    if (!reviewingPayment || !reviewAction) return;
-    setIsReviewing(true);
-    try {
-      const user = (await supabase.auth.getUser()).data.user;
-      
-      // Update offline payment status
-      const { error: updateError } = await supabase
-        .from('offline_payments')
-        .update({
-          status: reviewAction === 'approve' ? 'approved' : 'rejected',
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString(),
-          review_notes: reviewNotes || null,
-        })
-        .eq('id', reviewingPayment.id);
-      if (updateError) throw updateError;
-
-      // If approved, mark invoice as paid and update application status
-      if (reviewAction === 'approve') {
-        const { error: invError } = await supabase
-          .from('invoices')
-          .update({ status: 'paid', paid_at: new Date().toISOString() })
-          .eq('id', reviewingPayment.invoice_id);
-        if (invError) throw invError;
-
-        // Update linked application to submitted
-        const { data: invoiceData } = await supabase
-          .from('invoices')
-          .select('application_id')
-          .eq('id', reviewingPayment.invoice_id)
-          .single();
-        if (invoiceData?.application_id) {
-          await supabase
-            .from('certification_applications')
-            .update({ status: 'submitted', submitted_at: new Date().toISOString() })
-            .eq('id', invoiceData.application_id)
-            .in('status', ['draft']);
-        }
-
-        // Log to activity
-        await supabase.from('invoice_activity_log').insert({
-          invoice_id: reviewingPayment.invoice_id,
-          action: 'offline_payment_approved',
-          performed_by: user?.id,
-          metadata: { offline_payment_id: reviewingPayment.id, sender_name: reviewingPayment.sender_name },
-        });
-
-        // Trigger certificate issuance + receipt/cert emails for certification invoices
-        try {
-          await supabase.functions.invoke('issue-certificate-on-payment', {
-            body: { invoice_id: reviewingPayment.invoice_id },
-          });
-        } catch (e) { console.warn('issue-certificate-on-payment failed', e); }
-      }
-
-      toast({ title: reviewAction === 'approve' ? 'Payment Approved' : 'Payment Rejected', description: `Offline payment has been ${reviewAction === 'approve' ? 'approved' : 'rejected'}.` });
-      setReviewingPayment(null);
-      setReviewAction(null);
-      setReviewNotes('');
-      fetchOfflinePayments();
-      fetchData();
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
-    } finally {
-      setIsReviewing(false);
-    }
-  };
-
-  const handleViewScreenshot = async (path: string) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('application-documents')
-        .createSignedUrl(path, 60);
-      if (error) throw error;
-      window.open(data.signedUrl, '_blank');
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not load screenshot.' });
     }
   };
 
@@ -782,7 +641,7 @@ export default function AdminBilling() {
             <TabsTrigger value="subscriptions" className="gap-2"><Repeat className="h-4 w-4" /> Subscriptions</TabsTrigger>
             <TabsTrigger value="quotations" className="gap-2"><FileText className="h-4 w-4" /> Quotations</TabsTrigger>
             <TabsTrigger value="transactions" className="gap-2"><CreditCard className="h-4 w-4" /> Payment Transactions</TabsTrigger>
-            <TabsTrigger value="offline" className="gap-2"><Banknote className="h-4 w-4" /> Offline Payments</TabsTrigger>
+            
           </TabsList>
 
           <TabsContent value="pending"><PendingPricingTab /></TabsContent>
@@ -957,139 +816,7 @@ export default function AdminBilling() {
               </CardContent>
             </Card>
           </TabsContent>
-          {/* Offline Payments Tab */}
-          <TabsContent value="offline">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search offline payments..." value={offlineSearch} onChange={(e) => setOfflineSearch(e.target.value)} className="pl-9" />
-                  </div>
-                  <Select value={offlineStatusFilter} onValueChange={setOfflineStatusFilter}>
-                    <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filter status" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="pending_review">Pending Review</SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button variant="outline" size="sm" onClick={fetchOfflinePayments} disabled={offlineLoading}>
-                    <RefreshCw className={`h-4 w-4 mr-2 ${offlineLoading ? 'animate-spin' : ''}`} /> Refresh
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {offlineLoading ? (
-                  <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-                ) : filteredOffline.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Banknote className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">No offline payments found.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Invoice #</TableHead>
-                          <TableHead>Client</TableHead>
-                          <TableHead>Sender Name</TableHead>
-                          <TableHead>Phone</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Ref</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredOffline.map((op) => (
-                          <TableRow key={op.id}>
-                            <TableCell className="font-mono text-sm">{op.invoices?.invoice_number || '—'}</TableCell>
-                            <TableCell>{op.invoices?.organizations?.name || '—'}</TableCell>
-                            <TableCell>{op.sender_name}</TableCell>
-                            <TableCell className="font-mono text-sm">{op.sender_phone}</TableCell>
-                            <TableCell className="font-semibold">ZMW {Number(op.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
-                            <TableCell className="font-mono text-xs">{op.transaction_reference || '—'}</TableCell>
-                            <TableCell>
-                              <Badge variant={op.status === 'approved' ? 'default' : op.status === 'rejected' ? 'destructive' : 'secondary'}>
-                                {op.status === 'pending_review' ? 'Pending Review' : op.status.charAt(0).toUpperCase() + op.status.slice(1)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-sm">{format(new Date(op.created_at), 'dd MMM yyyy HH:mm')}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center justify-end gap-1">
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewScreenshot(op.screenshot_path)} title="View Screenshot">
-                                  <Image className="h-4 w-4" />
-                                </Button>
-                                {op.status === 'pending_review' && (
-                                  <>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => { setReviewingPayment(op); setReviewAction('approve'); }} title="Approve">
-                                      <CheckCircle className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => { setReviewingPayment(op); setReviewAction('reject'); }} title="Reject">
-                                      <XCircle className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
-
-        {/* Offline Payment Review Dialog */}
-        <Dialog open={!!reviewingPayment} onOpenChange={(open) => { if (!open) { setReviewingPayment(null); setReviewAction(null); setReviewNotes(''); } }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{reviewAction === 'approve' ? 'Approve' : 'Reject'} Offline Payment</DialogTitle>
-            </DialogHeader>
-            {reviewingPayment && (
-              <div className="space-y-4 py-2">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">Invoice</span><p className="font-mono font-semibold">{reviewingPayment.invoices?.invoice_number}</p></div>
-                  <div><span className="text-muted-foreground">Amount</span><p className="font-bold">ZMW {Number(reviewingPayment.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
-                  <div><span className="text-muted-foreground">Sender</span><p>{reviewingPayment.sender_name}</p></div>
-                  <div><span className="text-muted-foreground">Phone</span><p className="font-mono">{reviewingPayment.sender_phone}</p></div>
-                  {reviewingPayment.transaction_reference && <div><span className="text-muted-foreground">Reference</span><p className="font-mono">{reviewingPayment.transaction_reference}</p></div>}
-                  {reviewingPayment.notes && <div className="col-span-2"><span className="text-muted-foreground">Client Notes</span><p>{reviewingPayment.notes}</p></div>}
-                </div>
-                <Button variant="outline" size="sm" onClick={() => handleViewScreenshot(reviewingPayment.screenshot_path)}>
-                  <Image className="h-4 w-4 mr-2" /> View Payment Screenshot
-                </Button>
-                <Separator />
-                <div className="space-y-2">
-                  <Label>Review Notes {reviewAction === 'reject' ? '*' : '(optional)'}</Label>
-                  <Textarea
-                    placeholder={reviewAction === 'reject' ? 'Reason for rejection...' : 'Optional notes...'}
-                    value={reviewNotes}
-                    onChange={(e) => setReviewNotes(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setReviewingPayment(null); setReviewAction(null); setReviewNotes(''); }}>Cancel</Button>
-              <Button
-                onClick={handleReviewOfflinePayment}
-                disabled={isReviewing || (reviewAction === 'reject' && !reviewNotes.trim())}
-                variant={reviewAction === 'approve' ? 'default' : 'destructive'}
-              >
-                {isReviewing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {reviewAction === 'approve' ? 'Approve Payment' : 'Reject Payment'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
 
         <Dialog open={!!viewInvoice} onOpenChange={(open) => !open && setViewInvoice(null)}>
