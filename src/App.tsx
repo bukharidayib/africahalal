@@ -80,6 +80,8 @@ import AdminSupportChatSession from "./admin/pages/AdminSupportChatSession";
 import RolesPermissions from "./admin/pages/RolesPermissions";
 import RoleEditor from "./admin/pages/RoleEditor";
 import AdminBilling from "./admin/pages/AdminBilling";
+import Businesses from "./admin/pages/Businesses";
+import BusinessDetail from "./admin/pages/BusinessDetail";
 import IngredientTracker from "./admin/pages/IngredientTracker";
 import AdminSupervisorReportDetail from "./admin/pages/AdminSupervisorReportDetail";
 import { AdminProtectedRoute } from "./admin/components/AdminProtectedRoute";
@@ -236,6 +238,8 @@ const App = () => (
                 <Route path="roles" element={<PermissionGate requireAny={["canManageRoles","canManageUsers"]}><RolesPermissions /></PermissionGate>} />
                 <Route path="roles/:id" element={<PermissionGate requireAny={["canManageRoles","canManageUsers"]}><RoleEditor /></PermissionGate>} />
                 <Route path="billing" element={<PermissionGate require="canViewFinance"><AdminBilling /></PermissionGate>} />
+                <Route path="businesses" element={<PermissionGate require="canViewApplications"><Businesses /></PermissionGate>} />
+                <Route path="businesses/:id" element={<PermissionGate require="canViewApplications"><BusinessDetail /></PermissionGate>} />
                 <Route path="ingredients" element={<PermissionGate require="canViewIngredients"><IngredientTracker /></PermissionGate>} />
                 <Route path="supervisor-reports/:id" element={<PermissionGate require="canViewSupervisors"><AdminSupervisorReportDetail /></PermissionGate>} />
               </Route>
