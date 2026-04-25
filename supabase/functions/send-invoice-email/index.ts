@@ -205,7 +205,16 @@ Deno.serve(async (req) => {
       }
       recipients = valid;
       recipientSource = 'manual_override';
-    } else {
+    } else if (Array.isArray(invoice.recipient_emails) && invoice.recipient_emails.length) {
+      const valid = Array.from(new Set(
+        invoice.recipient_emails.map((e: any) => String(e || '').trim()).filter((e: string) => EMAIL_RE.test(e))
+      ));
+      if (valid.length) {
+        recipients = valid;
+        recipientSource = 'invoice.recipient_emails';
+      }
+    }
+    if (recipients.length === 0) {
       const recipientInfo = await resolveRecipient(invoice.organizations, invoice.organization_id);
       if (!recipientInfo.email) {
         const msg = `Cannot send invoice: missing ${recipientInfo.missing}`;
@@ -232,7 +241,10 @@ Deno.serve(async (req) => {
     const amount = `${invoice.currency} ${Number(invoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
     const payUrl = `https://africanhalaal.com/client/billing/invoices/${invoice.id}`;
 
-    const html = buildInvoiceEmailHtml({ invoice, orgName, amount, dueDate, payUrl });
+    const html = buildInvoiceEmailHtml({
+      invoice, orgName, amount, dueDate, payUrl,
+      mode: invoice.status === 'paid' ? 'receipt' : 'invoice',
+    });
 
     const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST',
