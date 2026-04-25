@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Building2, FileText, Award, Receipt, MessageSquare, History,
-  FolderOpen, DollarSign, Loader2, Eye, Mail, Phone, MapPin, Hash, Plus,
+  FolderOpen, DollarSign, Loader2, Eye, Mail, Phone, MapPin, Hash,
+  CalendarDays, Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { AdminLayout } from '../components/layout/AdminLayout';
@@ -17,6 +18,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { IssueCertificateDialog } from '../components/billing/IssueCertificateDialog';
+import { EditValidityDialog } from '../components/billing/EditValidityDialog';
 
 export default function BusinessDetail() {
   const { id } = useParams();
@@ -36,6 +38,7 @@ export default function BusinessDetail() {
   const [chats, setChats] = useState<any[]>([]);
   const [audits, setAudits] = useState<any[]>([]);
   const [issueFor, setIssueFor] = useState<{ applicationId: string; scope?: string } | null>(null);
+  const [editValidity, setEditValidity] = useState<{ id: string; issue_date: string; expiry_date: string; status: string } | null>(null);
 
   useEffect(() => { if (id) void load(); }, [id]);
 
@@ -171,20 +174,63 @@ export default function BusinessDetail() {
                   )}
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader><CardTitle>Owner</CardTitle></CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  {owner ? (
-                    <>
-                      <Field label="Full Name" value={owner.full_name || '—'} />
-                      <Field icon={Mail} label="Email" value={owner.email} />
-                      <Field label="Account Created" value={format(new Date(biz.created_at), 'dd MMM yyyy')} />
-                    </>
-                  ) : (
-                    <p className="text-muted-foreground">No owner record found.</p>
-                  )}
-                </CardContent>
-              </Card>
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader><CardTitle>Owner</CardTitle></CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    {owner ? (
+                      <>
+                        <Field label="Full Name" value={owner.full_name || '—'} />
+                        <Field icon={Mail} label="Email" value={owner.email} />
+                        <Field label="Account Created" value={format(new Date(biz.created_at), 'dd MMM yyyy')} />
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground">No owner record found.</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Manual Subscription / Validity Panel */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CalendarDays className="h-5 w-5 text-primary" /> Subscription / Validity
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const active = certs.find((c) => c.status === 'active');
+                      if (!active) {
+                        return <p className="text-sm text-muted-foreground">No active certificate. Issue a certificate from the Applications tab to start a subscription.</p>;
+                      }
+                      const daysLeft = Math.ceil((new Date(active.expiry_date).getTime() - Date.now()) / 86400000);
+                      return (
+                        <div className="space-y-3 text-sm">
+                          <Field icon={Award} label="Active Certificate" value={<span className="font-mono">{active.certificate_number}</span>} />
+                          <div className="grid grid-cols-2 gap-3">
+                            <Field label="Issued" value={format(new Date(active.issue_date), 'dd MMM yyyy')} />
+                            <Field label="Expires" value={
+                              <span className={daysLeft < 30 ? 'text-destructive font-semibold' : ''}>
+                                {format(new Date(active.expiry_date), 'dd MMM yyyy')} ({daysLeft}d)
+                              </span>
+                            } />
+                          </div>
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setEditValidity({
+                              id: active.id, issue_date: active.issue_date,
+                              expiry_date: active.expiry_date, status: active.status,
+                            })}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" /> Set / Extend Validity
+                          </Button>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
 
@@ -235,7 +281,16 @@ export default function BusinessDetail() {
                         <TableCell><Badge variant={c.status === 'active' ? 'default' : 'outline'} className="capitalize">{c.status}</Badge></TableCell>
                         <TableCell>{format(new Date(c.issue_date), 'dd MMM yyyy')}</TableCell>
                         <TableCell>{format(new Date(c.expiry_date), 'dd MMM yyyy')}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right space-x-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditValidity({
+                              id: c.id, issue_date: c.issue_date, expiry_date: c.expiry_date, status: c.status,
+                            })}
+                          >
+                            <Pencil className="h-4 w-4 mr-1" /> Edit Validity
+                          </Button>
                           <Button asChild variant="ghost" size="sm"><Link to={`/admin/certificates/${c.id}`}><Eye className="h-4 w-4" /></Link></Button>
                         </TableCell>
                       </TableRow>
@@ -387,6 +442,20 @@ export default function BusinessDetail() {
           organizationId={org.id}
           defaultScope={issueFor.scope}
           onIssued={() => { setIssueFor(null); void load(); }}
+        />
+      )}
+
+      {editValidity && (
+        <EditValidityDialog
+          open={!!editValidity}
+          onOpenChange={(o) => !o && setEditValidity(null)}
+          certificateId={editValidity.id}
+          initial={{
+            issue_date: editValidity.issue_date,
+            expiry_date: editValidity.expiry_date,
+            status: editValidity.status,
+          }}
+          onSaved={() => { setEditValidity(null); void load(); }}
         />
       )}
     </AdminLayout>

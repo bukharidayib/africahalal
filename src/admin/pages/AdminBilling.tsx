@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, Clock, AlertTriangle, CheckCircle2, Loader2, Search,
   Receipt, Plus, Eye, Pencil, Trash2, RefreshCw, CreditCard,
-  Calculator, Send, FileText, Repeat, Download
+  Calculator, Send, FileText, Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -30,7 +30,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PendingPricingTab from '../components/accountant/PendingPricingTab';
-import SubscriptionsTab from '../components/accountant/SubscriptionsTab';
 import QuotationsTab from '../components/accountant/QuotationsTab';
 import { OrgCombobox } from '../components/OrgCombobox';
 import { InvoiceFormDialog } from '../components/billing/InvoiceFormDialog';
@@ -525,14 +524,11 @@ export default function AdminBilling() {
           <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="pending" className="gap-2"><AlertTriangle className="h-4 w-4" /> Pending Pricing</TabsTrigger>
             <TabsTrigger value="invoices" className="gap-2"><Receipt className="h-4 w-4" /> Invoices</TabsTrigger>
-            <TabsTrigger value="subscriptions" className="gap-2"><Repeat className="h-4 w-4" /> Subscriptions</TabsTrigger>
             <TabsTrigger value="quotations" className="gap-2"><FileText className="h-4 w-4" /> Quotations</TabsTrigger>
             <TabsTrigger value="transactions" className="gap-2"><CreditCard className="h-4 w-4" /> Payment Transactions</TabsTrigger>
-            
           </TabsList>
 
           <TabsContent value="pending"><PendingPricingTab /></TabsContent>
-          <TabsContent value="subscriptions"><SubscriptionsTab /></TabsContent>
           <TabsContent value="quotations"><QuotationsTab /></TabsContent>
 
 
