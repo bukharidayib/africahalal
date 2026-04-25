@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Building2, FileText, Award, Receipt, MessageSquare, History,
-  FolderOpen, DollarSign, Loader2, Eye, Mail, Phone, MapPin, Hash,
+  FolderOpen, DollarSign, Loader2, Eye, Mail, Phone, MapPin, Hash, Plus,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { AdminLayout } from '../components/layout/AdminLayout';
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { IssueCertificateDialog } from '../components/billing/IssueCertificateDialog';
 
 export default function BusinessDetail() {
   const { id } = useParams();
@@ -34,6 +35,7 @@ export default function BusinessDetail() {
   const [messages, setMessages] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
   const [audits, setAudits] = useState<any[]>([]);
+  const [issueFor, setIssueFor] = useState<{ applicationId: string; scope?: string } | null>(null);
 
   useEffect(() => { if (id) void load(); }, [id]);
 
@@ -200,6 +202,16 @@ export default function BusinessDetail() {
                         <TableCell><Badge variant="secondary" className="capitalize">{a.status?.replace(/_/g, ' ')}</Badge></TableCell>
                         <TableCell>{a.submitted_at ? format(new Date(a.submitted_at), 'dd MMM yyyy') : '—'}</TableCell>
                         <TableCell className="text-right">
+                          {a.status === 'approved' && !certs.some((c) => c.application_id === a.id) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mr-2"
+                              onClick={() => setIssueFor({ applicationId: a.id, scope: a.scope })}
+                            >
+                              <Award className="h-4 w-4 mr-1" /> Issue Certificate
+                            </Button>
+                          )}
                           <Button asChild variant="ghost" size="sm"><Link to={`/admin/applications/${a.id}`}><Eye className="h-4 w-4" /></Link></Button>
                         </TableCell>
                       </TableRow>
