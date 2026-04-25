@@ -390,9 +390,7 @@ export function MoMoPaymentDialog({
         {paymentState === "processing" && (
           <div className="flex flex-col items-center py-8 gap-3">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">
-              {paymentMethod === "offline" ? "Submitting payment proof..." : "Processing payment..."}
-            </p>
+            <p className="text-sm text-muted-foreground">Processing payment...</p>
           </div>
         )}
 
