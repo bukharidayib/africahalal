@@ -137,10 +137,6 @@ export default function Applications() {
               Manage certification applications
             </p>
           </div>
-          <Button>
-            <FileText className="mr-2 h-4 w-4" />
-            New Application
-          </Button>
         </div>
 
         {/* Filters */}

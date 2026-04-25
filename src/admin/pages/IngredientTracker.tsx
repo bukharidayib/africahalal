@@ -178,7 +178,11 @@ export default function IngredientTracker() {
           <Card>
             <CardContent className="py-12 text-center">
               <FlaskConical className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
-              <p className="text-muted-foreground">No ingredient collections found.</p>
+              <h3 className="font-medium mb-1">No ingredient collections yet</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Ingredient collections are created by supervisors during inspections.
+                Once a supervisor submits a collected sample, it will appear here for AI Halal/Haram analysis.
+              </p>
             </CardContent>
           </Card>
         ) : (

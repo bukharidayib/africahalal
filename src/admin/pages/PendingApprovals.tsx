@@ -37,14 +37,9 @@ interface ApprovalRequest {
     application_number: string;
     scope: string;
     sector: string;
-    organizations?: {
-      name: string;
-    };
+    organizations?: { name: string };
   };
-  recommender?: {
-    full_name: string;
-    email: string;
-  };
+  recommender?: { full_name: string | null; email: string | null };
 }
 
 export default function PendingApprovals() {
@@ -61,6 +56,7 @@ export default function PendingApprovals() {
   }, []);
 
   async function fetchApprovals() {
+    setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('approval_requests')
@@ -70,18 +66,25 @@ export default function PendingApprovals() {
             application_number,
             scope,
             sector,
-            organizations (
-              name
-            )
+            organizations ( name )
           )
         `)
         .eq('status', 'pending')
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setApprovals(data || []);
+
+      const recIds = Array.from(new Set((data || []).map((a: any) => a.recommender_id).filter(Boolean)));
+      let recMap = new Map<string, any>();
+      if (recIds.length) {
+        const { data: profs } = await supabase
+          .from('profiles').select('id, full_name, email').in('id', recIds);
+        recMap = new Map((profs || []).map((p: any) => [p.id, p]));
+      }
+      setApprovals((data || []).map((a: any) => ({ ...a, recommender: recMap.get(a.recommender_id) })));
     } catch (error) {
       console.error('Error fetching approvals:', error);
+      toast.error('Failed to load approvals');
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +93,6 @@ export default function PendingApprovals() {
   async function handleAction() {
     if (!selectedApproval || !actionType || !user) return;
 
-    // Validate dual-control: approver cannot be the recommender
     if (selectedApproval.recommender_id === user.id) {
       toast.error('Dual-Control Violation', {
         description: 'You cannot approve your own recommendation.',
@@ -100,30 +102,42 @@ export default function PendingApprovals() {
 
     setIsSubmitting(true);
     try {
+      const newApprovalStatus = actionType === 'approve' ? 'approved' : 'rejected';
       const { error } = await supabase
         .from('approval_requests')
         .update({
-          status: actionType === 'approve' ? 'approved' : 'rejected',
+          status: newApprovalStatus,
           approver_id: user.id,
-          approval_notes: notes,
+          approval_notes: notes || null,
           resolved_at: new Date().toISOString(),
         })
         .eq('id', selectedApproval.id);
-
       if (error) throw error;
 
-      // Log the action
-      await supabase.rpc('log_audit', {
-        _action: actionType === 'approve' ? 'approval_granted' : 'approval_rejected',
-        _resource_type: 'approval_request',
-        _resource_id: selectedApproval.id,
-        _reason_code: actionType,
-        _metadata: { notes, application_id: selectedApproval.application_id },
-      });
+      // Advance the parent application status
+      const newAppStatus = actionType === 'approve' ? 'approved' : 'rejected';
+      const { error: appErr } = await supabase
+        .from('certification_applications')
+        .update({ status: newAppStatus as any })
+        .eq('id', selectedApproval.application_id);
+      if (appErr) console.warn('Failed to update application status:', appErr);
+
+      // Best-effort audit log
+      try {
+        await supabase.rpc('log_audit', {
+          _action: actionType === 'approve' ? 'approval_granted' : 'approval_rejected',
+          _resource_type: 'approval_request',
+          _resource_id: selectedApproval.id,
+          _reason_code: actionType,
+          _metadata: { notes, application_id: selectedApproval.application_id },
+        });
+      } catch (logErr) {
+        console.warn('Audit log failed (non-fatal):', logErr);
+      }
 
       toast.success(actionType === 'approve' ? 'Approved Successfully' : 'Rejected', {
-        description: actionType === 'approve' 
-          ? 'The certificate can now be issued.' 
+        description: actionType === 'approve'
+          ? 'The application has been approved and the certificate can now be issued.'
           : 'The approval request has been rejected.',
       });
 
@@ -149,11 +163,16 @@ export default function PendingApprovals() {
     <AdminLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold font-serif">Pending Approvals</h1>
-          <p className="text-muted-foreground">
-            Dual-control approval queue for certificate issuance
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold font-serif">Pending Approvals</h1>
+            <p className="text-muted-foreground">
+              Dual-control approval queue for certificate issuance
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchApprovals} disabled={isLoading}>
+            <Clock className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
         </div>
 
         {/* Info Card */}
@@ -236,7 +255,7 @@ export default function PendingApprovals() {
                     <div className="text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <User className="h-4 w-4" />
-                        Recommended {format(new Date(approval.created_at), 'dd MMM yyyy HH:mm')}
+                        Recommended by {approval.recommender?.full_name || approval.recommender?.email || 'Unknown'} · {format(new Date(approval.created_at), 'dd MMM yyyy HH:mm')}
                       </span>
                     </div>
 
