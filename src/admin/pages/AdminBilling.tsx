@@ -195,21 +195,6 @@ export default function AdminBilling() {
   }, [invoices, search, statusFilter]);
 
   useEffect(() => {
-    let result = offlinePayments;
-    if (offlineStatusFilter !== 'all') result = result.filter(o => o.status === offlineStatusFilter);
-    if (offlineSearch) {
-      const s = offlineSearch.toLowerCase();
-      result = result.filter(o =>
-        o.sender_name.toLowerCase().includes(s) ||
-        o.sender_phone.includes(s) ||
-        (o.invoices?.invoice_number || '').toLowerCase().includes(s) ||
-        (o.invoices?.organizations?.name || '').toLowerCase().includes(s)
-      );
-    }
-    setFilteredOffline(result);
-  }, [offlinePayments, offlineSearch, offlineStatusFilter]);
-
-  useEffect(() => {
     let result = transactions;
     if (txStatusFilter !== 'all') result = result.filter(t => t.status === txStatusFilter);
     if (txSearch) {
