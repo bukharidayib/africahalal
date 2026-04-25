@@ -250,18 +250,6 @@ export default function AdminBilling() {
     }
   };
 
-  const handleViewScreenshot = async (path: string) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('application-documents')
-        .createSignedUrl(path, 60);
-      if (error) throw error;
-      window.open(data.signedUrl, '_blank');
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not load screenshot.' });
-    }
-  };
-
   const handleCheckStatus = async (tx: PaymentTransaction) => {
     setCheckingStatusId(tx.id);
     try {
