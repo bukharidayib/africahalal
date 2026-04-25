@@ -428,7 +428,21 @@ export default function BusinessDetail() {
                     </div>
                   ))}
                 </div>
-              )}
+      )}
+
+      {editValidity && (
+        <EditValidityDialog
+          open={!!editValidity}
+          onOpenChange={(o) => !o && setEditValidity(null)}
+          certificateId={editValidity.id}
+          initial={{
+            issue_date: editValidity.issue_date,
+            expiry_date: editValidity.expiry_date,
+            status: editValidity.status,
+          }}
+          onSaved={() => { setEditValidity(null); void load(); }}
+        />
+      )}
             </CardContent></Card>
           </TabsContent>
         </Tabs>
