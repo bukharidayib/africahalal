@@ -410,9 +410,7 @@ export function MoMoPaymentDialog({
             <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/30">
               <CheckCircle2 className="h-6 w-6 text-green-600" />
             </div>
-            <p className="font-medium">
-              {paymentMethod === "offline" ? "Payment Proof Submitted!" : "Payment Successful!"}
-            </p>
+            <p className="font-medium">Payment Successful!</p>
             <p className="text-sm text-muted-foreground">{message}</p>
             {reference && <p className="text-xs text-muted-foreground font-mono">Ref: {reference}</p>}
           </div>
