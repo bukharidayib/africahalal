@@ -285,7 +285,7 @@ export default function CertificateDetail() {
           </AlertDialogHeader>
           {action !== 'reinstate' && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Reason {action !== 'reinstate' && <span className="text-destructive">*</span>}</label>
+              <label className="text-sm font-medium">Reason <span className="text-destructive">*</span></label>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Provide a reason for this action..." rows={3} />
             </div>
           )}
