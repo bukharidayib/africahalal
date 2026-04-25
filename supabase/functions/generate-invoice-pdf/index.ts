@@ -1,4 +1,4 @@
-// Generate invoice PDF (returns base64 in JSON or raw PDF stream)
+// Generate professional invoice PDF
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { PDFDocument, rgb, StandardFonts } from 'https://esm.sh/pdf-lib@1.17.1';
 
@@ -11,6 +11,20 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
+
+const fmt = (n: number) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function wrap(text: string, max: number): string[] {
+  const words = String(text || '').split(/\s+/);
+  const lines: string[] = [];
+  let line = '';
+  for (const w of words) {
+    if ((line + ' ' + w).trim().length > max) { if (line) lines.push(line.trim()); line = w; }
+    else line = (line ? line + ' ' : '') + w;
+  }
+  if (line) lines.push(line.trim());
+  return lines;
+}
 
 async function buildInvoicePdf(invoiceId: string): Promise<Uint8Array> {
   const { data: inv, error } = await supabase
@@ -25,39 +39,81 @@ async function buildInvoicePdf(invoiceId: string): Promise<Uint8Array> {
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-  const navy = rgb(0.06, 0.18, 0.34);
-  const gold = rgb(0.78, 0.62, 0.23);
-  const grey = rgb(0.4, 0.4, 0.4);
-  const black = rgb(0, 0, 0);
+  // Brand palette — institutional green + indigo accent (matches reference)
+  const green = rgb(0.10, 0.36, 0.20);     // #1A5C33 brand green
+  const indigo = rgb(0.36, 0.36, 0.95);    // accent for total
+  const ink = rgb(0.13, 0.16, 0.22);       // headings
+  const muted = rgb(0.45, 0.50, 0.56);     // body grey
+  const line = rgb(0.88, 0.89, 0.92);      // hairlines
+  const white = rgb(1, 1, 1);
 
-  // Header bar
-  page.drawRectangle({ x: 0, y: 780, width: 595, height: 62, color: navy });
-  page.drawText('AFRICAN HALAL INSTITUTE', { x: 40, y: 812, size: 16, font: bold, color: rgb(1, 1, 1) });
-  page.drawText('Halal Certification & Compliance', { x: 40, y: 794, size: 9, font, color: rgb(0.85, 0.85, 0.85) });
-  page.drawText('INVOICE', { x: 460, y: 808, size: 20, font: bold, color: gold });
+  const W = 595;
+  const M = 50; // margin
+  let y = 792;
 
-  // Invoice meta
-  page.drawText(`Invoice #: ${inv.invoice_number}`, { x: 40, y: 745, size: 11, font: bold, color: black });
-  page.drawText(`Issue Date: ${new Date(inv.created_at).toLocaleDateString('en-GB')}`, { x: 40, y: 728, size: 10, font, color: grey });
-  page.drawText(`Due Date: ${new Date(inv.due_date).toLocaleDateString('en-GB')}`, { x: 40, y: 713, size: 10, font, color: grey });
-  page.drawText(`Status: ${String(inv.status).toUpperCase()}`, { x: 40, y: 698, size: 10, font: bold, color: inv.status === 'paid' ? rgb(0.1, 0.5, 0.1) : navy });
+  // ── Header: company (left) + INVOICE (right) ──
+  page.drawText('African Halal Institute', { x: M, y, size: 20, font: bold, color: green });
+  page.drawText('INVOICE', { x: W - M - bold.widthOfTextAtSize('INVOICE', 22), y, size: 22, font: bold, color: ink });
 
-  // Bill To
+  y -= 18;
+  const addr = ['Plot 123, Cairo Road', 'Lusaka, Zambia', 'accounts@africanhalaal.com'];
+  let ay = y;
+  for (const ln of addr) { page.drawText(ln, { x: M, y: ay, size: 10, font, color: muted }); ay -= 13; }
+
+  // Invoice meta right
+  const meta = [
+    `#${inv.invoice_number}`,
+    `Date: ${new Date(inv.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+    `Due: ${new Date(inv.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+  ];
+  let my = y;
+  for (let i = 0; i < meta.length; i++) {
+    const t = meta[i];
+    const sz = i === 0 ? 11 : 10;
+    const f = i === 0 ? font : font;
+    const col = i === 0 ? muted : muted;
+    page.drawText(t, { x: W - M - f.widthOfTextAtSize(t, sz), y: my, size: sz, font: f, color: col });
+    my -= 14;
+  }
+
+  // Divider (indigo accent like reference)
+  y = ay - 8;
+  page.drawRectangle({ x: M, y, width: W - 2 * M, height: 1.5, color: indigo });
+
+  // ── Bill To ──
+  y -= 30;
+  page.drawText('Bill To:', { x: M, y, size: 12, font: bold, color: green });
+  y -= 18;
   const org = inv.organizations || {};
-  page.drawText('BILL TO', { x: 350, y: 745, size: 9, font: bold, color: gold });
-  page.drawText(org.name || '—', { x: 350, y: 728, size: 11, font: bold, color: black });
-  if (org.registration_number) page.drawText(`Reg No: ${org.registration_number}`, { x: 350, y: 713, size: 9, font, color: grey });
-  if (org.address) page.drawText(String(org.address).slice(0, 40), { x: 350, y: 700, size: 9, font, color: grey });
-  if (org.city || org.country) page.drawText([org.city, org.country].filter(Boolean).join(', '), { x: 350, y: 687, size: 9, font, color: grey });
-  if (org.contact_email) page.drawText(org.contact_email, { x: 350, y: 674, size: 9, font, color: grey });
+  page.drawText(org.name || '—', { x: M, y, size: 12, font: bold, color: ink });
+  y -= 15;
+  const billLines = [org.address, [org.city, org.country].filter(Boolean).join(', '), org.contact_email].filter(Boolean) as string[];
+  for (const ln of billLines) {
+    page.drawText(String(ln), { x: M, y, size: 10, font, color: muted });
+    y -= 13;
+  }
 
-  // Items table header
-  let y = 640;
-  page.drawRectangle({ x: 40, y: y - 4, width: 515, height: 22, color: navy });
-  page.drawText('DESCRIPTION', { x: 50, y: y + 4, size: 10, font: bold, color: rgb(1, 1, 1) });
-  page.drawText('AMOUNT', { x: 480, y: y + 4, size: 10, font: bold, color: rgb(1, 1, 1) });
-  y -= 28;
+  // ── Items table ──
+  y -= 20;
+  const tableX = M;
+  const tableW = W - 2 * M;
+  const colDescX = tableX + 14;
+  const colQtyX = tableX + 300;
+  const colPriceX = tableX + 360;
+  const colTotalX = tableX + tableW - 14;
 
+  // Header row
+  page.drawRectangle({ x: tableX, y: y - 6, width: tableW, height: 32, color: green });
+  const hY = y + 6;
+  page.drawText('Description', { x: colDescX, y: hY, size: 11, font: bold, color: white });
+  page.drawText('Quantity', { x: colQtyX, y: hY, size: 11, font: bold, color: white });
+  page.drawText('Unit Price', { x: colPriceX, y: hY, size: 11, font: bold, color: white });
+  const totalLbl = 'Total';
+  page.drawText(totalLbl, { x: colTotalX - bold.widthOfTextAtSize(totalLbl, 11), y: hY, size: 11, font: bold, color: white });
+
+  y -= 30;
+
+  // Build line items: support quotation-style items if stored on invoice, else single line
   const feeLabel: Record<string, string> = {
     application_fee: 'Application Fee',
     certification: 'Certification Fee',
@@ -66,53 +122,102 @@ async function buildInvoicePdf(invoiceId: string): Promise<Uint8Array> {
     renewal: 'Renewal Fee',
     other: 'Service Charge',
   };
-  const lineTitle = feeLabel[inv.fee_type] || inv.fee_type;
-  page.drawText(lineTitle, { x: 50, y, size: 11, font: bold, color: black });
-  if (inv.description) {
-    const desc = String(inv.description);
-    const lines: string[] = [];
-    let line = '';
-    for (const word of desc.split(/\s+/)) {
-      if ((line + ' ' + word).length > 60) { lines.push(line.trim()); line = word; } else line += ' ' + word;
-    }
-    if (line) lines.push(line.trim());
-    let dy = y - 14;
-    for (const ln of lines.slice(0, 4)) {
-      page.drawText(ln, { x: 50, y: dy, size: 9, font, color: grey });
+  const items = Array.isArray((inv as any).items) && (inv as any).items.length
+    ? (inv as any).items
+    : [{
+        label: feeLabel[inv.fee_type] || inv.fee_type,
+        description: inv.description || '',
+        qty: 1,
+        unit_price: Number(inv.amount),
+        total: Number(inv.amount),
+      }];
+
+  for (const it of items) {
+    const label = String(it.label || '');
+    const desc = String(it.description || '');
+    const qty = it.qty ?? 1;
+    const unit = Number(it.unit_price ?? it.total ?? 0);
+    const total = Number(it.total ?? unit * Number(qty || 1));
+
+    const descLines = desc ? wrap(desc, 55) : [];
+    const rowH = 22 + descLines.length * 12;
+
+    page.drawText(label, { x: colDescX, y, size: 11, font: bold, color: ink });
+    let dy = y - 13;
+    for (const ln of descLines) {
+      page.drawText(ln, { x: colDescX, y: dy, size: 9, font, color: muted });
       dy -= 12;
     }
-  }
-  page.drawText(`${inv.currency} ${Number(inv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, { x: 480, y, size: 11, font: bold, color: black });
 
-  // Total
-  y = 500;
-  page.drawLine({ start: { x: 350, y: y + 25 }, end: { x: 555, y: y + 25 }, thickness: 0.5, color: grey });
-  page.drawText('TOTAL', { x: 360, y, size: 13, font: bold, color: navy });
-  page.drawText(`${inv.currency} ${Number(inv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, { x: 460, y, size: 14, font: bold, color: gold });
+    page.drawText(String(qty), { x: colQtyX, y, size: 10, font, color: ink });
+    const up = `${inv.currency} ${fmt(unit)}`;
+    page.drawText(up, { x: colPriceX, y, size: 10, font, color: ink });
+    const tt = `${inv.currency} ${fmt(total)}`;
+    page.drawText(tt, { x: colTotalX - bold.widthOfTextAtSize(tt, 10), y, size: 10, font: bold, color: ink });
 
-  // Payment instructions
-  y = 420;
-  page.drawText('PAYMENT INSTRUCTIONS', { x: 40, y, size: 10, font: bold, color: navy });
-  y -= 16;
-  const instructions = [
-    'Pay via Mobile Money or Card through your AHI client portal:',
-    'https://africanhalaal.com → Billing → Pay Now',
-    '',
-    'For offline payment, contact accounts@africanhalaal.com.',
-    'Please reference the invoice number on all payments.',
-  ];
-  for (const line of instructions) {
-    page.drawText(line, { x: 40, y, size: 9, font, color: grey });
-    y -= 13;
+    y -= rowH;
+    page.drawLine({ start: { x: tableX, y: y + 4 }, end: { x: tableX + tableW, y: y + 4 }, thickness: 0.5, color: line });
+    y -= 6;
   }
 
-  // Footer
-  page.drawLine({ start: { x: 40, y: 70 }, end: { x: 555, y: 70 }, thickness: 0.5, color: grey });
+  // ── Totals (right aligned) ──
+  y -= 14;
+  const subtotal = items.reduce((s: number, it: any) => s + Number(it.total ?? 0), 0);
+  const taxRate = Number((inv as any).tax_rate ?? 0);
+  const taxAmount = Number((inv as any).tax_amount ?? (subtotal * taxRate / 100));
+  const grand = Number(inv.amount ?? subtotal + taxAmount);
+
+  const labelRightX = W - M - 160;
+  const valueRightX = W - M;
+
+  const drawRow = (lbl: string, val: string, opts: { bold?: boolean; size?: number; color?: any } = {}) => {
+    const sz = opts.size || 11;
+    const f = opts.bold ? bold : font;
+    const c = opts.color || ink;
+    page.drawText(lbl, { x: labelRightX - font.widthOfTextAtSize(lbl, sz), y, size: sz, font, color: muted });
+    page.drawText(val, { x: valueRightX - f.widthOfTextAtSize(val, sz), y, size: sz, font: f, color: c });
+  };
+
+  drawRow('Subtotal:', `${inv.currency} ${fmt(subtotal)}`, { bold: true });
+  y -= 18;
+  if (taxRate > 0 || taxAmount > 0) {
+    drawRow(`Tax (${taxRate}%):`, `${inv.currency} ${fmt(taxAmount)}`, { bold: true });
+    y -= 18;
+  }
+  // Divider before total
+  page.drawLine({ start: { x: labelRightX - 80, y: y + 6 }, end: { x: valueRightX, y: y + 6 }, thickness: 0.5, color: line });
+  y -= 6;
+  // Grand total in indigo
+  const totalLabel = 'Total Due:';
+  const totalValue = `${inv.currency} ${fmt(grand)}`;
+  page.drawText(totalLabel, { x: labelRightX - font.widthOfTextAtSize(totalLabel, 14), y, size: 14, font, color: indigo });
+  page.drawText(totalValue, { x: valueRightX - bold.widthOfTextAtSize(totalValue, 16), y, size: 16, font: bold, color: indigo });
+
+  // Status badge (paid/unpaid) under totals
+  y -= 26;
+  const status = String(inv.status || '').toUpperCase();
+  const badgeColor = inv.status === 'paid' ? rgb(0.10, 0.55, 0.25) : (inv.status === 'overdue' ? rgb(0.78, 0.20, 0.20) : muted);
+  const badgeText = `Status: ${status}`;
+  page.drawText(badgeText, { x: valueRightX - bold.widthOfTextAtSize(badgeText, 10), y, size: 10, font: bold, color: badgeColor });
+
+  // ── Footer block ──
+  // Hairline divider
+  page.drawLine({ start: { x: M, y: 130 }, end: { x: W - M, y: 130 }, thickness: 0.5, color: line });
+
+  page.drawText('Payment Terms:', { x: M, y: 110, size: 10, font: bold, color: ink });
+  const terms = `Payment is due by ${new Date(inv.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}. Pay via your AHI client portal (Billing → Pay Now) or contact accounts@africanhalaal.com for offline options. Please reference invoice #${inv.invoice_number} on all payments.`;
+  let ty = 95;
+  for (const ln of wrap(terms, 95)) {
+    page.drawText(ln, { x: M, y: ty, size: 10, font, color: muted });
+    ty -= 13;
+  }
+  page.drawText('Thank you for your business!', { x: M, y: ty - 6, size: 10, font: bold, color: ink });
+
   page.drawText('African Halal Institute · Lusaka, Zambia · accounts@africanhalaal.com', {
-    x: 40, y: 55, size: 8, font, color: grey,
+    x: M, y: 36, size: 8, font, color: muted,
   });
   page.drawText('This is a computer-generated invoice. No signature required.', {
-    x: 40, y: 42, size: 8, font, color: grey,
+    x: M, y: 24, size: 8, font, color: muted,
   });
 
   return await pdf.save();
