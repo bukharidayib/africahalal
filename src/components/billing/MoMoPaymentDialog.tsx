@@ -428,10 +428,8 @@ export function MoMoPaymentDialog({
 
         <DialogFooter>
           {paymentState === "idle" && (
-            <Button onClick={handlePayment} disabled={!isFormValid || isSubmittingOffline} className="w-full">
-              {paymentMethod === "offline" ? (
-                <><Upload className="mr-2 h-4 w-4" /> Submit Payment Proof</>
-              ) : paymentMethod === "card" ? (
+            <Button onClick={handlePayment} disabled={!isFormValid} className="w-full">
+              {paymentMethod === "card" ? (
                 <><CreditCard className="mr-2 h-4 w-4" /> Pay {currency} {Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</>
               ) : (
                 <><Phone className="mr-2 h-4 w-4" /> Pay {currency} {Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</>
