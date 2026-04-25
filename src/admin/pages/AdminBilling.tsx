@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, Clock, AlertTriangle, CheckCircle2, Loader2, Search,
   Receipt, Plus, Eye, Pencil, Trash2, RefreshCw, CreditCard,
-  Calculator, Send, FileText, Repeat, Download
+  Calculator, Send, FileText, Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
