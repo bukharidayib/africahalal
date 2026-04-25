@@ -61,6 +61,7 @@ import AdminRegister from "./admin/pages/AdminRegister";
 import AdminDashboard from "./admin/pages/AdminDashboard";
 import Applications from "./admin/pages/Applications";
 import Certificates from "./admin/pages/Certificates";
+import CertificateDetail from "./admin/pages/CertificateDetail";
 import Inspections from "./admin/pages/Inspections";
 import PendingApprovals from "./admin/pages/PendingApprovals";
 import AuditLogs from "./admin/pages/AuditLogs";
