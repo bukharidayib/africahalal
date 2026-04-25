@@ -632,42 +632,92 @@ export default function AdminBilling() {
             <DialogTrigger asChild>
               <Button><Plus className="mr-2 h-4 w-4" /> Create Invoice</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Create New Invoice</DialogTitle></DialogHeader>
               <div className="space-y-4 py-4">
                 <div>
                   <Label>Organization *</Label>
-                  <Select value={newInvoice.organization_id} onValueChange={(v) => setNewInvoice(p => ({ ...p, organization_id: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select organization" /></SelectTrigger>
-                    <SelectContent>{orgs.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <OrgCombobox
+                    options={orgs}
+                    value={newInvoice.organization_id}
+                    onChange={(v) => setNewInvoice(p => ({ ...p, organization_id: v }))}
+                  />
                 </div>
                 <div>
                   <Label>Fee Type *</Label>
-                  <Select value={newInvoice.fee_type} onValueChange={(v) => setNewInvoice(p => ({ ...p, fee_type: v }))}>
+                  <Select
+                    value={newInvoice.fee_type}
+                    onValueChange={(v) => setNewInvoice(p => {
+                      const next = { ...p, fee_type: v };
+                      if (!needsValidity(v)) {
+                        next.validity_period = '';
+                        next.expiry_date = '';
+                      } else if (!next.start_date) {
+                        next.start_date = todayStr();
+                      }
+                      return next;
+                    })}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="application_fee">Application Fee</SelectItem>
+                      <SelectItem value="inspection">Inspection Fee</SelectItem>
                       <SelectItem value="certification">Certification Fee</SelectItem>
                       <SelectItem value="subscription">Subscription Fee</SelectItem>
-                      <SelectItem value="renewal">Renewal Fee</SelectItem>
-                      <SelectItem value="inspection">Inspection Fee</SelectItem>
-                      <SelectItem value="other">Other Service Charge</SelectItem>
+                      <SelectItem value="other">Other Services Charge</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label>Certification Validity Period</Label>
-                  <Select value={newInvoice.validity_period} onValueChange={(v) => setNewInvoice(p => ({ ...p, validity_period: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select validity period (optional)" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1_quarter">1 Quarter (3 months)</SelectItem>
-                      <SelectItem value="2_quarter">2 Quarters (6 months)</SelectItem>
-                      <SelectItem value="3_quarter">3 Quarters (9 months)</SelectItem>
-                      <SelectItem value="4_quarter">4 Quarters (12 months)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                {needsValidity(newInvoice.fee_type) && (
+                  <>
+                    <div>
+                      <Label>Validity Period *</Label>
+                      <Select
+                        value={newInvoice.validity_period}
+                        onValueChange={(v) => setNewInvoice(p => ({
+                          ...p,
+                          validity_period: v,
+                          expiry_date: addMonthsStr(p.start_date || todayStr(), VALIDITY_MONTHS[v] || 0),
+                        }))}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Select validity period" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1_quarter">1 Quarter (3 months)</SelectItem>
+                          <SelectItem value="2_quarter">2 Quarters (6 months)</SelectItem>
+                          <SelectItem value="3_quarter">3 Quarters (9 months)</SelectItem>
+                          <SelectItem value="4_quarter">4 Quarters (12 months)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Start Date *</Label>
+                        <Input
+                          type="date"
+                          value={newInvoice.start_date}
+                          onChange={(e) => setNewInvoice(p => ({
+                            ...p,
+                            start_date: e.target.value,
+                            expiry_date: p.validity_period
+                              ? addMonthsStr(e.target.value, VALIDITY_MONTHS[p.validity_period] || 0)
+                              : p.expiry_date,
+                          }))}
+                        />
+                      </div>
+                      <div>
+                        <Label>Expiry Date *</Label>
+                        <Input
+                          type="date"
+                          value={newInvoice.expiry_date}
+                          onChange={(e) => setNewInvoice(p => ({ ...p, expiry_date: e.target.value }))}
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1">Auto-filled. Editable.</p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <div>
                   <Label>Amount (ZMW) *</Label>
                   <Input type="number" step="0.01" min="0" value={newInvoice.amount} onChange={(e) => setNewInvoice(p => ({ ...p, amount: e.target.value }))} />
