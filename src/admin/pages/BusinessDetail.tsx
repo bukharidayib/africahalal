@@ -4,7 +4,7 @@ import {
   ArrowLeft, Building2, FileText, Award, Receipt, MessageSquare, History,
   FolderOpen, DollarSign, Loader2, Eye, Mail, Phone, MapPin, Hash,
   CalendarDays, Pencil, Plus, Download, Send, CheckCircle2, ChevronDown,
-  ChevronRight, RefreshCw,
+  ChevronRight, RefreshCw, Pause, Play, XCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { AdminLayout } from '../components/layout/AdminLayout';
@@ -22,6 +22,11 @@ import { IssueCertificateDialog, EligibleApp } from '../components/billing/Issue
 import { EditValidityDialog } from '../components/billing/EditValidityDialog';
 import { CertificateActionsMenu } from '../components/billing/CertificateActionsMenu';
 import { InvoiceFormDialog } from '../components/billing/InvoiceFormDialog';
+import { DocumentPreviewDialog } from '../components/documents/DocumentPreviewDialog';
+import { SubscriptionFormDialog } from '../components/billing/SubscriptionFormDialog';
+import { SendNotifyDialog } from '../components/billing/SendNotifyDialog';
+
+const fmtCycle = (c?: string) => (c || '').replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
 
 export default function BusinessDetail() {
   const { id } = useParams();
@@ -34,6 +39,7 @@ export default function BusinessDetail() {
 
   const [apps, setApps] = useState<any[]>([]);
   const [certs, setCerts] = useState<any[]>([]);
+  const [subs, setSubs] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
@@ -48,6 +54,13 @@ export default function BusinessDetail() {
   const [editValidity, setEditValidity] = useState<{ id: string; issue_date: string; expiry_date: string; status: string } | null>(null);
   const [invoiceDialog, setInvoiceDialog] = useState<{ open: boolean; invoiceId?: string | null }>({ open: false });
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ filePath: string; fileName: string } | null>(null);
+  const [subDialog, setSubDialog] = useState<{ open: boolean; sub?: any | null }>({ open: false });
+  const [notify, setNotify] = useState<
+    | { kind: 'cert'; certificateId: string; certNumber: string }
+    | { kind: 'sub'; subscriptionId: string; planName: string }
+    | null
+  >(null);
 
   useEffect(() => { if (id) void load(); }, [id]);
 
@@ -67,13 +80,17 @@ export default function BusinessDetail() {
       setOwner(ownerData);
 
       const orgId = b.organization_id;
-      const [appsRes, certsRes, invRes, payRes, chatRes, auditRes] = await Promise.all([
+      const [appsRes, certsRes, subsRes, invRes, payRes, chatRes, auditRes] = await Promise.all([
         supabase.from('certification_applications')
           .select('id, application_number, status, scope, sector, created_at, submitted_at')
           .eq('business_id', b.id)
           .order('created_at', { ascending: false }),
         orgId ? supabase.from('certificates')
           .select('id, certificate_number, status, issue_date, expiry_date, scope, application_id, created_at')
+          .eq('organization_id', orgId)
+          .order('created_at', { ascending: false }) : Promise.resolve({ data: [] } as any),
+        orgId ? supabase.from('subscriptions')
+          .select('*')
           .eq('organization_id', orgId)
           .order('created_at', { ascending: false }) : Promise.resolve({ data: [] } as any),
         orgId ? supabase.from('invoices')
@@ -94,6 +111,7 @@ export default function BusinessDetail() {
 
       setApps(appsRes.data || []);
       setCerts(certsRes.data || []);
+      setSubs(subsRes.data || []);
       setInvoices(invRes.data || []);
       setPayments(payRes.data || []);
       setChats(chatRes.data || []);
@@ -119,23 +137,67 @@ export default function BusinessDetail() {
     }
   };
 
-  // Derived values
-  const eligibleApps: EligibleApp[] = useMemo(() => {
-    const certedAppIds = new Set(certs.map((c) => c.application_id).filter(Boolean));
-    return apps
-      .filter((a) => a.status === 'approved' && !certedAppIds.has(a.id))
-      .map((a) => ({ id: a.id, application_number: a.application_number, scope: a.scope }));
-  }, [apps, certs]);
-
-  const activeCert = useMemo(() => certs.find((c) => c.status === 'active'), [certs]);
-  const subscriptionHistory = useMemo(
-    () => [...certs].sort((a, b) => +new Date(b.issue_date) - +new Date(a.issue_date)),
+  // Eligibility for cert issuance: approved app + no ACTIVE certificate linked.
+  // (Apps with expired/revoked/suspended certs are eligible for re-issuance.)
+  const activeCertAppIds = useMemo(
+    () => new Set(certs.filter((c) => c.status === 'active').map((c) => c.application_id).filter(Boolean)),
     [certs],
   );
+  const eligibleApps: EligibleApp[] = useMemo(() => {
+    return apps
+      .filter((a) => a.status === 'approved' && !activeCertAppIds.has(a.id))
+      .map((a) => ({ id: a.id, application_number: a.application_number, scope: a.scope }));
+  }, [apps, activeCertAppIds]);
+
+  const activeSub = useMemo(() => subs.find((s) => s.status === 'active'), [subs]);
+  const activeCert = useMemo(() => certs.find((c) => c.status === 'active'), [certs]);
 
   const totalPaid = invoices.filter((i) => i.status === 'paid').reduce((s, i) => s + Number(i.total || i.amount || 0), 0);
   const outstanding = invoices.filter((i) => i.status !== 'paid' && i.status !== 'cancelled').reduce((s, i) => s + Number(i.total || i.amount || 0), 0);
   const activeCerts = certs.filter((c) => c.status === 'active').length;
+
+  // Subscription helpers
+  const notifySubChange = (subId: string, eventType: 'created' | 'updated' | 'renewed' | 'suspended' | 'reactivated' | 'cancelled') => {
+    supabase.functions.invoke('send-subscription-email', {
+      body: { subscription_id: subId, event_type: eventType },
+    }).catch((err) => console.warn('sub email failed', err));
+  };
+
+  const updateSubStatus = async (sub: any, next: 'active' | 'suspended' | 'cancelled') => {
+    try {
+      const { error } = await supabase.from('subscriptions').update({ status: next }).eq('id', sub.id);
+      if (error) throw error;
+      const event = next === 'active' ? 'reactivated' : next === 'suspended' ? 'suspended' : 'cancelled';
+      notifySubChange(sub.id, event);
+      toast({ title: `Subscription ${event}`, description: 'Client notified by email.' });
+      void load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Update failed', description: e.message });
+    }
+  };
+
+  const renewSubscription = async (sub: any) => {
+    // Extend end_date and next_billing_date by the current cycle length.
+    const cycleMonthsMap: Record<string, number> = {
+      '1_month': 1, '2_months': 2, '3_months': 3, '4_months': 4, '6_months': 6, '12_months': 12,
+      '1_quarter': 3, '2_quarters': 6, '3_quarters': 9, '4_quarters': 12,
+    };
+    const months = cycleMonthsMap[sub.billing_cycle] || 12;
+    const base = sub.end_date ? new Date(sub.end_date) : new Date();
+    base.setMonth(base.getMonth() + months);
+    const newEnd = base.toISOString().slice(0, 10);
+    try {
+      const { error } = await supabase.from('subscriptions')
+        .update({ end_date: newEnd, next_billing_date: newEnd, status: 'active' })
+        .eq('id', sub.id);
+      if (error) throw error;
+      notifySubChange(sub.id, 'renewed');
+      toast({ title: 'Subscription renewed', description: `New end date ${newEnd} · client notified` });
+      void load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Renew failed', description: e.message });
+    }
+  };
 
   // Invoice actions
   const downloadInvoicePdf = async (inv: any) => {
@@ -272,65 +334,71 @@ export default function BusinessDetail() {
             </div>
           </TabsContent>
 
-          {/* Subscription */}
+          {/* Subscription — independent from certificates */}
           <TabsContent value="subscription">
             <div className="space-y-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <CalendarDays className="h-5 w-5 text-primary" /> Current Subscription
-                  </CardTitle>
-                  {!activeCert && (
-                    <Button
-                      size="sm"
-                      onClick={() => { setIssueFixedApp(null); setIssueOpen(true); }}
-                      disabled={eligibleApps.length === 0}
-                      title={eligibleApps.length === 0 ? 'Needs an approved application without a certificate' : ''}
-                    >
-                      <Plus className="h-4 w-4 mr-2" /> Start Subscription
-                    </Button>
-                  )}
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <CalendarDays className="h-5 w-5 text-primary" /> Current Subscription
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">Subscription is separate from the halal certificate.</p>
+                  </div>
+                  <Button size="sm" onClick={() => setSubDialog({ open: true, sub: null })} disabled={!org}>
+                    <Plus className="h-4 w-4 mr-2" /> New Subscription
+                  </Button>
                 </CardHeader>
                 <CardContent>
-                  {!activeCert ? (
+                  {!activeSub ? (
                     <p className="text-sm text-muted-foreground">
-                      No active subscription. {eligibleApps.length === 0
-                        ? 'Approve an application first to issue a certificate.'
-                        : 'Click "Start Subscription" to issue a certificate for an approved application.'}
+                      No active subscription. Click "New Subscription" to create one (month-based or quarter-based).
                     </p>
                   ) : (
                     (() => {
-                      const daysLeft = Math.ceil((new Date(activeCert.expiry_date).getTime() - Date.now()) / 86400000);
-                      const expiringSoon = daysLeft < 30 && daysLeft >= 0;
-                      const expired = daysLeft < 0;
+                      const daysLeft = activeSub.end_date
+                        ? Math.ceil((new Date(activeSub.end_date).getTime() - Date.now()) / 86400000)
+                        : null;
+                      const expired = daysLeft !== null && daysLeft < 0;
+                      const expiringSoon = daysLeft !== null && daysLeft >= 0 && daysLeft < 30;
                       return (
                         <div className="space-y-4">
                           <div className="grid gap-3 md:grid-cols-3">
-                            <Field icon={Award} label="Certificate" value={<span className="font-mono">{activeCert.certificate_number}</span>} />
-                            <Field icon={CalendarDays} label="Issued" value={format(new Date(activeCert.issue_date), 'dd MMM yyyy')} />
+                            <Field icon={Award} label="Plan" value={activeSub.plan_name} />
+                            <Field label="Cycle" value={fmtCycle(activeSub.billing_cycle)} />
+                            <Field label="Amount" value={`${activeSub.currency || 'ZMW'} ${Number(activeSub.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                            <Field icon={CalendarDays} label="Start" value={format(new Date(activeSub.start_date), 'dd MMM yyyy')} />
                             <Field
                               icon={CalendarDays}
-                              label="Expires"
+                              label="End"
                               value={
-                                <span className={expired ? 'text-destructive font-semibold' : expiringSoon ? 'text-amber-600 font-semibold' : ''}>
-                                  {format(new Date(activeCert.expiry_date), 'dd MMM yyyy')}
-                                  {' · '}
-                                  {expired ? 'Expired' : `${daysLeft}d left`}
-                                </span>
+                                activeSub.end_date ? (
+                                  <span className={expired ? 'text-destructive font-semibold' : expiringSoon ? 'text-amber-600 font-semibold' : ''}>
+                                    {format(new Date(activeSub.end_date), 'dd MMM yyyy')}
+                                    {daysLeft !== null && (<>{' · '}{expired ? 'Expired' : `${daysLeft}d left`}</>)}
+                                  </span>
+                                ) : '—'
                               }
                             />
+                            <Field label="Next Billing" value={activeSub.next_billing_date ? format(new Date(activeSub.next_billing_date), 'dd MMM yyyy') : '—'} />
                           </div>
+                          {activeSub.notes && <p className="text-xs text-muted-foreground border-l-2 border-primary/30 pl-3">{activeSub.notes}</p>}
                           <div className="flex gap-2 flex-wrap">
-                            <Button
-                              size="sm"
-                              onClick={() => setEditValidity({
-                                id: activeCert.id, issue_date: activeCert.issue_date,
-                                expiry_date: activeCert.expiry_date, status: activeCert.status,
-                              })}
-                            >
-                              <Pencil className="h-4 w-4 mr-2" /> Renew / Extend / Manage
+                            <Button size="sm" onClick={() => setSubDialog({ open: true, sub: activeSub })}>
+                              <Pencil className="h-4 w-4 mr-2" /> Edit
                             </Button>
-                            <CertificateActionsMenu cert={activeCert} onChanged={load} />
+                            <Button size="sm" variant="outline" onClick={() => renewSubscription(activeSub)}>
+                              <RefreshCw className="h-4 w-4 mr-2" /> Renew
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => updateSubStatus(activeSub, 'suspended')}>
+                              <Pause className="h-4 w-4 mr-2" /> Suspend
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-destructive" onClick={() => updateSubStatus(activeSub, 'cancelled')}>
+                              <XCircle className="h-4 w-4 mr-2" /> Cancel
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setNotify({ kind: 'sub', subscriptionId: activeSub.id, planName: activeSub.plan_name })}>
+                              <Mail className="h-4 w-4 mr-2" /> Email Client
+                            </Button>
                           </div>
                         </div>
                       );
@@ -342,28 +410,39 @@ export default function BusinessDetail() {
               <Card>
                 <CardHeader><CardTitle>Subscription History</CardTitle></CardHeader>
                 <CardContent>
-                  {subscriptionHistory.length === 0 ? <Empty icon={History} text="No subscription history." /> : (
+                  {subs.length === 0 ? <Empty icon={History} text="No subscriptions yet." /> : (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Certificate #</TableHead>
+                          <TableHead>Plan</TableHead>
+                          <TableHead>Cycle</TableHead>
+                          <TableHead>Amount</TableHead>
                           <TableHead>Period</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead></TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {subscriptionHistory.map((c) => (
-                          <TableRow key={c.id}>
-                            <TableCell className="font-mono text-xs">{c.certificate_number}</TableCell>
+                        {subs.map((s) => (
+                          <TableRow key={s.id}>
+                            <TableCell className="font-medium">{s.plan_name}</TableCell>
+                            <TableCell className="text-sm">{fmtCycle(s.billing_cycle)}</TableCell>
+                            <TableCell className="font-semibold">{s.currency || 'ZMW'} {Number(s.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
                             <TableCell className="text-sm">
-                              {format(new Date(c.issue_date), 'dd MMM yyyy')} → {format(new Date(c.expiry_date), 'dd MMM yyyy')}
+                              {format(new Date(s.start_date), 'dd MMM yyyy')}{s.end_date ? ` → ${format(new Date(s.end_date), 'dd MMM yyyy')}` : ''}
                             </TableCell>
                             <TableCell>
-                              <Badge variant={c.status === 'active' ? 'default' : 'outline'} className="capitalize">{c.status}</Badge>
+                              <Badge variant={s.status === 'active' ? 'default' : 'outline'} className="capitalize">{s.status}</Badge>
                             </TableCell>
-                            <TableCell className="text-right">
-                              <CertificateActionsMenu cert={c} onChanged={load} />
+                            <TableCell className="text-right space-x-1">
+                              <Button variant="ghost" size="icon" title="Edit" onClick={() => setSubDialog({ open: true, sub: s })}><Pencil className="h-4 w-4" /></Button>
+                              {s.status === 'active' && (
+                                <Button variant="ghost" size="icon" title="Suspend" onClick={() => updateSubStatus(s, 'suspended')}><Pause className="h-4 w-4" /></Button>
+                              )}
+                              {s.status === 'suspended' && (
+                                <Button variant="ghost" size="icon" title="Reactivate" onClick={() => updateSubStatus(s, 'active')}><Play className="h-4 w-4" /></Button>
+                              )}
+                              <Button variant="ghost" size="icon" title="Email Client" onClick={() => setNotify({ kind: 'sub', subscriptionId: s.id, planName: s.plan_name })}><Mail className="h-4 w-4" /></Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -394,7 +473,8 @@ export default function BusinessDetail() {
                       const appDocs = docs.filter((d) => d.application_id === a.id);
                       const appInvoices = invoices.filter((i) => i.application_id === a.id);
                       const appHistory = statusHistory.filter((h) => h.application_id === a.id);
-                      const hasCert = certs.some((c) => c.application_id === a.id);
+                      const hasActiveCert = activeCertAppIds.has(a.id);
+                      const isEligible = a.status === 'approved' && !hasActiveCert;
                       return (
                         <>
                           <TableRow key={a.id}>
@@ -408,7 +488,7 @@ export default function BusinessDetail() {
                             <TableCell><Badge variant="secondary" className="capitalize">{a.status?.replace(/_/g, ' ')}</Badge></TableCell>
                             <TableCell>{a.submitted_at ? format(new Date(a.submitted_at), 'dd MMM yyyy') : '—'}</TableCell>
                             <TableCell className="text-right">
-                              {a.status === 'approved' && !hasCert && (
+                              {isEligible && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -417,6 +497,9 @@ export default function BusinessDetail() {
                                 >
                                   <Award className="h-4 w-4 mr-1" /> Issue Certificate
                                 </Button>
+                              )}
+                              {a.status === 'approved' && hasActiveCert && (
+                                <Badge variant="outline" className="mr-2">Active cert exists</Badge>
                               )}
                               <Button asChild variant="ghost" size="sm"><Link to={`/admin/applications/${a.id}`}><Eye className="h-4 w-4" /></Link></Button>
                             </TableCell>
@@ -431,8 +514,15 @@ export default function BusinessDetail() {
                                       <ul className="space-y-1 text-sm max-h-40 overflow-y-auto">
                                         {appDocs.map((d) => (
                                           <li key={d.id} className="flex items-center justify-between gap-2">
-                                            <span className="truncate" title={d.file_name}>{d.file_name}</span>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => downloadDocument(d)}>
+                                            <button
+                                              type="button"
+                                              className="truncate text-left hover:underline text-primary"
+                                              title={`Preview ${d.file_name}`}
+                                              onClick={() => setPreview({ filePath: d.file_path, fileName: d.file_name })}
+                                            >
+                                              {d.file_name}
+                                            </button>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6" title="Download" onClick={() => downloadDocument(d)}>
                                               <Download className="h-3.5 w-3.5" />
                                             </Button>
                                           </li>
@@ -488,7 +578,7 @@ export default function BusinessDetail() {
                   size="sm"
                   onClick={() => { setIssueFixedApp(null); setIssueOpen(true); }}
                   disabled={eligibleApps.length === 0}
-                  title={eligibleApps.length === 0 ? 'Needs an approved application without a certificate' : ''}
+                  title={eligibleApps.length === 0 ? 'Needs an approved application without an active certificate' : ''}
                 >
                   <Plus className="h-4 w-4 mr-2" /> Issue Certificate
                 </Button>
@@ -513,6 +603,14 @@ export default function BusinessDetail() {
                               })}
                             >
                               <Pencil className="h-4 w-4 mr-1" /> Validity
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Email Client"
+                              onClick={() => setNotify({ kind: 'cert', certificateId: c.id, certNumber: c.certificate_number })}
+                            >
+                              <Mail className="h-4 w-4" />
                             </Button>
                             <Button asChild variant="ghost" size="sm"><Link to={`/admin/certificates/${c.id}`}><Eye className="h-4 w-4" /></Link></Button>
                             <CertificateActionsMenu cert={c} onChanged={load} />
@@ -593,16 +691,25 @@ export default function BusinessDetail() {
             <Card><CardContent className="pt-6">
               {docs.length === 0 ? <Empty icon={FolderOpen} text="No documents uploaded." /> : (
                 <Table>
-                  <TableHeader><TableRow><TableHead>Document</TableHead><TableHead>Type</TableHead><TableHead>Version</TableHead><TableHead>Uploaded</TableHead><TableHead className="text-right"></TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead>Document</TableHead><TableHead>Type</TableHead><TableHead>Version</TableHead><TableHead>Uploaded</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {docs.map((d) => (
                       <TableRow key={d.id}>
-                        <TableCell>{d.file_name}</TableCell>
+                        <TableCell>
+                          <button
+                            type="button"
+                            className="text-left hover:underline text-primary"
+                            onClick={() => setPreview({ filePath: d.file_path, fileName: d.file_name })}
+                          >
+                            {d.file_name}
+                          </button>
+                        </TableCell>
                         <TableCell className="capitalize">{d.document_type?.replace(/_/g, ' ')}</TableCell>
                         <TableCell>v{d.version}</TableCell>
                         <TableCell className="text-xs">{format(new Date(d.uploaded_at), 'dd MMM yyyy')}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => downloadDocument(d)}><Download className="h-4 w-4" /></Button>
+                        <TableCell className="text-right space-x-1">
+                          <Button variant="ghost" size="icon" title="Preview" onClick={() => setPreview({ filePath: d.file_path, fileName: d.file_name })}><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" title="Download" onClick={() => downloadDocument(d)}><Download className="h-4 w-4" /></Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -712,6 +819,53 @@ export default function BusinessDetail() {
           invoiceId={invoiceDialog.invoiceId}
           defaultOrgId={org.id}
           onSaved={() => { setInvoiceDialog({ open: false }); void load(); }}
+        />
+      )}
+
+      {/* Subscription dialog */}
+      {subDialog.open && org && (
+        <SubscriptionFormDialog
+          open={subDialog.open}
+          onOpenChange={(o) => !o && setSubDialog({ open: false })}
+          organizationId={org.id}
+          initial={subDialog.sub}
+          onSaved={(saved, eventType) => {
+            setSubDialog({ open: false });
+            if (saved?.id) notifySubChange(saved.id, eventType);
+            void load();
+          }}
+        />
+      )}
+
+      {/* Document preview */}
+      {preview && (
+        <DocumentPreviewDialog
+          open={!!preview}
+          onOpenChange={(o) => !o && setPreview(null)}
+          filePath={preview.filePath}
+          fileName={preview.fileName}
+        />
+      )}
+
+      {/* Manual notify dialog */}
+      {notify && notify.kind === 'cert' && (
+        <SendNotifyDialog
+          open={true}
+          onOpenChange={(o) => !o && setNotify(null)}
+          title={`Email client about ${notify.certNumber}`}
+          description="Send the latest certificate details to the client with an optional custom message."
+          functionName="send-certificate-email"
+          payload={{ certificate_id: notify.certificateId }}
+        />
+      )}
+      {notify && notify.kind === 'sub' && (
+        <SendNotifyDialog
+          open={true}
+          onOpenChange={(o) => !o && setNotify(null)}
+          title={`Email client about ${notify.planName}`}
+          description="Send the current subscription details with an optional custom message."
+          functionName="send-subscription-email"
+          payload={{ subscription_id: notify.subscriptionId }}
         />
       )}
     </AdminLayout>

@@ -24,6 +24,7 @@ interface BusinessRow {
   owner_email?: string | null;
   owner_name?: string | null;
   active_certs?: number;
+  active_cert_number?: string | null;
   open_apps?: number;
   outstanding?: number;
   days_to_expiry?: number | null;
@@ -65,7 +66,7 @@ export default function Businesses() {
           ? supabase.from('profiles').select('id, email, full_name').in('id', userIds)
           : Promise.resolve({ data: [] as any[] }),
         orgIds.length
-          ? supabase.from('certificates').select('organization_id, status, expiry_date').in('organization_id', orgIds)
+          ? supabase.from('certificates').select('organization_id, certificate_number, status, expiry_date').in('organization_id', orgIds)
           : Promise.resolve({ data: [] as any[] }),
         list.length
           ? supabase.from('certification_applications').select('id, business_id, organization_id, status').in('business_id', list.map((b) => b.id))
@@ -78,12 +79,14 @@ export default function Businesses() {
       const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
       const activeCertByOrg = new Map<string, number>();
       const latestExpiryByOrg = new Map<string, string>();
+      const activeCertNumberByOrg = new Map<string, string>();
       (certs || []).forEach((c: any) => {
         if (c.status === 'active') {
           activeCertByOrg.set(c.organization_id, (activeCertByOrg.get(c.organization_id) || 0) + 1);
           const cur = latestExpiryByOrg.get(c.organization_id);
           if (!cur || new Date(c.expiry_date) > new Date(cur)) {
             latestExpiryByOrg.set(c.organization_id, c.expiry_date);
+            activeCertNumberByOrg.set(c.organization_id, c.certificate_number);
           }
         }
       });
@@ -118,6 +121,7 @@ export default function Businesses() {
           owner_email: p?.email || null,
           owner_name: p?.full_name || null,
           active_certs: activeCount,
+          active_cert_number: orgId ? (activeCertNumberByOrg.get(orgId) || null) : null,
           open_apps: appsByBiz.get(b.id) || 0,
           outstanding: orgId ? (outByOrg.get(orgId) || 0) : 0,
           days_to_expiry: daysToExpiry,
@@ -196,6 +200,7 @@ export default function Businesses() {
                     <TableHead>Business</TableHead>
                     <TableHead>PACRA #</TableHead>
                     <TableHead>Owner</TableHead>
+                    <TableHead>Certificate</TableHead>
                     <TableHead>Subscription</TableHead>
                     <TableHead>Open Apps</TableHead>
                     <TableHead>Outstanding</TableHead>
@@ -212,6 +217,15 @@ export default function Businesses() {
                           <span>{r.owner_name || '—'}</span>
                           <span className="text-xs text-muted-foreground">{r.owner_email || '—'}</span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {r.active_certs && r.active_certs > 0 ? (
+                          <Badge className="bg-emerald-600 hover:bg-emerald-600/90 text-white">
+                            Active{r.active_cert_number ? ` · ${r.active_cert_number}` : ''}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">None</Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <SubBadge status={r.sub_status} days={r.days_to_expiry} />
