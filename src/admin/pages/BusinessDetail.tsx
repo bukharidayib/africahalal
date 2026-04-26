@@ -56,6 +56,7 @@ export default function BusinessDetail() {
   const [editValidity, setEditValidity] = useState<{ id: string; issue_date: string; expiry_date: string; status: string } | null>(null);
   const [invoiceDialog, setInvoiceDialog] = useState<{ open: boolean; invoiceId?: string | null }>({ open: false });
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
+  const [expandedCert, setExpandedCert] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ filePath: string; fileName: string } | null>(null);
   const [subDialog, setSubDialog] = useState<{ open: boolean; sub?: any | null }>({ open: false });
   const [notify, setNotify] = useState<
