@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Play, Send, Save, Building2, Calendar, ArrowLeft, Upload, CheckCircle2 } from "lucide-react";
+import { Loader2, Play, Send, Save, Building2, Calendar, ArrowLeft, Upload, CheckCircle2, ThumbsUp, ThumbsDown, AlertTriangle, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -92,6 +92,7 @@ export default function InspectorInspectionDetail() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeCategory, setActiveCategory] = useState(CHECKLIST_CATEGORIES[0].key);
+  const [reportInfo, setReportInfo] = useState<any>(null);
 
   useEffect(() => {
     loadInspection();
@@ -163,6 +164,7 @@ export default function InspectorInspectionDetail() {
     if (report) {
       setOverallNotes(report.overall_assessment || "");
       setRecommendations(report.recommendations || "");
+      setReportInfo(report);
     }
 
     setIsLoading(false);
@@ -366,6 +368,45 @@ export default function InspectorInspectionDetail() {
             {inspection.status === "in_progress" ? "In Progress" : inspection.status === "completed" ? "Completed" : "Scheduled"}
           </Badge>
         </div>
+
+        {/* Admin Review Status Banner */}
+        {reportInfo && reportInfo.status && reportInfo.status !== "draft" && (() => {
+          const s = reportInfo.status;
+          const cfg: Record<string, { icon: any; cls: string; title: string }> = {
+            submitted: { icon: Clock, cls: "border-amber-500/40 bg-amber-50 dark:bg-amber-950/20", title: "Submitted — Awaiting Admin Review" },
+            approved: { icon: ThumbsUp, cls: "border-green-500/40 bg-green-50 dark:bg-green-950/20", title: "Report Approved by Admin" },
+            rejected: { icon: ThumbsDown, cls: "border-red-500/40 bg-red-50 dark:bg-red-950/20", title: "Report Rejected by Admin" },
+            conditional: { icon: AlertTriangle, cls: "border-amber-500/40 bg-amber-50 dark:bg-amber-950/20", title: "Conditional Approval" },
+          };
+          const c = cfg[s] || cfg.submitted;
+          const Icon = c.icon;
+          return (
+            <Card className={c.cls}>
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <Icon className="h-6 w-6 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold">{c.title}</h3>
+                    {reportInfo.reviewed_at && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Reviewed on {format(new Date(reportInfo.reviewed_at), "PPp")}
+                      </p>
+                    )}
+                    {reportInfo.compliance_score != null && (
+                      <p className="text-sm mt-2">Compliance Score: <span className="font-bold">{reportInfo.compliance_score}%</span></p>
+                    )}
+                    {reportInfo.review_notes && (
+                      <div className="mt-3 p-3 bg-background/60 rounded border">
+                        <p className="text-xs text-muted-foreground mb-1">Review Notes</p>
+                        <p className="text-sm whitespace-pre-wrap">{reportInfo.review_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Organization Details */}
         <Card>
