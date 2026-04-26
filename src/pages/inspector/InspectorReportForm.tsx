@@ -296,17 +296,17 @@ export default function InspectorReportForm() {
               </div>
               <div className="space-y-2">
                 <Label>Company</Label>
-                {sites.length <= 1 ? (
-                  <Input value={sites[0]?.organizations?.name || "No company assigned"} disabled className="bg-muted" />
+                {sites.length === 0 ? (
+                  <Input value="No company assigned" disabled className="bg-muted" />
+                ) : sites.length === 1 ? (
+                  <Input value={sites[0].name} disabled className="bg-muted" />
                 ) : (
-                  <Select value={selectedSite} onValueChange={setSelectedSite}>
-                    <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                    <SelectContent>
-                      {sites.map((s: any) => (
-                        <SelectItem key={s.id} value={s.organization_id}>{s.organizations?.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <OrgCombobox
+                    options={sites}
+                    value={selectedSite}
+                    onChange={setSelectedSite}
+                    placeholder="Select company"
+                  />
                 )}
               </div>
               <div className="space-y-2">
