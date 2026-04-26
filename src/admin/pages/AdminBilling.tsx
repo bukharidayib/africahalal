@@ -29,7 +29,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import PendingPricingTab from '../components/accountant/PendingPricingTab';
 import QuotationsTab from '../components/accountant/QuotationsTab';
 import { OrgCombobox } from '../components/OrgCombobox';
 import { InvoiceFormDialog } from '../components/billing/InvoiceFormDialog';
@@ -520,15 +519,13 @@ export default function AdminBilling() {
         </div>
 
         {/* Tabs: Invoices + Payment Transactions */}
-        <Tabs defaultValue="pending" className="space-y-4">
+        <Tabs defaultValue="invoices" className="space-y-4">
           <TabsList className="flex-wrap h-auto">
-            <TabsTrigger value="pending" className="gap-2"><AlertTriangle className="h-4 w-4" /> Pending Pricing</TabsTrigger>
             <TabsTrigger value="invoices" className="gap-2"><Receipt className="h-4 w-4" /> Invoices</TabsTrigger>
             <TabsTrigger value="quotations" className="gap-2"><FileText className="h-4 w-4" /> Quotations</TabsTrigger>
             <TabsTrigger value="transactions" className="gap-2"><CreditCard className="h-4 w-4" /> Payment Transactions</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pending"><PendingPricingTab /></TabsContent>
           <TabsContent value="quotations"><QuotationsTab /></TabsContent>
 
 
