@@ -107,6 +107,7 @@ const STATUS_TO_STAGE: Record<ApplicationStatus, string> = {
   awaiting_inspection: 'INSPECTION_SCHEDULED',
   inspection_complete: 'INSPECTION_COMPLETED',
   pending_decision: 'INSPECTION_COMPLETED',
+  pending_approval: 'INSPECTION_COMPLETED',
   approved: 'APPROVED',
   rejected: 'REJECTED',
   suspended: 'SUSPENDED',

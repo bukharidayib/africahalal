@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
-type ApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'awaiting_inspection' | 'inspection_complete' | 'pending_decision' | 'approved' | 'rejected' | 'suspended' | 'withdrawn' | 'expired';
+type ApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'awaiting_inspection' | 'inspection_complete' | 'pending_decision' | 'pending_approval' | 'approved' | 'rejected' | 'suspended' | 'withdrawn' | 'expired';
 
 const ARCHIVED_STATUSES: ApplicationStatus[] = ['expired', 'rejected', 'withdrawn'];
 
@@ -45,6 +45,7 @@ const statusConfig: Record<ApplicationStatus, { label: string; color: string; ic
     awaiting_inspection: { label: "Awaiting Inspection", color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200", icon: Clock },
     inspection_complete: { label: "Inspection Complete", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200", icon: CheckCircle },
     pending_decision: { label: "Pending Decision", color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200", icon: AlertCircle },
+    pending_approval: { label: "Pending Approval", color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200", icon: AlertCircle },
     approved: { label: "Approved", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200", icon: CheckCircle },
     rejected: { label: "Rejected", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", icon: XCircle },
     suspended: { label: "Suspended", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", icon: AlertCircle },
@@ -90,7 +91,7 @@ export default function MyApplications() {
 
     const filteredApplications = applications.filter(app => {
         const matchesFilter = filter === "all" || 
-            (filter === "in_progress" && ['submitted', 'under_review', 'awaiting_inspection', 'inspection_complete', 'pending_decision'].includes(app.status)) ||
+            (filter === "in_progress" && ['submitted', 'under_review', 'awaiting_inspection', 'inspection_complete', 'pending_decision', 'pending_approval'].includes(app.status)) ||
             (filter === "completed" && ['approved', 'rejected'].includes(app.status)) ||
             app.status === filter;
         
