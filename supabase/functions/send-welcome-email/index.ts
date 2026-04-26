@@ -22,7 +22,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const name = full_name || "Valued Client";
-    const appUrl = "https://africahalal.lovable.app";
+    const appUrl = "https://africanhalaal.com";
 
     const emailResponse = await resend.emails.send({
       from: "Africa Halal Integrity System <info@africanhalaal.com>",

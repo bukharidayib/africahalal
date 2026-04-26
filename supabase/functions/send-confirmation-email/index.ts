@@ -33,7 +33,7 @@ const handler = async (req: Request): Promise<Response> => {
       type: "magiclink",
       email,
       options: {
-        redirectTo: redirect_to || "https://africahalal.lovable.app/auth/signin",
+        redirectTo: redirect_to || "https://africanhalaal.com/auth/signin",
       },
     });
 
