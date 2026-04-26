@@ -60,11 +60,11 @@ interface ChecklistItem {
 
 export default function InspectorReportForm() {
   const [reportType, setReportType] = useState("daily_checklist");
-  const [sites, setSites] = useState<any[]>([]);
+  const { organizations: sites, isLoading: sitesLoading } = useInspectorOrganizations();
   const [selectedSite, setSelectedSite] = useState("");
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [notes, setNotes] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
@@ -82,20 +82,8 @@ export default function InspectorReportForm() {
   // Monthly KPI state removed - now in InspectorPerformance.tsx
 
   useEffect(() => {
-    async function loadSites() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { data } = await (supabase
-        .from("organization_Inspectors" as any)
-        .select("*, organizations(name, id)")
-        .eq("inspector_id", session.user.id) as any);
-      const siteList = (data as any[]) || [];
-      setSites(siteList);
-      if (siteList.length === 1) setSelectedSite(siteList[0].organization_id);
-      setIsLoading(false);
-    }
-    loadSites();
-  }, []);
+    if (sites.length === 1 && !selectedSite) setSelectedSite(sites[0].id);
+  }, [sites, selectedSite]);
 
   useEffect(() => {
     const newItems: ChecklistItem[] = [];
