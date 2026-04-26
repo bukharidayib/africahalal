@@ -46,6 +46,7 @@ export default function Businesses() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | SubStatus>('all');
+  const [overdueSubs, setOverdueSubs] = useState(0);
 
   useEffect(() => { void load(); }, []);
 
