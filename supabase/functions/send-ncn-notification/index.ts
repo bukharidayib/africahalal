@@ -12,7 +12,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const APP_URL = "https://africahalal.lovable.app";
+const APP_URL = "https://africanhalaal.com";
 
 const SEVERITY_COLORS: Record<string, string> = {
   minor: "#d97706",

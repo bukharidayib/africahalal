@@ -32,7 +32,7 @@ const handler = async (req: Request): Promise<Response> => {
       type: "recovery",
       email,
       options: {
-        redirectTo: redirect_to || "https://africahalal.lovable.app/auth/reset-password",
+        redirectTo: redirect_to || "https://africanhalaal.com/auth/reset-password",
       },
     });
 
@@ -70,7 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
           <div style="max-width:560px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
             <!-- Header with Logo -->
             <div style="background:linear-gradient(135deg,#1a5c2e,#2d7a45);padding:32px 40px;text-align:center;">
-              <img src="https://africahalal.lovable.app/logo.png" alt="AHI Logo" style="height:56px;margin-bottom:16px;" />
+              <img src="https://africanhalaal.com/logo.png" alt="AHI Logo" style="height:56px;margin-bottom:16px;" />
               <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">
                 Africa Halal Integrity System
               </h1>

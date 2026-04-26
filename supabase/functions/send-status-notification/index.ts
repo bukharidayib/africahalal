@@ -13,7 +13,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = "https://xdixdqyzjfdqummwpuzg.supabase.co";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const APP_URL = "https://africahalal.lovable.app";
+const APP_URL = "https://africanhalaal.com";
 
 interface StatusNotificationRequest {
   application_id: string;
