@@ -131,6 +131,20 @@ export default function Businesses() {
         };
       });
       setRows(enriched);
+
+      // Aggregate: count past-due subscriptions across all businesses
+      if (orgIds.length) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { count } = await supabase
+          .from('subscriptions')
+          .select('id', { count: 'exact', head: true })
+          .in('organization_id', orgIds)
+          .in('status', ['active', 'suspended'])
+          .lt('end_date', today);
+        setOverdueSubs(count || 0);
+      } else {
+        setOverdueSubs(0);
+      }
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Failed to load', description: e.message });
     } finally {
