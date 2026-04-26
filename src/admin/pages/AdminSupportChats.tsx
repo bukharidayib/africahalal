@@ -93,10 +93,21 @@ export default function AdminSupportChats() {
 
             const { data: lastMsg } = await supabase
               .from('chat_messages')
-              .select('message')
+              .select('message, created_at')
               .eq('session_id', chat.id)
               .order('created_at', { ascending: false })
               .limit(1);
+
+            // Count unread (client messages newer than admin_last_read_at)
+            let unread = 0;
+            const lastRead = (chat as any).admin_last_read_at;
+            const { count: unreadCount } = await supabase
+              .from('chat_messages')
+              .select('*', { count: 'exact', head: true })
+              .eq('session_id', chat.id)
+              .eq('sender_type', 'client')
+              .gt('created_at', lastRead || '1970-01-01');
+            unread = unreadCount || 0;
 
             return {
               ...chat,
@@ -104,6 +115,7 @@ export default function AdminSupportChats() {
               message_count: count || 0,
               last_message: lastMsg?.[0]?.message,
               userRole: getUserRole(chat.user_id),
+              unread_count: unread,
             };
           })
         );
