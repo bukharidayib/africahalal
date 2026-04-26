@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Plus, Trash2, Upload, Save, Send } from "lucide-react";
 import { format } from "date-fns";
+import { OrgCombobox } from "@/admin/components/OrgCombobox";
+import { useInspectorOrganizations } from "@/hooks/useInspectorOrganizations";
 
 const CATEGORIES = [
   { key: "shariah_compliance", label: "Shariah Compliance Operations" },
