@@ -42,11 +42,23 @@ interface ApprovalRequest {
   recommender?: { full_name: string | null; email: string | null };
 }
 
+interface PendingApp {
+  id: string;
+  application_number: string;
+  scope: string;
+  sector: string;
+  submitted_at: string | null;
+  created_at: string;
+  organizations?: { name: string } | null;
+}
+
 export default function PendingApprovals() {
   const { user } = useAdminAuthContext();
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
+  const [pendingApps, setPendingApps] = useState<PendingApp[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedApproval, setSelectedApproval] = useState<ApprovalRequest | null>(null);
+  const [selectedApp, setSelectedApp] = useState<PendingApp | null>(null);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,19 +70,26 @@ export default function PendingApprovals() {
   async function fetchApprovals() {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('approval_requests')
-        .select(`
-          *,
-          certification_applications (
-            application_number,
-            scope,
-            sector,
-            organizations ( name )
-          )
-        `)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true });
+      const [{ data, error }, { data: apps }] = await Promise.all([
+        supabase
+          .from('approval_requests')
+          .select(`
+            *,
+            certification_applications (
+              application_number,
+              scope,
+              sector,
+              organizations ( name )
+            )
+          `)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('certification_applications')
+          .select('id, application_number, scope, sector, submitted_at, created_at, organizations(name)')
+          .eq('status', 'pending_approval' as any)
+          .order('created_at', { ascending: true }),
+      ]);
 
       if (error) throw error;
 
@@ -82,11 +101,46 @@ export default function PendingApprovals() {
         recMap = new Map((profs || []).map((p: any) => [p.id, p]));
       }
       setApprovals((data || []).map((a: any) => ({ ...a, recommender: recMap.get(a.recommender_id) })));
+      setPendingApps((apps || []) as any);
     } catch (error) {
       console.error('Error fetching approvals:', error);
       toast.error('Failed to load approvals');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleAppDecision(decision: 'approve' | 'reject') {
+    if (!selectedApp || !user) return;
+    setIsSubmitting(true);
+    try {
+      const newStatus = decision === 'approve' ? 'approved' : 'rejected';
+      const { error } = await supabase
+        .from('certification_applications')
+        .update({ status: newStatus as any })
+        .eq('id', selectedApp.id);
+      if (error) throw error;
+
+      try {
+        await supabase.rpc('log_audit', {
+          _action: decision === 'approve' ? 'application_approved' : 'application_rejected',
+          _resource_type: 'certification_applications',
+          _resource_id: selectedApp.id,
+          _reason_code: decision,
+          _metadata: { notes },
+        });
+      } catch {}
+
+      toast.success(decision === 'approve' ? 'Application approved' : 'Application rejected');
+      setSelectedApp(null);
+      setActionType(null);
+      setNotes('');
+      fetchApprovals();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Failed to update application');
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
