@@ -12,6 +12,8 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+type SubStatus = 'active' | 'expiring' | 'expired' | 'none';
+
 interface BusinessRow {
   id: string;
   entity_name: string;
@@ -24,13 +26,24 @@ interface BusinessRow {
   active_certs?: number;
   open_apps?: number;
   outstanding?: number;
+  days_to_expiry?: number | null;
+  sub_status?: SubStatus;
 }
+
+const FILTERS: { key: 'all' | SubStatus; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'expiring', label: 'Expiring ≤30d' },
+  { key: 'expired', label: 'Expired' },
+  { key: 'none', label: 'No certificate' },
+];
 
 export default function Businesses() {
   const { toast } = useToast();
   const [rows, setRows] = useState<BusinessRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'all' | SubStatus>('all');
 
   useEffect(() => { void load(); }, []);
 
@@ -52,7 +65,7 @@ export default function Businesses() {
           ? supabase.from('profiles').select('id, email, full_name').in('id', userIds)
           : Promise.resolve({ data: [] as any[] }),
         orgIds.length
-          ? supabase.from('certificates').select('organization_id, status').in('organization_id', orgIds)
+          ? supabase.from('certificates').select('organization_id, status, expiry_date').in('organization_id', orgIds)
           : Promise.resolve({ data: [] as any[] }),
         list.length
           ? supabase.from('certification_applications').select('id, business_id, organization_id, status').in('business_id', list.map((b) => b.id))
@@ -63,9 +76,16 @@ export default function Businesses() {
       ]);
 
       const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-      const certByOrg = new Map<string, number>();
+      const activeCertByOrg = new Map<string, number>();
+      const latestExpiryByOrg = new Map<string, string>();
       (certs || []).forEach((c: any) => {
-        if (c.status === 'active') certByOrg.set(c.organization_id, (certByOrg.get(c.organization_id) || 0) + 1);
+        if (c.status === 'active') {
+          activeCertByOrg.set(c.organization_id, (activeCertByOrg.get(c.organization_id) || 0) + 1);
+          const cur = latestExpiryByOrg.get(c.organization_id);
+          if (!cur || new Date(c.expiry_date) > new Date(cur)) {
+            latestExpiryByOrg.set(c.organization_id, c.expiry_date);
+          }
+        }
       });
       const appsByBiz = new Map<string, number>();
       (apps || []).forEach((a: any) => {
@@ -80,15 +100,28 @@ export default function Businesses() {
         }
       });
 
-      const enriched = list.map((b) => {
+      const enriched: BusinessRow[] = list.map((b) => {
         const p: any = profileMap.get(b.user_id);
+        const orgId = b.organization_id || '';
+        const expiry = latestExpiryByOrg.get(orgId);
+        const activeCount = orgId ? (activeCertByOrg.get(orgId) || 0) : 0;
+        let subStatus: SubStatus = 'none';
+        let daysToExpiry: number | null = null;
+        if (activeCount > 0 && expiry) {
+          daysToExpiry = Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000);
+          if (daysToExpiry < 0) subStatus = 'expired';
+          else if (daysToExpiry <= 30) subStatus = 'expiring';
+          else subStatus = 'active';
+        }
         return {
           ...b,
           owner_email: p?.email || null,
           owner_name: p?.full_name || null,
-          active_certs: b.organization_id ? (certByOrg.get(b.organization_id) || 0) : 0,
+          active_certs: activeCount,
           open_apps: appsByBiz.get(b.id) || 0,
-          outstanding: b.organization_id ? (outByOrg.get(b.organization_id) || 0) : 0,
+          outstanding: orgId ? (outByOrg.get(orgId) || 0) : 0,
+          days_to_expiry: daysToExpiry,
+          sub_status: subStatus,
         };
       });
       setRows(enriched);
@@ -99,15 +132,25 @@ export default function Businesses() {
     }
   };
 
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: rows.length, active: 0, expiring: 0, expired: 0, none: 0 };
+    rows.forEach((r) => { if (r.sub_status) c[r.sub_status]++; });
+    return c;
+  }, [rows]);
+
   const filtered = useMemo(() => {
-    if (!search) return rows;
-    const s = search.toLowerCase();
-    return rows.filter((r) =>
-      r.entity_name?.toLowerCase().includes(s) ||
-      r.pacra_number?.toLowerCase().includes(s) ||
-      r.owner_email?.toLowerCase().includes(s),
-    );
-  }, [rows, search]);
+    let list = rows;
+    if (filter !== 'all') list = list.filter((r) => r.sub_status === filter);
+    if (search) {
+      const s = search.toLowerCase();
+      list = list.filter((r) =>
+        r.entity_name?.toLowerCase().includes(s) ||
+        r.pacra_number?.toLowerCase().includes(s) ||
+        r.owner_email?.toLowerCase().includes(s),
+      );
+    }
+    return list;
+  }, [rows, search, filter]);
 
   return (
     <AdminLayout>
@@ -116,14 +159,26 @@ export default function Businesses() {
           <h1 className="text-2xl font-bold font-serif flex items-center gap-2">
             <Building2 className="h-6 w-6" /> Businesses
           </h1>
-          <p className="text-muted-foreground">Unified hub for every certified business — applications, certificates, invoices, documents and history.</p>
+          <p className="text-muted-foreground">Unified hub for every certified business — applications, certificates, subscriptions, invoices, documents and history.</p>
         </div>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="space-y-3">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Search by name, PACRA #, or owner email…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {FILTERS.map((f) => (
+                <Button
+                  key={f.key}
+                  variant={filter === f.key ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFilter(f.key)}
+                >
+                  {f.label} <span className="ml-2 opacity-70 text-xs">{counts[f.key] ?? 0}</span>
+                </Button>
+              ))}
             </div>
           </CardHeader>
           <CardContent>
@@ -141,7 +196,7 @@ export default function Businesses() {
                     <TableHead>Business</TableHead>
                     <TableHead>PACRA #</TableHead>
                     <TableHead>Owner</TableHead>
-                    <TableHead>Active Certs</TableHead>
+                    <TableHead>Subscription</TableHead>
                     <TableHead>Open Apps</TableHead>
                     <TableHead>Outstanding</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -159,7 +214,7 @@ export default function Businesses() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={r.active_certs ? 'default' : 'outline'}>{r.active_certs}</Badge>
+                        <SubBadge status={r.sub_status} days={r.days_to_expiry} />
                       </TableCell>
                       <TableCell>
                         <Badge variant={r.open_apps ? 'secondary' : 'outline'}>{r.open_apps}</Badge>
@@ -182,4 +237,11 @@ export default function Businesses() {
       </div>
     </AdminLayout>
   );
+}
+
+function SubBadge({ status, days }: { status?: SubStatus; days?: number | null }) {
+  if (!status || status === 'none') return <Badge variant="outline">No cert</Badge>;
+  if (status === 'expired') return <Badge variant="destructive">Expired</Badge>;
+  if (status === 'expiring') return <Badge className="bg-amber-500 hover:bg-amber-500/90 text-white">Expiring · {days}d</Badge>;
+  return <Badge>Active · {days}d</Badge>;
 }
