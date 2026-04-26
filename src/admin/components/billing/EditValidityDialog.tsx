@@ -70,7 +70,12 @@ export function EditValidityDialog({ open, onOpenChange, certificateId, initial,
         performed_by: user?.id,
       });
 
-      toast({ title: 'Validity updated', description: `Now expires ${expiryDate}` });
+      // Auto-notify the client about the certificate change
+      supabase.functions.invoke('send-certificate-email', {
+        body: { certificate_id: certificateId, event_type: 'updated', custom_message: reason || undefined },
+      }).catch((err) => console.warn('cert email failed', err));
+
+      toast({ title: 'Validity updated', description: `Now expires ${expiryDate} · client notified` });
       onOpenChange(false);
       onSaved?.();
     } catch (e: any) {

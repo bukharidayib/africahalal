@@ -45,7 +45,7 @@ export function CertificateActionsMenu({ cert, onChanged }: Props) {
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke('send-certificate-email', {
-        body: { certificate_id: cert.id },
+        body: { certificate_id: cert.id, event_type: 'manual' },
       });
       if (error) throw error;
       toast({ title: 'Certificate emailed', description: `Sent to ${data?.recipient || 'client'}.` });
@@ -71,7 +71,12 @@ export function CertificateActionsMenu({ cert, onChanged }: Props) {
         reason: reason || `Status changed to ${next}`,
         performed_by: user?.id,
       });
-      toast({ title: 'Status updated', description: `${cert.certificate_number} → ${next}` });
+      // Auto-notify client
+      const eventType = next === 'active' ? 'reactivated' : next === 'suspended' ? 'suspended' : 'revoked';
+      supabase.functions.invoke('send-certificate-email', {
+        body: { certificate_id: cert.id, event_type: eventType, custom_message: reason || undefined },
+      }).catch((err) => console.warn('cert email failed', err));
+      toast({ title: 'Status updated', description: `${cert.certificate_number} → ${next} · client notified` });
       setConfirm(null);
       setReason('');
       onChanged?.();
