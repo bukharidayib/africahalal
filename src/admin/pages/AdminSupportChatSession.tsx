@@ -11,6 +11,7 @@ import { useAdminAuthContext } from '../contexts/AdminAuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 
 interface ChatMessage {
   id: string;
@@ -50,6 +51,7 @@ export default function AdminSupportChatSession() {
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { peerTyping, notifyTyping } = useTypingIndicator({ sessionId: id || null, userId: user?.id || null, senderType: 'admin' });
 
   useEffect(() => {
     if (id) {
@@ -313,6 +315,16 @@ export default function AdminSupportChatSession() {
                   )}
                   <div ref={messagesEndRef} />
                 </div>
+                {peerTyping && (
+                  <div className="flex gap-2 items-center mt-3 text-xs text-muted-foreground">
+                    <span className="flex gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </span>
+                    Client is typing…
+                  </div>
+                )}
               </ScrollArea>
               
               {isActive && (
@@ -338,7 +350,7 @@ export default function AdminSupportChatSession() {
                       ref={inputRef}
                       placeholder="Type your message..."
                       value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
+                      onChange={(e) => { setNewMessage(e.target.value); notifyTyping(); }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
