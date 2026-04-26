@@ -1,74 +1,75 @@
-# Fixes & Enhancements: Business Hub, Invoicing, Accountant Cleanup
+## Goal
 
-## 1. Fix "No Business Found" in Admin → Businesses
+Make the admin **Business module** (`/admin/businesses/:id`) a complete control hub: manage certificates (issue **only when an application is approved**), manage subscriptions manually, manage invoices/payments, and drill into application details (documents, payments, status). Same certificate template as the auto-issued ones.
 
-**Root cause:** The `client_businesses` table only has RLS policies for the owning user (`auth.uid() = user_id`). Admins are blocked from `SELECT`, so the page returns an empty list even though 5 businesses exist in the DB.
+---
 
-**Fix:** Add an admin SELECT policy.
+## What you'll be able to do (per business)
 
-```sql
-CREATE POLICY "Admins can view all businesses"
-ON public.client_businesses FOR SELECT
-TO authenticated
-USING (is_admin_user(auth.uid()));
+### 1. Certificates — manual issuance & full lifecycle
+- **Issue Certificate** button at the top of the Certificates tab.
+  - Shows a dropdown of the business's **approved applications that don't yet have a certificate**.
+  - Disabled with a clear hint ("No approved application available") when there are none.
+  - Auto-generated cert number (editable), scope, issue date, expiry date, notes.
+  - Uses the **same `CertificateTemplate`** as the auto flow (verifiable QR + public verify page).
+- **Per-row actions**: Edit Validity (already exists), **Suspend / Revoke / Reactivate**, **Download PDF**, **Send to Client by Email**, **View Public Verify Page**.
+- All status changes log to `certificate_history`.
 
-CREATE POLICY "Admins can update businesses"
-ON public.client_businesses FOR UPDATE
-TO authenticated
-USING (is_admin_user(auth.uid()));
-```
+### 2. Subscription — manual full lifecycle
+A dedicated **Subscription** tab promoted from the Overview panel:
+- **Current subscription card**: cert #, issued, expires, days remaining, status.
+- **Renew / Extend** (+3, +6, +12, +24 months or custom expiry).
+- **Suspend / Reactivate / Cancel** with reason note (logged).
+- **Subscription history** table listing every past certificate / period.
+- New subscription = issue a new certificate (still requires an approved application — same gate as #1).
 
-Also confirm the join queries (`profiles`, `certificates`, `certification_applications`, `invoices`) load — RLS already permits admin reads on those.
+### 3. Applications — full drill-down
+- Applications tab keeps the table but adds an expandable detail panel per row showing:
+  - Status timeline
+  - All uploaded documents (filename, type, version, **View / Download** via signed URL)
+  - All invoices for that application + payment status
+  - Quick link to full `/admin/applications/:id`
+- Inline "Issue Certificate" button stays for approved apps without a cert.
 
-## 2. Remove "Subscriptions" tab in Accountant module
+### 4. Invoices & Payments — manage from inside the business
+- "**+ New Invoice**" button at the top — opens existing `InvoiceFormDialog` with the business's organization pre-selected (multi-line items already supported).
+- Per-row actions: **View**, **Edit**, **Send by Email**, **Download PDF**, **Mark Paid** (manual).
+- Payment transactions table stays for visibility.
 
-In `src/admin/pages/AdminBilling.tsx`:
-- Remove `<TabsTrigger value="subscriptions">` and its `<TabsContent>`.
-- Remove the `SubscriptionsTab` import and the `Repeat` icon if unused.
+### 5. Smarter listing page
+On `/admin/businesses` add quick filter chips: **All / Active / Expiring ≤30 days / Expired / No certificate**, plus a "**Days until expiry**" column.
 
-## 3. Modern, beautiful Invoice (PDF + Client view) with multi-items
+---
 
-**Note:** The reference invoice you mentioned didn't come through as an attachment. I'll design a clean, modern professional template — typical AHI brand: serif headline, generous whitespace, two-column header (issuer left / billed-to right), boxed totals panel, line-item table with zebra rows, footer with payment instructions and thank-you note. If you want a specific look, please re-attach the image and I'll match it.
+## Technical changes
 
-### 3a. PDF (`supabase/functions/generate-invoice-pdf/index.ts`)
-Redesign HTML/CSS to:
-- Header: AHI logo + brand mark on left, big "INVOICE" wordmark + invoice # / dates on right.
-- Two cards: **From** (Africa Halal Inspectorate) and **Bill To** (organization name, address, recipient emails).
-- Line-items table: # · Description · Qty · Unit Price · Line Total.
-- Right-aligned totals box: Subtotal, Discount, Tax (with rate), **Grand Total** highlighted in brand green.
-- Notes section + payment instructions (MoMo / bank).
-- Footer with website, contact, and "Thank you for your business".
-- Status watermark when `paid` / `overdue` / `cancelled`.
+### Files to edit
+- `src/admin/pages/BusinessDetail.tsx`
+  - New `Subscription` tab with renew / suspend / reactivate / cancel.
+  - Certificates tab gets a header **Issue Certificate** button (gated to approved apps without a cert).
+  - Per-cert actions menu (Suspend/Revoke/Reactivate/Download/Email).
+  - Expandable application rows with documents + invoices + status timeline.
+  - "+ New Invoice" button in Invoices tab → opens `InvoiceFormDialog`.
+- `src/admin/components/billing/IssueCertificateDialog.tsx`
+  - Accept a list of eligible (approved, no-cert) applications and let admin pick which one when invoked from the Certificates/Subscription tab header.
+- `src/admin/pages/Businesses.tsx`
+  - Add subscription status column + filter chips.
 
-### 3b. Admin invoice form (`InvoiceFormDialog.tsx`)
-Already supports multi-line items, tax %, discount, multi-recipient emails — keep but:
-- Add a **Live Preview** panel (side panel or "Preview" button) rendering the same modern layout so admins see exactly what the client gets before sending.
-- Wire "Send" to the existing `send-invoice-email` function (already supports `recipient_emails[]`).
+### New file
+- `src/admin/components/billing/CertificateActionsMenu.tsx` — Suspend / Revoke / Reactivate / Download PDF / Email / View Public, all writing to `certificate_history`.
 
-### 3c. Client invoice view (`src/pages/client/BillingInvoiceDetail.tsx`)
-Redesign to mirror the new PDF layout:
-- Replace single-line amount display with the full line-item table (load from `invoice_items`).
-- Add the same totals panel (subtotal / discount / tax / grand total).
-- Keep existing MoMo "Pay Now" CTA and payment-attempts history below the invoice card.
+### Database
+- No schema changes — `certificates.application_id` stays NOT NULL because every issuance must reference an approved application.
+- (Optional) index `certificates(organization_id, status, expiry_date)` to speed up subscription lookups.
 
-## 4. Manual validity / subscription duration inside Business Hub
+### Edge functions (reused)
+- `generate-invoice-pdf`, `send-invoice-email`, `send-certificate-email` — all already deployed.
 
-In `src/admin/pages/BusinessDetail.tsx`:
-- **Certificates tab:** add an "Edit validity" action on each certificate row → dialog to update `issue_date` and `expiry_date` manually (admin-only via `certificates.update` permission).
-- **Applications tab:** when issuing a certificate via `IssueCertificateDialog`, validity dates are already manual — confirmed.
-- **New "Subscription" mini-section per business** (inside Overview tab): shows current active certificate's expiry as the subscription end date, with a "Set/Extend" button that updates `expiry_date` directly. No automatic recurring logic — fully manual as requested.
+---
 
-## Files to change
+## Out of scope
+- Changing the certificate visual template (kept identical).
+- Auto-billing on renewal (stays manual, per your earlier instruction).
+- Issuing certificates without an approved application.
 
-- `supabase/migrations/<new>.sql` — admin RLS on `client_businesses`
-- `src/admin/pages/AdminBilling.tsx` — remove Subscriptions tab
-- `src/admin/components/billing/InvoiceFormDialog.tsx` — add live preview
-- `src/admin/components/billing/InvoicePreview.tsx` *(new)* — shared modern invoice JSX used by preview + client detail
-- `src/pages/client/BillingInvoiceDetail.tsx` — render modern layout + line items
-- `src/admin/pages/BusinessDetail.tsx` — manual validity edit dialog + subscription panel
-- `src/admin/components/billing/EditValidityDialog.tsx` *(new)*
-- `supabase/functions/generate-invoice-pdf/index.ts` — redesigned HTML template
-
-## Out of scope (ask if you want them)
-- Automated subscription billing / renewal reminders (you asked for manual control).
-- Stripe/Paddle — keeping current ZynlePay MoMo flow.
+Once approved, I'll implement everything in one pass.
