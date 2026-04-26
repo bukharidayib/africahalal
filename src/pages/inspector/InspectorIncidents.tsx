@@ -30,7 +30,7 @@ export default function InspectorIncidents() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await (supabase.from("inspector_incidents" as any).select("*").order("reported_at", { ascending: false }) as any);
+      const { data } = await (supabase.from("inspector_incidents" as any).select("*").order("created_at", { ascending: false }) as any);
       setIncidents((data as any[]) || []);
       setIsLoading(false);
     }
