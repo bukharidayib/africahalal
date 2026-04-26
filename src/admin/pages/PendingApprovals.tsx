@@ -245,107 +245,167 @@ export default function PendingApprovals() {
           </CardContent>
         </Card>
 
-        {/* Approvals List */}
-        {isLoading ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Loading approval requests...
+        {/* Section: Applications awaiting approval */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Applications Awaiting Approval</h2>
+            <Badge variant="secondary">{pendingApps.length}</Badge>
           </div>
-        ) : approvals.length === 0 ? (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center text-muted-foreground">
-                <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <h3 className="font-medium mb-1">No pending approvals</h3>
-                <p className="text-sm">
-                  All approval requests have been processed.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {approvals.map((approval) => (
-              <Card key={approval.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        {approval.certification_applications?.application_number}
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        <span className="flex items-center gap-2">
+
+          {isLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          ) : pendingApps.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground text-sm">
+                No applications awaiting approval.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {pendingApps.map((app) => (
+                <Card key={app.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <FileText className="h-5 w-5" />
+                          {app.application_number}
+                        </CardTitle>
+                        <CardDescription className="mt-1 flex items-center gap-2">
                           <Building2 className="h-4 w-4" />
-                          {approval.certification_applications?.organizations?.name}
-                        </span>
-                      </CardDescription>
+                          {app.organizations?.name || 'Unknown organization'}
+                        </CardDescription>
+                      </div>
+                      <Badge className="gap-1 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">
+                        <Clock className="h-3 w-3" /> Pending Approval
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="gap-1">
-                      <Clock className="h-3 w-3" />
-                      Pending
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Scope</p>
-                      <p>{approval.certification_applications?.scope}</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Scope</p>
+                        <p>{app.scope}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Sector</p>
+                        <p>{app.sector}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Sector</p>
-                      <p>{approval.certification_applications?.sector}</p>
-                    </div>
-                  </div>
-
-                  {approval.recommendation_notes && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Recommendation Notes</p>
-                      <p className="text-sm mt-1">{approval.recommendation_notes}</p>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <div className="text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <User className="h-4 w-4" />
-                        Recommended by {approval.recommender?.full_name || approval.recommender?.email || 'Unknown'} · {format(new Date(approval.created_at), 'dd MMM yyyy HH:mm')}
-                      </span>
-                    </div>
-
-                    {canApprove(approval) ? (
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <div className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        Submitted {format(new Date(app.submitted_at || app.created_at), 'dd MMM yyyy HH:mm')}
+                      </div>
                       <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedApproval(approval);
-                            setActionType('reject');
-                          }}
-                        >
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Reject
+                        <Button variant="outline" onClick={() => { setSelectedApp(app); setActionType('reject'); }}>
+                          <XCircle className="mr-2 h-4 w-4" /> Reject
                         </Button>
-                        <Button
-                          onClick={() => {
-                            setSelectedApproval(approval);
-                            setActionType('approve');
-                          }}
-                        >
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Approve
+                        <Button onClick={() => { setSelectedApp(app); setActionType('approve'); }}>
+                          <CheckCircle2 className="mr-2 h-4 w-4" /> Approve
                         </Button>
                       </div>
-                    ) : (
-                      <Badge variant="secondary">
-                        Your recommendation - cannot self-approve
-                      </Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Section: Dual-control approval requests */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Dual-Control Recommendations</h2>
+            <Badge variant="secondary">{approvals.length}</Badge>
           </div>
-        )}
+
+          {isLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading approval requests...</div>
+          ) : approvals.length === 0 ? (
+            <Card>
+              <CardContent className="py-8">
+                <div className="text-center text-muted-foreground">
+                  <CheckCircle2 className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">No dual-control approval requests pending.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {approvals.map((approval) => (
+                <Card key={approval.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <FileText className="h-5 w-5" />
+                          {approval.certification_applications?.application_number}
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                          <span className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4" />
+                            {approval.certification_applications?.organizations?.name}
+                          </span>
+                        </CardDescription>
+                      </div>
+                      <Badge variant="outline" className="gap-1">
+                        <Clock className="h-3 w-3" />
+                        Pending
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Scope</p>
+                        <p>{approval.certification_applications?.scope}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Sector</p>
+                        <p>{approval.certification_applications?.sector}</p>
+                      </div>
+                    </div>
+
+                    {approval.recommendation_notes && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Recommendation Notes</p>
+                        <p className="text-sm mt-1">{approval.recommendation_notes}</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <div className="text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <User className="h-4 w-4" />
+                          Recommended by {approval.recommender?.full_name || approval.recommender?.email || 'Unknown'} · {format(new Date(approval.created_at), 'dd MMM yyyy HH:mm')}
+                        </span>
+                      </div>
+
+                      {canApprove(approval) ? (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => { setSelectedApproval(approval); setActionType('reject'); }}
+                          >
+                            <XCircle className="mr-2 h-4 w-4" /> Reject
+                          </Button>
+                          <Button
+                            onClick={() => { setSelectedApproval(approval); setActionType('approve'); }}
+                          >
+                            <CheckCircle2 className="mr-2 h-4 w-4" /> Approve
+                          </Button>
+                        </div>
+                      ) : (
+                        <Badge variant="secondary">Your recommendation - cannot self-approve</Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Action Dialog */}
