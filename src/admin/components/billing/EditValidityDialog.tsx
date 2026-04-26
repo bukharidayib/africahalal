@@ -135,6 +135,11 @@ export function EditValidityDialog({ open, onOpenChange, certificateId, initial,
           </div>
         </div>
 
+        <div className="border-t pt-3 max-h-48 overflow-y-auto">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Recent activity</p>
+          <CertificateTimeline certificateId={certificateId} compact />
+        </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving}>
