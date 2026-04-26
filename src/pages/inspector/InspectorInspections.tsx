@@ -57,7 +57,19 @@ export default function InspectorInspections() {
       }
 
       const { data } = await query;
-      setInspections(data || []);
+      const rows = data || [];
+
+      if (rows.length > 0) {
+        const ids = rows.map((r: any) => r.id);
+        const { data: reports } = await supabase
+          .from("inspection_reports")
+          .select("inspection_id, status, compliance_score")
+          .in("inspection_id", ids);
+        const map = new Map((reports || []).map((r: any) => [r.inspection_id, r]));
+        rows.forEach((r: any) => { r.report = map.get(r.id) || null; });
+      }
+
+      setInspections(rows);
       setIsLoading(false);
     }
     load();
@@ -126,12 +138,22 @@ export default function InspectorInspections() {
                     <TableHead>Application</TableHead>
                     <TableHead>Scheduled Date</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Report Review</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((insp) => {
                     const status = statusConfig[insp.status] || statusConfig.scheduled;
+                    const reportStatus = insp.report?.status as string | undefined;
+                    const reportBadge: Record<string, { label: string; cls: string }> = {
+                      submitted: { label: "Awaiting Review", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
+                      approved: { label: "Approved", cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+                      rejected: { label: "Rejected", cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
+                      conditional: { label: "Conditional", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
+                      draft: { label: "Draft", cls: "bg-muted text-muted-foreground" },
+                    };
+                    const rb = reportStatus ? reportBadge[reportStatus] : null;
                     return (
                       <TableRow key={insp.id}>
                         <TableCell>
@@ -155,6 +177,13 @@ export default function InspectorInspections() {
                         </TableCell>
                         <TableCell>
                           <Badge variant={status.variant}>{status.label}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {rb ? (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${rb.cls}`}>{rb.label}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Button asChild variant="ghost" size="icon">
