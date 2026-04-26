@@ -10,9 +10,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Send, Upload } from "lucide-react";
+import { OrgCombobox } from "@/admin/components/OrgCombobox";
+import { useInspectorOrganizations } from "@/hooks/useInspectorOrganizations";
 
 export default function InspectorIncidentForm() {
-  const [sites, setSites] = useState<any[]>([]);
+  const { organizations: sites, isLoading } = useInspectorOrganizations();
   const [selectedSite, setSelectedSite] = useState("");
   const [incidentType, setIncidentType] = useState("");
   const [severity, setSeverity] = useState("medium");
@@ -21,22 +23,12 @@ export default function InspectorIncidentForm() {
   const [evidenceUrls, setEvidenceUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    async function load() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { data } = await (supabase.from("organization_Inspectors" as any).select("*, organizations(name, id)").eq("inspector_id", session.user.id) as any);
-      const siteList = (data as any[]) || [];
-      setSites(siteList);
-      if (siteList.length === 1) setSelectedSite(siteList[0].organization_id);
-      setIsLoading(false);
-    }
-    load();
-  }, []);
+    if (sites.length === 1 && !selectedSite) setSelectedSite(sites[0].id);
+  }, [sites, selectedSite]);
 
   const handleEvidenceUpload = async (file: File) => {
     const { data: { session } } = await supabase.auth.getSession();
