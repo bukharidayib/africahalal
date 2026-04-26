@@ -63,10 +63,7 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const origin = req.headers.get("origin") || req.headers.get("referer") || "";
-    const appUrl = origin.startsWith("http")
-      ? new URL(origin).origin
-      : "https://africahalal.lovable.app";
+    const appUrl = "https://africanhalaal.com";
 
     const registerUrl = `${appUrl}/inspector/register?email=${encodeURIComponent(email)}&token=${encodeURIComponent(invitation_token)}`;
     const signinUrl = `${appUrl}/inspector/signin`;
