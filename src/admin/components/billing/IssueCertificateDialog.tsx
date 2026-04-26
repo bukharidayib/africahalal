@@ -1,19 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Award, Loader2 } from 'lucide-react';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+
+export interface EligibleApp {
+  id: string;
+  application_number: string;
+  scope?: string | null;
+}
 
 interface IssueCertificateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  applicationId: string;
+  /** When provided, the application is fixed and not selectable. */
+  applicationId?: string;
+  /** When applicationId is omitted, admin picks from this list (approved apps without a cert). */
+  eligibleApps?: EligibleApp[];
   organizationId: string;
   defaultScope?: string;
   onIssued?: (certificateId: string) => void;
