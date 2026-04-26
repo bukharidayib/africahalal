@@ -591,37 +591,59 @@ export default function BusinessDetail() {
               <CardContent>
                 {certs.length === 0 ? <Empty icon={Award} text="No certificates issued." /> : (
                   <Table>
-                    <TableHeader><TableRow><TableHead>Cert #</TableHead><TableHead>Status</TableHead><TableHead>Issue Date</TableHead><TableHead>Expiry</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead className="w-8" /><TableHead>Cert #</TableHead><TableHead>Status</TableHead><TableHead>Issue Date</TableHead><TableHead>Expiry</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {certs.map((c) => (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-mono">{c.certificate_number}</TableCell>
-                          <TableCell><Badge variant={c.status === 'active' ? 'default' : 'outline'} className="capitalize">{c.status}</Badge></TableCell>
-                          <TableCell>{format(new Date(c.issue_date), 'dd MMM yyyy')}</TableCell>
-                          <TableCell>{format(new Date(c.expiry_date), 'dd MMM yyyy')}</TableCell>
-                          <TableCell className="text-right space-x-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setEditValidity({
-                                id: c.id, issue_date: c.issue_date, expiry_date: c.expiry_date, status: c.status,
-                              })}
-                            >
-                              <Pencil className="h-4 w-4 mr-1" /> Validity
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Email Client"
-                              onClick={() => setNotify({ kind: 'cert', certificateId: c.id, certNumber: c.certificate_number })}
-                            >
-                              <Mail className="h-4 w-4" />
-                            </Button>
-                            <Button asChild variant="ghost" size="sm"><Link to={`/admin/certificates/${c.id}`}><Eye className="h-4 w-4" /></Link></Button>
-                            <CertificateActionsMenu cert={c} onChanged={load} />
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {certs.map((c) => {
+                        const isOpen = expandedCert === c.id;
+                        return (
+                          <>
+                            <TableRow key={c.id}>
+                              <TableCell>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedCert(isOpen ? null : c.id)} title="Show audit timeline">
+                                  {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="font-mono">{c.certificate_number}</TableCell>
+                              <TableCell><Badge variant={c.status === 'active' ? 'default' : 'outline'} className="capitalize">{c.status}</Badge></TableCell>
+                              <TableCell>{format(new Date(c.issue_date), 'dd MMM yyyy')}</TableCell>
+                              <TableCell>{format(new Date(c.expiry_date), 'dd MMM yyyy')}</TableCell>
+                              <TableCell className="text-right space-x-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setEditValidity({
+                                    id: c.id, issue_date: c.issue_date, expiry_date: c.expiry_date, status: c.status,
+                                  })}
+                                >
+                                  <Pencil className="h-4 w-4 mr-1" /> Validity
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title="Email Client"
+                                  onClick={() => setNotify({ kind: 'cert', certificateId: c.id, certNumber: c.certificate_number })}
+                                >
+                                  <Mail className="h-4 w-4" />
+                                </Button>
+                                <Button asChild variant="ghost" size="sm"><Link to={`/admin/certificates/${c.id}`}><Eye className="h-4 w-4" /></Link></Button>
+                                <CertificateActionsMenu cert={c} onChanged={load} />
+                              </TableCell>
+                            </TableRow>
+                            {isOpen && (
+                              <TableRow key={`${c.id}-tl`}>
+                                <TableCell colSpan={6} className="bg-muted/30">
+                                  <div className="py-3 px-2">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
+                                      <History className="h-3.5 w-3.5" /> Audit Timeline
+                                    </p>
+                                    <CertificateTimeline certificateId={c.id} />
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 )}
