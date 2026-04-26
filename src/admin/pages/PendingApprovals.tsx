@@ -411,18 +411,19 @@ export default function PendingApprovals() {
       {/* Action Dialog */}
       <Dialog open={!!actionType} onOpenChange={() => {
         setSelectedApproval(null);
+        setSelectedApp(null);
         setActionType(null);
         setNotes('');
       }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {actionType === 'approve' ? 'Approve Certificate Issuance' : 'Reject Approval Request'}
+              {actionType === 'approve' ? 'Approve Application' : 'Reject Application'}
             </DialogTitle>
             <DialogDescription>
               {actionType === 'approve'
-                ? 'Confirm approval for this certificate. This action will be logged.'
-                : 'Reject this approval request with a reason.'}
+                ? 'Confirm approval. This action will be logged.'
+                : 'Reject this request with a reason.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -434,9 +435,7 @@ export default function PendingApprovals() {
               <Textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder={actionType === 'approve' 
-                  ? 'Add any notes...'
-                  : 'Explain the reason for rejection...'}
+                placeholder={actionType === 'approve' ? 'Add any notes...' : 'Explain the reason for rejection...'}
                 className="mt-1"
               />
             </div>
@@ -445,13 +444,17 @@ export default function PendingApprovals() {
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setSelectedApproval(null);
+              setSelectedApp(null);
               setActionType(null);
               setNotes('');
             }}>
               Cancel
             </Button>
             <Button
-              onClick={handleAction}
+              onClick={() => {
+                if (selectedApp) handleAppDecision(actionType as 'approve' | 'reject');
+                else handleAction();
+              }}
               disabled={isSubmitting || (actionType === 'reject' && !notes.trim())}
               variant={actionType === 'approve' ? 'default' : 'destructive'}
             >
