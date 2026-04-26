@@ -895,7 +895,7 @@ export default function CertificationApplication() {
                                 </div>
 
                                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-foreground/80 space-y-1">
-                                    <p><strong>Note:</strong> After submission, our Accountant team will review your application and send you a quotation/invoice with the application fee and any optional subscription plan.</p>
+                                    <p><strong>Note:</strong> After submission, our certification team will review your application and contact you with the next steps.</p>
                                 </div>
                             </div>
                         )}
@@ -1138,7 +1138,7 @@ export default function CertificationApplication() {
                                 </DialogTitle>
                                 <DialogDescription>
                                     Your application <strong>{submitted.application_number}</strong> has been received.
-                                    Our Accountant team will review it and email you a quotation/invoice for the application fee shortly.
+                                    Our certification team will review it and reach out to you with the next steps.
                                 </DialogDescription>
                             </DialogHeader>
                             <DialogFooter>
