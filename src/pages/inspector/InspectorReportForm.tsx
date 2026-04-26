@@ -178,8 +178,8 @@ export default function InspectorReportForm() {
       if (!session) throw new Error("Not authenticated");
 
       // Resolve organization_id to organizations id (find or create)
-      const selectedOrg = sites.find((s: any) => s.organization_id === selectedSite);
-      const orgName = selectedOrg?.organizations?.name || "Site";
+      const selectedOrg = sites.find((s) => s.id === selectedSite);
+      const orgName = selectedOrg?.name || "Site";
       let { data: existingSite } = await (supabase
         .from("supervisor_sites" as any)
         .select("id")
