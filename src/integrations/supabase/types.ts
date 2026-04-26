@@ -2916,6 +2916,10 @@ export type Database = {
       generate_quotation_number: { Args: never; Returns: string }
       generate_supervisor_incident_number: { Args: never; Returns: string }
       generate_ticket_number: { Args: never; Returns: string }
+      get_inspector_application_ids: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
       get_user_permissions: { Args: { _user_id: string }; Returns: string[] }
       get_user_role: { Args: { _user_id: string }; Returns: string }
       has_permission: {
