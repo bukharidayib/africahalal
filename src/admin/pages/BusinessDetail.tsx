@@ -596,7 +596,7 @@ export default function BusinessDetail() {
                       {certs.map((c) => {
                         const isOpen = expandedCert === c.id;
                         return (
-                          <>
+                          <Fragment key={c.id}>
                             <TableRow key={c.id}>
                               <TableCell>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedCert(isOpen ? null : c.id)} title="Show audit timeline">
