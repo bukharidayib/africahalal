@@ -196,7 +196,7 @@ export function IssueCertificateDialog({
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
-          <Button onClick={handleIssue} disabled={submitting || loading}>
+          <Button onClick={handleIssue} disabled={submitting || loading || noApps}>
             {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Award className="h-4 w-4 mr-2" />}
             Issue Certificate
           </Button>
