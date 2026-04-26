@@ -82,12 +82,6 @@ const navItems: NavItem[] = [
     permission: 'canViewApplications',
   },
   {
-    title: 'Pending Approvals',
-    href: '/admin/approvals',
-    icon: CheckSquare,
-    permission: 'canApproveApplications',
-  },
-  {
     title: 'Certificates',
     href: '/admin/certificates',
     icon: Award,
