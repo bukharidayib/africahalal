@@ -158,9 +158,16 @@ export default function AdminSupportChats() {
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">{chat.profile?.email}</p>
-              <p className="text-sm text-muted-foreground truncate mt-1">
-                {chat.last_message || 'No messages yet'}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground truncate mt-1 flex-1">
+                  {chat.last_message || 'No messages yet'}
+                </p>
+                {!!chat.unread_count && chat.unread_count > 0 && (
+                  <Badge className="bg-red-500 hover:bg-red-500 text-white text-[10px] px-2 py-0 h-5">
+                    {chat.unread_count} new
+                  </Badge>
+                )}
+              </div>
               <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
