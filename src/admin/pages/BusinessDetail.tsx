@@ -279,7 +279,9 @@ export default function BusinessDetail() {
           <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-2" /> Refresh</Button>
         </div>
 
-        {/* KPI Cards */}
+        {biz?.organization_id && <BusinessAlerts organizationId={biz.organization_id} />}
+
+
         <div className="grid gap-4 md:grid-cols-4">
           <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Total Paid</p><p className="text-2xl font-bold">ZMW {totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></CardContent></Card>
           <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Outstanding</p><p className={`text-2xl font-bold ${outstanding ? 'text-destructive' : ''}`}>ZMW {outstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></CardContent></Card>
