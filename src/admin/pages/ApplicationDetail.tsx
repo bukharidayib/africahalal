@@ -91,6 +91,7 @@ const statusConfig: Record<ApplicationStatus, { label: string; variant: 'default
   awaiting_inspection: { label: 'Inspection Scheduled', variant: 'secondary' },
   inspection_complete: { label: 'Inspection Completed', variant: 'secondary' },
   pending_decision: { label: 'Pending Decision', variant: 'default' },
+  pending_approval: { label: 'Pending Approval', variant: 'default' },
   approved: { label: 'Approved', variant: 'default' },
   rejected: { label: 'Rejected', variant: 'destructive' },
   suspended: { label: 'Suspended', variant: 'destructive' },
