@@ -22,6 +22,7 @@ interface ChatSession {
   message_count?: number;
   last_message?: string;
   userRole?: string;
+  unread_count?: number;
 }
 
 export default function AdminSupportChats() {
@@ -93,10 +94,21 @@ export default function AdminSupportChats() {
 
             const { data: lastMsg } = await supabase
               .from('chat_messages')
-              .select('message')
+              .select('message, created_at')
               .eq('session_id', chat.id)
               .order('created_at', { ascending: false })
               .limit(1);
+
+            // Count unread (client messages newer than admin_last_read_at)
+            let unread = 0;
+            const lastRead = (chat as any).admin_last_read_at;
+            const { count: unreadCount } = await supabase
+              .from('chat_messages')
+              .select('*', { count: 'exact', head: true })
+              .eq('session_id', chat.id)
+              .eq('sender_type', 'client')
+              .gt('created_at', lastRead || '1970-01-01');
+            unread = unreadCount || 0;
 
             return {
               ...chat,
@@ -104,6 +116,7 @@ export default function AdminSupportChats() {
               message_count: count || 0,
               last_message: lastMsg?.[0]?.message,
               userRole: getUserRole(chat.user_id),
+              unread_count: unread,
             };
           })
         );
@@ -145,9 +158,16 @@ export default function AdminSupportChats() {
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">{chat.profile?.email}</p>
-              <p className="text-sm text-muted-foreground truncate mt-1">
-                {chat.last_message || 'No messages yet'}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground truncate mt-1 flex-1">
+                  {chat.last_message || 'No messages yet'}
+                </p>
+                {!!chat.unread_count && chat.unread_count > 0 && (
+                  <Badge className="bg-red-500 hover:bg-red-500 text-white text-[10px] px-2 py-0 h-5">
+                    {chat.unread_count} new
+                  </Badge>
+                )}
+              </div>
               <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />

@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { AdminLayout } from "../components/layout/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, FlaskConical, Brain, CheckCircle2, XCircle, AlertTriangle, HelpCircle } from "lucide-react";
+import { Loader2, FlaskConical, Brain, CheckCircle2, XCircle, AlertTriangle, HelpCircle, Search } from "lucide-react";
 import { format } from "date-fns";
 
 const statusColors: Record<string, string> = {
@@ -27,6 +28,7 @@ export default function IngredientTracker() {
   const [collections, setCollections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCollection, setSelectedCollection] = useState<any>(null);
   const [ingredients, setIngredients] = useState<any[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState<string | null>(null);
@@ -148,7 +150,25 @@ export default function IngredientTracker() {
     toast({ title: decision === "accepted" ? "Accepted" : "Flagged" });
   };
 
-  const filtered = statusFilter === "all" ? collections : collections.filter((c: any) => c.status === statusFilter);
+  const filtered = useMemo(() => {
+    let list = statusFilter === "all" ? collections : collections.filter((c: any) => c.status === statusFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((c: any) =>
+        (c.product_name || "").toLowerCase().includes(q) ||
+        (c.brand || "").toLowerCase().includes(q) ||
+        (c.organizations?.name || "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [collections, statusFilter, searchQuery]);
+
+  const counts = useMemo(() => ({
+    total: collections.length,
+    pending: collections.filter((c: any) => c.status === "pending").length,
+    analyzed: collections.filter((c: any) => c.status === "analyzed").length,
+    flagged: collections.filter((c: any) => c.status === "flagged").length,
+  }), [collections]);
 
   return (
     <AdminLayout>
@@ -160,9 +180,35 @@ export default function IngredientTracker() {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        {/* KPI cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: "Total", value: counts.total, color: "text-foreground" },
+            { label: "Pending", value: counts.pending, color: "text-amber-600" },
+            { label: "Analyzed", value: counts.analyzed, color: "text-blue-600" },
+            { label: "Flagged", value: counts.flagged, color: "text-red-600" },
+          ].map(k => (
+            <Card key={k.label}>
+              <CardContent className="p-4">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">{k.label}</div>
+                <div className={`text-2xl font-bold mt-1 ${k.color}`}>{k.value}</div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by product, brand, or company…"
+              className="pl-9"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>

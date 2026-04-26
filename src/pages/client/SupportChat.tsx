@@ -48,7 +48,10 @@ export default function SupportChat() {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [messages]);
+        if (sessionId && messages.length) {
+            supabase.from('chat_sessions').update({ client_last_read_at: new Date().toISOString() }).eq('id', sessionId);
+        }
+    }, [messages, sessionId]);
 
     // Set up realtime subscription
     useEffect(() => {

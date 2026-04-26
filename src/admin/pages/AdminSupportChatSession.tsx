@@ -53,6 +53,13 @@ export default function AdminSupportChatSession() {
   const inputRef = useRef<HTMLInputElement>(null);
   const { peerTyping, notifyTyping } = useTypingIndicator({ sessionId: id || null, userId: user?.id || null, senderType: 'admin' });
 
+  // Mark as read whenever messages change
+  useEffect(() => {
+    if (id && messages.length) {
+      supabase.from('chat_sessions').update({ admin_last_read_at: new Date().toISOString() }).eq('id', id);
+    }
+  }, [id, messages.length]);
+
   useEffect(() => {
     if (id) {
       fetchSession();
