@@ -82,7 +82,7 @@ export default function InspectorIncidents() {
                       </span>
                     </TableCell>
                     <TableCell><Badge variant="outline">{inc.status}</Badge></TableCell>
-                    <TableCell className="text-sm">{format(new Date(inc.reported_at), "dd MMM yyyy HH:mm")}</TableCell>
+                    <TableCell className="text-sm">{format(new Date(inc.created_at), "dd MMM yyyy HH:mm")}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
