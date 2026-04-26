@@ -1182,6 +1182,36 @@ export type Database = {
           },
         ]
       }
+      inspector_activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          inspector_id: string
+          metadata: Json
+          resource_id: string | null
+          resource_type: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          inspector_id: string
+          metadata?: Json
+          resource_id?: string | null
+          resource_type?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          inspector_id?: string
+          metadata?: Json
+          resource_id?: string | null
+          resource_type?: string | null
+        }
+        Relationships: []
+      }
       inspector_conflicts: {
         Row: {
           declared_at: string
@@ -1223,6 +1253,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inspector_incidents: {
+        Row: {
+          created_at: string
+          description: string
+          evidence_urls: string[] | null
+          id: string
+          immediate_action_taken: string | null
+          incident_number: string
+          incident_type: string
+          organization_id: string
+          reported_by: string
+          severity: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          evidence_urls?: string[] | null
+          id?: string
+          immediate_action_taken?: string | null
+          incident_number: string
+          incident_type: string
+          organization_id: string
+          reported_by: string
+          severity?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          evidence_urls?: string[] | null
+          id?: string
+          immediate_action_taken?: string | null
+          incident_number?: string
+          incident_type?: string
+          organization_id?: string
+          reported_by?: string
+          severity?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       inspector_invitations: {
         Row: {
@@ -1325,6 +1400,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inspector_observations: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          observation: string
+          organization_id: string
+          recommendation: string | null
+          tag: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          observation: string
+          organization_id: string
+          recommendation?: string | null
+          tag: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          observation?: string
+          organization_id?: string
+          recommendation?: string | null
+          tag?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       inspector_organizations: {
         Row: {
@@ -2910,6 +3018,7 @@ export type Database = {
       expire_lapsed_applications: { Args: never; Returns: number }
       generate_application_number: { Args: never; Returns: string }
       generate_certificate_number: { Args: never; Returns: string }
+      generate_Inspector_incident_number: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       generate_ncn_number: { Args: never; Returns: string }
       generate_ncr_supervisor_number: { Args: never; Returns: string }
@@ -2945,6 +3054,16 @@ export type Database = {
           _reason_code?: string
           _resource_id?: string
           _resource_type: string
+        }
+        Returns: string
+      }
+      log_Inspector_activity: {
+        Args: {
+          _action: string
+          _inspector_id: string
+          _metadata?: Json
+          _resource_id?: string
+          _resource_type?: string
         }
         Returns: string
       }
