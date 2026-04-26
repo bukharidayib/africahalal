@@ -40,7 +40,7 @@ const oneYearStr = () => {
  * Manually issue a certificate. Admin enters validity dates and scope.
  */
 export function IssueCertificateDialog({
-  open, onOpenChange, applicationId, organizationId, defaultScope, onIssued,
+  open, onOpenChange, applicationId, eligibleApps, organizationId, defaultScope, onIssued,
 }: IssueCertificateDialogProps) {
   const { toast } = useToast();
   const [certNumber, setCertNumber] = useState('');
@@ -50,6 +50,10 @@ export function IssueCertificateDialog({
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [pickedAppId, setPickedAppId] = useState<string>('');
+
+  const showAppPicker = !applicationId;
+  const apps = useMemo(() => eligibleApps || [], [eligibleApps]);
 
   useEffect(() => {
     if (!open) return;
@@ -57,6 +61,7 @@ export function IssueCertificateDialog({
     setIssueDate(todayStr());
     setExpiryDate(oneYearStr());
     setNotes('');
+    setPickedAppId(showAppPicker && apps.length === 1 ? apps[0].id : '');
     void preloadNumber();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -71,7 +76,13 @@ export function IssueCertificateDialog({
     }
   };
 
+  const effectiveAppId = applicationId || pickedAppId;
+
   const handleIssue = async () => {
+    if (!effectiveAppId) {
+      toast({ variant: 'destructive', title: 'Select an application', description: 'Pick the approved application this certificate belongs to.' });
+      return;
+    }
     if (!certNumber || !scope.trim() || !issueDate || !expiryDate) {
       toast({ variant: 'destructive', title: 'Missing fields', description: 'Please fill all required fields.' });
       return;
@@ -86,7 +97,7 @@ export function IssueCertificateDialog({
       const qrHash = crypto.randomUUID().replace(/-/g, '');
       const { data: cert, error } = await supabase.from('certificates').insert({
         certificate_number: certNumber,
-        application_id: applicationId,
+        application_id: effectiveAppId,
         organization_id: organizationId,
         scope: scope.trim(),
         issue_date: issueDate,
@@ -100,7 +111,6 @@ export function IssueCertificateDialog({
       }).select('id').single();
       if (error) throw error;
 
-      // History entry
       await supabase.from('certificate_history').insert({
         certificate_id: cert.id,
         action: 'manually_issued',
@@ -118,6 +128,8 @@ export function IssueCertificateDialog({
     }
   };
 
+  const noApps = showAppPicker && apps.length === 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -125,11 +137,38 @@ export function IssueCertificateDialog({
           <DialogTitle className="flex items-center gap-2">
             <Award className="h-5 w-5 text-primary" /> Issue Certificate Manually
           </DialogTitle>
+          <DialogDescription>
+            Certificates can only be issued against an approved application that doesn't already have one.
+          </DialogDescription>
         </DialogHeader>
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : noApps ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            No approved applications without a certificate are available for this business.
+          </div>
         ) : (
           <div className="space-y-4 py-4">
+            {showAppPicker && (
+              <div>
+                <Label>Approved Application *</Label>
+                <Select
+                  value={pickedAppId}
+                  onValueChange={(v) => {
+                    setPickedAppId(v);
+                    const app = apps.find((a) => a.id === v);
+                    if (app?.scope && !scope) setScope(app.scope);
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select approved application…" /></SelectTrigger>
+                  <SelectContent>
+                    {apps.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.application_number}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label>Certificate Number *</Label>
               <Input value={certNumber} onChange={(e) => setCertNumber(e.target.value)} />
