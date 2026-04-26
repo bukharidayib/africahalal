@@ -316,12 +316,11 @@ export function InvoiceFormDialog({
               <div className="space-y-4">
                 <div>
                   <Label>Fee Type *</Label>
-                  <Select value={feeType} onValueChange={setFeeType}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {FEE_TYPES.map(([v, lbl]) => <SelectItem key={v} value={v}>{lbl}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    value={feeType}
+                    onChange={(e) => setFeeType(e.target.value)}
+                    placeholder="e.g. Certification, Renewal, Inspection"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
