@@ -28,6 +28,7 @@ export default function IngredientTracker() {
   const [collections, setCollections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCollection, setSelectedCollection] = useState<any>(null);
   const [ingredients, setIngredients] = useState<any[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState<string | null>(null);
