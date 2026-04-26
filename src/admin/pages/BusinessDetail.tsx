@@ -641,7 +641,7 @@ export default function BusinessDetail() {
                                 </TableCell>
                               </TableRow>
                             )}
-                          </>
+                          </Fragment>
                         );
                       })}
                     </TableBody>
