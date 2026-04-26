@@ -22,6 +22,7 @@ interface ChatSession {
   message_count?: number;
   last_message?: string;
   userRole?: string;
+  unread_count?: number;
 }
 
 export default function AdminSupportChats() {
