@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Play, Send, Save, Building2, Calendar, ArrowLeft, Upload, CheckCircle2 } from "lucide-react";
+import { Loader2, Play, Send, Save, Building2, Calendar, ArrowLeft, Upload, CheckCircle2, ThumbsUp, ThumbsDown, AlertTriangle, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -92,6 +92,7 @@ export default function InspectorInspectionDetail() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeCategory, setActiveCategory] = useState(CHECKLIST_CATEGORIES[0].key);
+  const [reportInfo, setReportInfo] = useState<any>(null);
 
   useEffect(() => {
     loadInspection();
@@ -163,6 +164,7 @@ export default function InspectorInspectionDetail() {
     if (report) {
       setOverallNotes(report.overall_assessment || "");
       setRecommendations(report.recommendations || "");
+      setReportInfo(report);
     }
 
     setIsLoading(false);
