@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Search, Eye, Loader2 } from 'lucide-react';
+import { Building2, Search, Eye, Loader2, AlertTriangle, CalendarClock } from 'lucide-react';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -45,6 +46,7 @@ export default function Businesses() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | SubStatus>('all');
+  const [overdueSubs, setOverdueSubs] = useState(0);
 
   useEffect(() => { void load(); }, []);
 
@@ -129,6 +131,20 @@ export default function Businesses() {
         };
       });
       setRows(enriched);
+
+      // Aggregate: count past-due subscriptions across all businesses
+      if (orgIds.length) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { count } = await supabase
+          .from('subscriptions')
+          .select('id', { count: 'exact', head: true })
+          .in('organization_id', orgIds)
+          .in('status', ['active', 'suspended'])
+          .lt('end_date', today);
+        setOverdueSubs(count || 0);
+      } else {
+        setOverdueSubs(0);
+      }
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Failed to load', description: e.message });
     } finally {
@@ -165,6 +181,36 @@ export default function Businesses() {
           </h1>
           <p className="text-muted-foreground">Unified hub for every certified business — applications, certificates, subscriptions, invoices, documents and history.</p>
         </div>
+
+        {(counts.expiring > 0 || counts.expired > 0 || overdueSubs > 0) && (
+          <div className="space-y-2">
+            {(counts.expiring > 0 || counts.expired > 0) && (
+              <Alert className="border-amber-500/40 bg-amber-500/5">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertTitle className="text-sm">Certificate attention required</AlertTitle>
+                <AlertDescription className="text-xs flex flex-wrap gap-3 mt-1">
+                  {counts.expired > 0 && (
+                    <button onClick={() => setFilter('expired')} className="underline-offset-2 hover:underline text-destructive font-medium">
+                      {counts.expired} expired
+                    </button>
+                  )}
+                  {counts.expiring > 0 && (
+                    <button onClick={() => setFilter('expiring')} className="underline-offset-2 hover:underline text-amber-700 dark:text-amber-400 font-medium">
+                      {counts.expiring} expiring within 30 days
+                    </button>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+            {overdueSubs > 0 && (
+              <Alert variant="destructive">
+                <CalendarClock className="h-4 w-4" />
+                <AlertTitle className="text-sm">{overdueSubs} subscription(s) past-due</AlertTitle>
+                <AlertDescription className="text-xs">Open the relevant business to renew or cancel.</AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
 
         <Card>
           <CardHeader className="space-y-3">

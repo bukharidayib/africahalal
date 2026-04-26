@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { CertificateTimeline } from './CertificateTimeline';
 
 interface Props {
   open: boolean;
@@ -132,6 +133,11 @@ export function EditValidityDialog({ open, onOpenChange, certificateId, initial,
             <Label>Reason / Note (audit log)</Label>
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="e.g. Subscription extended after manual renewal payment." />
           </div>
+        </div>
+
+        <div className="border-t pt-3 max-h-48 overflow-y-auto">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Recent activity</p>
+          <CertificateTimeline certificateId={certificateId} compact />
         </div>
 
         <DialogFooter>

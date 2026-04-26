@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Building2, FileText, Award, Receipt, MessageSquare, History,
@@ -25,6 +25,8 @@ import { InvoiceFormDialog } from '../components/billing/InvoiceFormDialog';
 import { DocumentPreviewDialog } from '../components/documents/DocumentPreviewDialog';
 import { SubscriptionFormDialog } from '../components/billing/SubscriptionFormDialog';
 import { SendNotifyDialog } from '../components/billing/SendNotifyDialog';
+import { CertificateTimeline } from '../components/billing/CertificateTimeline';
+import { BusinessAlerts } from '../components/billing/BusinessAlerts';
 
 const fmtCycle = (c?: string) => (c || '').replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
 
@@ -54,6 +56,7 @@ export default function BusinessDetail() {
   const [editValidity, setEditValidity] = useState<{ id: string; issue_date: string; expiry_date: string; status: string } | null>(null);
   const [invoiceDialog, setInvoiceDialog] = useState<{ open: boolean; invoiceId?: string | null }>({ open: false });
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
+  const [expandedCert, setExpandedCert] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ filePath: string; fileName: string } | null>(null);
   const [subDialog, setSubDialog] = useState<{ open: boolean; sub?: any | null }>({ open: false });
   const [notify, setNotify] = useState<
@@ -277,7 +280,9 @@ export default function BusinessDetail() {
           <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-2" /> Refresh</Button>
         </div>
 
-        {/* KPI Cards */}
+        {biz?.organization_id && <BusinessAlerts organizationId={biz.organization_id} />}
+
+
         <div className="grid gap-4 md:grid-cols-4">
           <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Total Paid</p><p className="text-2xl font-bold">ZMW {totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></CardContent></Card>
           <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Outstanding</p><p className={`text-2xl font-bold ${outstanding ? 'text-destructive' : ''}`}>ZMW {outstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></CardContent></Card>
@@ -586,37 +591,59 @@ export default function BusinessDetail() {
               <CardContent>
                 {certs.length === 0 ? <Empty icon={Award} text="No certificates issued." /> : (
                   <Table>
-                    <TableHeader><TableRow><TableHead>Cert #</TableHead><TableHead>Status</TableHead><TableHead>Issue Date</TableHead><TableHead>Expiry</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead className="w-8" /><TableHead>Cert #</TableHead><TableHead>Status</TableHead><TableHead>Issue Date</TableHead><TableHead>Expiry</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {certs.map((c) => (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-mono">{c.certificate_number}</TableCell>
-                          <TableCell><Badge variant={c.status === 'active' ? 'default' : 'outline'} className="capitalize">{c.status}</Badge></TableCell>
-                          <TableCell>{format(new Date(c.issue_date), 'dd MMM yyyy')}</TableCell>
-                          <TableCell>{format(new Date(c.expiry_date), 'dd MMM yyyy')}</TableCell>
-                          <TableCell className="text-right space-x-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setEditValidity({
-                                id: c.id, issue_date: c.issue_date, expiry_date: c.expiry_date, status: c.status,
-                              })}
-                            >
-                              <Pencil className="h-4 w-4 mr-1" /> Validity
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Email Client"
-                              onClick={() => setNotify({ kind: 'cert', certificateId: c.id, certNumber: c.certificate_number })}
-                            >
-                              <Mail className="h-4 w-4" />
-                            </Button>
-                            <Button asChild variant="ghost" size="sm"><Link to={`/admin/certificates/${c.id}`}><Eye className="h-4 w-4" /></Link></Button>
-                            <CertificateActionsMenu cert={c} onChanged={load} />
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {certs.map((c) => {
+                        const isOpen = expandedCert === c.id;
+                        return (
+                          <Fragment key={c.id}>
+                            <TableRow key={c.id}>
+                              <TableCell>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedCert(isOpen ? null : c.id)} title="Show audit timeline">
+                                  {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="font-mono">{c.certificate_number}</TableCell>
+                              <TableCell><Badge variant={c.status === 'active' ? 'default' : 'outline'} className="capitalize">{c.status}</Badge></TableCell>
+                              <TableCell>{format(new Date(c.issue_date), 'dd MMM yyyy')}</TableCell>
+                              <TableCell>{format(new Date(c.expiry_date), 'dd MMM yyyy')}</TableCell>
+                              <TableCell className="text-right space-x-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setEditValidity({
+                                    id: c.id, issue_date: c.issue_date, expiry_date: c.expiry_date, status: c.status,
+                                  })}
+                                >
+                                  <Pencil className="h-4 w-4 mr-1" /> Validity
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title="Email Client"
+                                  onClick={() => setNotify({ kind: 'cert', certificateId: c.id, certNumber: c.certificate_number })}
+                                >
+                                  <Mail className="h-4 w-4" />
+                                </Button>
+                                <Button asChild variant="ghost" size="sm"><Link to={`/admin/certificates/${c.id}`}><Eye className="h-4 w-4" /></Link></Button>
+                                <CertificateActionsMenu cert={c} onChanged={load} />
+                              </TableCell>
+                            </TableRow>
+                            {isOpen && (
+                              <TableRow key={`${c.id}-tl`}>
+                                <TableCell colSpan={6} className="bg-muted/30">
+                                  <div className="py-3 px-2">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
+                                      <History className="h-3.5 w-3.5" /> Audit Timeline
+                                    </p>
+                                    <CertificateTimeline certificateId={c.id} />
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 )}
