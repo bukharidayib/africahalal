@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Loader2, BookOpen } from "lucide-react";
 import { format } from "date-fns";
+import { OrgCombobox } from "@/admin/components/OrgCombobox";
+import { useInspectorOrganizations } from "@/hooks/useInspectorOrganizations";
 
 const TAG_COLORS: Record<string, string> = {
   operational: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
@@ -22,7 +24,7 @@ const TAG_COLORS: Record<string, string> = {
 
 export default function InspectorObservations() {
   const [observations, setObservations] = useState<any[]>([]);
-  const [sites, setSites] = useState<any[]>([]);
+  const { organizations: sites, isLoading: sitesLoading } = useInspectorOrganizations();
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [tagFilter, setTagFilter] = useState("all");
@@ -39,16 +41,14 @@ export default function InspectorObservations() {
 
     const { data: obsData } = await (supabase.from("inspector_observations" as any).select("*").eq("created_by", session.user.id).order("created_at", { ascending: false }) as any);
     setObservations((obsData as any[]) || []);
-
-    const { data: siteData } = await (supabase.from("organization_Inspectors" as any).select("*, organizations(name, id)").eq("inspector_id", session.user.id) as any);
-    const siteList = (siteData as any[]) || [];
-    setSites(siteList);
-    if (siteList.length === 1) setNewSite(siteList[0].organization_id);
-
     setIsLoading(false);
   };
 
   useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    if (sites.length === 1 && !newSite) setNewSite(sites[0].id);
+  }, [sites, newSite]);
 
   const handleSubmit = async () => {
     if (!newSite || !newTag || !newObs.trim()) {
@@ -141,15 +141,17 @@ export default function InspectorObservations() {
             <div className="space-y-4 py-2">
               <div className="space-y-2">
                 <Label>Company *</Label>
-                {sites.length <= 1 ? (
-                  <Input value={sites[0]?.organizations?.name || "No company assigned"} disabled className="bg-muted" />
+                {sites.length === 0 ? (
+                  <Input value="No company assigned" disabled className="bg-muted" />
+                ) : sites.length === 1 ? (
+                  <Input value={sites[0].name} disabled className="bg-muted" />
                 ) : (
-                  <Select value={newSite} onValueChange={setNewSite}>
-                    <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                    <SelectContent>
-                      {sites.map((s: any) => <SelectItem key={s.id} value={s.organization_id}>{s.organizations?.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <OrgCombobox
+                    options={sites}
+                    value={newSite}
+                    onChange={setNewSite}
+                    placeholder="Select company"
+                  />
                 )}
               </div>
               <div className="space-y-2">

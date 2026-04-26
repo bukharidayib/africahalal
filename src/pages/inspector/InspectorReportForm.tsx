@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Plus, Trash2, Upload, Save, Send } from "lucide-react";
 import { format } from "date-fns";
+import { OrgCombobox } from "@/admin/components/OrgCombobox";
+import { useInspectorOrganizations } from "@/hooks/useInspectorOrganizations";
 
 const CATEGORIES = [
   { key: "shariah_compliance", label: "Shariah Compliance Operations" },
@@ -58,11 +60,11 @@ interface ChecklistItem {
 
 export default function InspectorReportForm() {
   const [reportType, setReportType] = useState("daily_checklist");
-  const [sites, setSites] = useState<any[]>([]);
+  const { organizations: sites, isLoading: sitesLoading } = useInspectorOrganizations();
   const [selectedSite, setSelectedSite] = useState("");
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [notes, setNotes] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
@@ -80,20 +82,8 @@ export default function InspectorReportForm() {
   // Monthly KPI state removed - now in InspectorPerformance.tsx
 
   useEffect(() => {
-    async function loadSites() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { data } = await (supabase
-        .from("organization_Inspectors" as any)
-        .select("*, organizations(name, id)")
-        .eq("inspector_id", session.user.id) as any);
-      const siteList = (data as any[]) || [];
-      setSites(siteList);
-      if (siteList.length === 1) setSelectedSite(siteList[0].organization_id);
-      setIsLoading(false);
-    }
-    loadSites();
-  }, []);
+    if (sites.length === 1 && !selectedSite) setSelectedSite(sites[0].id);
+  }, [sites, selectedSite]);
 
   useEffect(() => {
     const newItems: ChecklistItem[] = [];
@@ -188,8 +178,8 @@ export default function InspectorReportForm() {
       if (!session) throw new Error("Not authenticated");
 
       // Resolve organization_id to organizations id (find or create)
-      const selectedOrg = sites.find((s: any) => s.organization_id === selectedSite);
-      const orgName = selectedOrg?.organizations?.name || "Site";
+      const selectedOrg = sites.find((s) => s.id === selectedSite);
+      const orgName = selectedOrg?.name || "Site";
       let { data: existingSite } = await (supabase
         .from("supervisor_sites" as any)
         .select("id")
@@ -306,17 +296,17 @@ export default function InspectorReportForm() {
               </div>
               <div className="space-y-2">
                 <Label>Company</Label>
-                {sites.length <= 1 ? (
-                  <Input value={sites[0]?.organizations?.name || "No company assigned"} disabled className="bg-muted" />
+                {sites.length === 0 ? (
+                  <Input value="No company assigned" disabled className="bg-muted" />
+                ) : sites.length === 1 ? (
+                  <Input value={sites[0].name} disabled className="bg-muted" />
                 ) : (
-                  <Select value={selectedSite} onValueChange={setSelectedSite}>
-                    <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                    <SelectContent>
-                      {sites.map((s: any) => (
-                        <SelectItem key={s.id} value={s.organization_id}>{s.organizations?.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <OrgCombobox
+                    options={sites}
+                    value={selectedSite}
+                    onChange={setSelectedSite}
+                    placeholder="Select company"
+                  />
                 )}
               </div>
               <div className="space-y-2">
