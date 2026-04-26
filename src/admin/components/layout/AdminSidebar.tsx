@@ -4,7 +4,7 @@ import {
   LayoutDashboard,
   FileText,
   Award,
-  CheckSquare,
+  
   ClipboardList,
   Users,
   AlertTriangle,
@@ -80,12 +80,6 @@ const navItems: NavItem[] = [
     href: '/admin/businesses',
     icon: Building2,
     permission: 'canViewApplications',
-  },
-  {
-    title: 'Pending Approvals',
-    href: '/admin/approvals',
-    icon: CheckSquare,
-    permission: 'canApproveApplications',
   },
   {
     title: 'Certificates',

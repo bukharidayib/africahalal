@@ -19,7 +19,6 @@ interface DashboardStats {
   activeCertificates: number;
   scheduledInspections: number;
   openNCNs: number;
-  pendingApprovals: number;
 }
 
 interface RBACStats {
@@ -44,7 +43,6 @@ export default function AdminDashboard() {
     activeCertificates: 0,
     scheduledInspections: 0,
     openNCNs: 0,
-    pendingApprovals: 0,
   });
   const [rbacStats, setRBACStats] = useState<RBACStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,14 +50,13 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const [totalApps, pendingReview, activeCerts, scheduledInsp, openNCNs, pendingApprovalRes] =
+        const [totalApps, pendingReview, activeCerts, scheduledInsp, openNCNs] =
           await Promise.all([
             supabase.from('certification_applications').select('*', { count: 'exact', head: true }),
             supabase.from('certification_applications').select('*', { count: 'exact', head: true }).in('status', ['submitted', 'under_review']),
             supabase.from('certificates').select('*', { count: 'exact', head: true }).eq('status', 'active'),
             supabase.from('inspections').select('*', { count: 'exact', head: true }).eq('status', 'scheduled'),
             supabase.from('non_conformance_notices').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-            supabase.from('approval_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
           ]);
 
         setStats({
@@ -68,7 +65,6 @@ export default function AdminDashboard() {
           activeCertificates: activeCerts.count || 0,
           scheduledInspections: scheduledInsp.count || 0,
           openNCNs: openNCNs.count || 0,
-          pendingApprovals: pendingApprovalRes.count || 0,
         });
       } catch (error) {
         console.error('Error fetching dashboard stats:', error);
@@ -164,12 +160,6 @@ export default function AdminDashboard() {
       icon: AlertTriangle, description: 'Requiring attention',
       color: 'text-red-600', bgColor: 'bg-red-100 dark:bg-red-900/30',
       show: permissions.canViewEnforcement,
-    },
-    {
-      title: 'Pending Approvals', value: stats.pendingApprovals,
-      icon: CheckCircle2, description: 'Awaiting dual approval',
-      color: 'text-indigo-600', bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
-      show: permissions.canIssueCertificates,
     },
   ];
 
@@ -323,46 +313,25 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* Recent Applications & Pending Approvals */}
-        <div className="grid gap-4 md:grid-cols-2">
-          {permissions.canViewApplications && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Recent Applications</CardTitle>
-                <CardDescription>Latest submissions requiring attention</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No applications yet</p>
-                  <p className="text-sm">New applications will appear here</p>
-                </div>
-                <Button asChild variant="outline" className="w-full mt-4">
-                  <Link to="/admin/applications">View All Applications</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {permissions.canIssueCertificates && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Pending Approvals</CardTitle>
-                <CardDescription>Certificates awaiting your approval</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No pending approvals</p>
-                  <p className="text-sm">Approval requests will appear here</p>
-                </div>
-                <Button asChild variant="outline" className="w-full mt-4">
-                  <Link to="/admin/approvals">View Approval Queue</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        {/* Recent Applications */}
+        {permissions.canViewApplications && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Recent Applications</CardTitle>
+              <CardDescription>Latest submissions requiring attention</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No applications yet</p>
+                <p className="text-sm">New applications will appear here</p>
+              </div>
+              <Button asChild variant="outline" className="w-full mt-4">
+                <Link to="/admin/applications">View All Applications</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Quick Actions Row */}
         <Card>
