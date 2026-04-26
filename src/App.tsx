@@ -63,7 +63,7 @@ import Applications from "./admin/pages/Applications";
 import Certificates from "./admin/pages/Certificates";
 import CertificateDetail from "./admin/pages/CertificateDetail";
 import Inspections from "./admin/pages/Inspections";
-import PendingApprovals from "./admin/pages/PendingApprovals";
+
 import AuditLogs from "./admin/pages/AuditLogs";
 import UserManagement from "./admin/pages/UserManagement";
 import Supervisors from "./admin/pages/Supervisors";
@@ -222,7 +222,7 @@ const App = () => (
                 <Route path="certificates/:id" element={<PermissionGate require="canViewCertificates"><CertificateDetail /></PermissionGate>} />
                 <Route path="inspections" element={<PermissionGate require="canViewInspections"><Inspections /></PermissionGate>} />
                 <Route path="inspections/:id" element={<PermissionGate require="canViewInspections"><AdminInspectionDetail /></PermissionGate>} />
-                <Route path="approvals" element={<PermissionGate require="canApproveApplications"><PendingApprovals /></PermissionGate>} />
+                
                 <Route path="audit-logs" element={<PermissionGate require="canViewAuditLogs"><AuditLogs /></PermissionGate>} />
                 <Route path="users" element={<PermissionGate require="canManageUsers"><UserManagement /></PermissionGate>} />
                 <Route path="supervisors" element={<PermissionGate require="canViewSupervisors"><Supervisors /></PermissionGate>} />
