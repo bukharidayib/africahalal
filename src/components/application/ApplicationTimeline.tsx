@@ -26,6 +26,7 @@ const STATUS_LABELS: Record<string, string> = {
   awaiting_inspection: "Awaiting Inspection",
   inspection_complete: "Inspection Complete",
   pending_decision: "Pending Decision",
+  pending_approval: "Pending Approval",
   approved: "Approved",
   rejected: "Rejected",
   suspended: "Suspended",

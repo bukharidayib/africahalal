@@ -42,6 +42,7 @@ type ApplicationStatus =
   | 'awaiting_inspection'
   | 'inspection_complete'
   | 'pending_decision'
+  | 'pending_approval'
   | 'approved'
   | 'rejected'
   | 'suspended'
@@ -71,6 +72,7 @@ const statusConfig: Record<ApplicationStatus, { label: string; variant: 'default
   awaiting_inspection: { label: 'Awaiting Inspection', variant: 'secondary', icon: Calendar },
   inspection_complete: { label: 'Inspection Complete', variant: 'secondary', icon: CheckCircle2 },
   pending_decision: { label: 'Pending Decision', variant: 'default', icon: AlertCircle },
+  pending_approval: { label: 'Pending Approval', variant: 'default', icon: AlertCircle },
   approved: { label: 'Approved', variant: 'default', icon: CheckCircle2 },
   rejected: { label: 'Rejected', variant: 'destructive', icon: XCircle },
   suspended: { label: 'Suspended', variant: 'destructive', icon: AlertCircle },
@@ -162,6 +164,7 @@ export default function Applications() {
                   <SelectItem value="under_review">Under Review</SelectItem>
                   <SelectItem value="awaiting_inspection">Awaiting Inspection</SelectItem>
                   <SelectItem value="pending_decision">Pending Decision</SelectItem>
+                  <SelectItem value="pending_approval">Pending Approval</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>

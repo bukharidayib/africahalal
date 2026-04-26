@@ -25,12 +25,15 @@ const STEPS = [
   { key: 'under_review', label: 'Under Review', icon: Search },
   { key: 'awaiting_inspection', label: 'Inspection Scheduled', icon: ClipboardCheck },
   { key: 'inspection_complete', label: 'Inspection Completed', icon: ClipboardCheck },
+  { key: 'pending_approval', label: 'Pending Approval', icon: Scale },
   { key: 'approved', label: 'Approved', icon: BadgeCheck },
 ];
 
 const FINAL_STATUSES = ['approved', 'rejected', 'suspended'];
 
 function getStepIndex(status: string): number {
+  // pending_decision is treated like pending_approval in the visual tracker
+  if (status === 'pending_decision') return STEPS.findIndex(s => s.key === 'pending_approval');
   const idx = STEPS.findIndex(s => s.key === status);
   return idx >= 0 ? idx : 0;
 }
@@ -42,6 +45,8 @@ function getNextStepText(status: string): string {
     case 'under_review': return 'Application under review by certification officer';
     case 'awaiting_inspection': return 'Inspection has been scheduled';
     case 'inspection_complete': return 'Inspection completed, awaiting decision';
+    case 'pending_decision': return 'Awaiting final decision from approver';
+    case 'pending_approval': return 'Application is awaiting final approval';
     case 'approved': return 'Certification approved! Certificate issued.';
     case 'rejected': return 'Application was rejected';
     case 'suspended': return 'Certification suspended';

@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 
 interface ChatMessage {
     id: string;
@@ -37,6 +38,7 @@ export default function SupportChat() {
     const [sending, setSending] = useState(false);
     const [newMessage, setNewMessage] = useState("");
     const [userId, setUserId] = useState<string | null>(null);
+    const { peerTyping, notifyTyping } = useTypingIndicator({ sessionId, userId, senderType: "client" });
 
     useEffect(() => {
         initializeChat();
@@ -254,6 +256,16 @@ export default function SupportChat() {
                                         );
                                     })}
                                 </div>
+                                {peerTyping && (
+                                    <div className="flex gap-2 items-center mt-3 text-xs text-muted-foreground">
+                                        <span className="flex gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        </span>
+                                        Support is typing…
+                                    </div>
+                                )}
                             </ScrollArea>
 
                             {/* Input */}
@@ -263,7 +275,7 @@ export default function SupportChat() {
                                         placeholder="Type your message..."
                                         className="min-h-[60px] max-h-[120px] resize-none"
                                         value={newMessage}
-                                        onChange={(e) => setNewMessage(e.target.value)}
+                                        onChange={(e) => { setNewMessage(e.target.value); notifyTyping(); }}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !e.shiftKey) {
                                                 e.preventDefault();

@@ -27,7 +27,7 @@ import { format } from "date-fns";
 import { ApplicationChat } from "@/components/application/ApplicationChat";
 import { ApplicationTimeline } from "@/components/application/ApplicationTimeline";
 
-type ApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'awaiting_inspection' | 'inspection_complete' | 'pending_decision' | 'approved' | 'rejected' | 'suspended' | 'withdrawn' | 'expired';
+type ApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'awaiting_inspection' | 'inspection_complete' | 'pending_decision' | 'pending_approval' | 'approved' | 'rejected' | 'suspended' | 'withdrawn' | 'expired';
 
 interface Application {
     id: string;
@@ -87,6 +87,7 @@ const statusConfig: Record<ApplicationStatus, { label: string; color: string }> 
     awaiting_inspection: { label: "Awaiting Inspection", color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" },
     inspection_complete: { label: "Inspection Complete", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" },
     pending_decision: { label: "Pending Decision", color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
+    pending_approval: { label: "Pending Approval", color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200" },
     approved: { label: "Approved", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
     rejected: { label: "Rejected", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
     suspended: { label: "Suspended", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },

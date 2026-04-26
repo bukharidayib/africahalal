@@ -719,6 +719,8 @@ export type Database = {
       }
       chat_sessions: {
         Row: {
+          admin_last_read_at: string | null
+          client_last_read_at: string | null
           ended_at: string | null
           id: string
           started_at: string
@@ -726,6 +728,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          admin_last_read_at?: string | null
+          client_last_read_at?: string | null
           ended_at?: string | null
           id?: string
           started_at?: string
@@ -733,6 +737,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          admin_last_read_at?: string | null
+          client_last_read_at?: string | null
           ended_at?: string | null
           id?: string
           started_at?: string
@@ -740,6 +746,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      chat_typing_indicators: {
+        Row: {
+          id: string
+          is_typing: boolean
+          sender_type: string
+          session_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          is_typing?: boolean
+          sender_type: string
+          session_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          is_typing?: boolean
+          sender_type?: string
+          session_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_typing_indicators_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       client_businesses: {
         Row: {
@@ -2961,6 +3002,7 @@ export type Database = {
         | "suspended"
         | "withdrawn"
         | "expired"
+        | "pending_approval"
       approval_status: "pending" | "approved" | "rejected"
       certificate_status: "active" | "suspended" | "revoked" | "expired"
       corrective_action_status:
@@ -3122,6 +3164,7 @@ export const Constants = {
         "suspended",
         "withdrawn",
         "expired",
+        "pending_approval",
       ],
       approval_status: ["pending", "approved", "rejected"],
       certificate_status: ["active", "suspended", "revoked", "expired"],
