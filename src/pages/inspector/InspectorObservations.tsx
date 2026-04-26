@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Loader2, BookOpen } from "lucide-react";
 import { format } from "date-fns";
+import { OrgCombobox } from "@/admin/components/OrgCombobox";
+import { useInspectorOrganizations } from "@/hooks/useInspectorOrganizations";
 
 const TAG_COLORS: Record<string, string> = {
   operational: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
