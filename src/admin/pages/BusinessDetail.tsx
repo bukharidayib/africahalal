@@ -4,7 +4,7 @@ import {
   ArrowLeft, Building2, FileText, Award, Receipt, MessageSquare, History,
   FolderOpen, DollarSign, Loader2, Eye, Mail, Phone, MapPin, Hash,
   CalendarDays, Pencil, Plus, Download, Send, CheckCircle2, ChevronDown,
-  ChevronRight, RefreshCw, Pause, Play, XCircle,
+  ChevronRight, RefreshCw, Pause, Play, XCircle, ClipboardList, AlertTriangle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { AdminLayout } from '../components/layout/AdminLayout';
@@ -49,6 +49,10 @@ export default function BusinessDetail() {
   const [chats, setChats] = useState<any[]>([]);
   const [audits, setAudits] = useState<any[]>([]);
   const [statusHistory, setStatusHistory] = useState<any[]>([]);
+  const [inspectorReports, setInspectorReports] = useState<any[]>([]);
+  const [supervisorReports, setSupervisorReports] = useState<any[]>([]);
+  const [inspectorIncidents, setInspectorIncidents] = useState<any[]>([]);
+  const [supervisorIncidents, setSupervisorIncidents] = useState<any[]>([]);
 
   // Dialogs
   const [issueOpen, setIssueOpen] = useState(false);

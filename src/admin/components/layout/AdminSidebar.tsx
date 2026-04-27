@@ -94,6 +94,12 @@ const navItems: NavItem[] = [
     permission: 'canViewInspections',
   },
   {
+    title: 'Reports',
+    href: '/admin/reports',
+    icon: ClipboardList,
+    permission: 'canViewReports',
+  },
+  {
     title: 'Inspectors',
     href: '/admin/inspectors',
     icon: Users,
