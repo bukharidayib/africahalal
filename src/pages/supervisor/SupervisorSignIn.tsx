@@ -34,20 +34,26 @@ export default function SupervisorSignIn() {
         return;
       }
 
-      // Check if user is a supervisor
-      const { data: supervisorRecord } = await supabase
-        .from("organization_supervisors")
-        .select("id")
-        .eq("supervisor_id", data.session.user.id)
-        .limit(1)
-        .maybeSingle();
+      const userId = data.session.user.id;
 
-      if (!supervisorRecord) {
+      // Supervisor portal: must be a supervisor and must NOT be any admin/officer/inspector.
+      const [{ data: supervisorRecord }, { data: anyAdminRole }, { data: inspectorRecord }] = await Promise.all([
+        supabase.from("organization_supervisors").select("id").eq("supervisor_id", userId).limit(1).maybeSingle(),
+        supabase
+          .from("user_roles")
+          .select("role_id, admin_roles!inner(status)")
+          .eq("user_id", userId)
+          .eq("admin_roles.status", "active")
+          .maybeSingle(),
+        supabase.from("inspectors").select("id").eq("user_id", userId).eq("is_active", true).maybeSingle(),
+      ]);
+
+      if (anyAdminRole || inspectorRecord || !supervisorRecord) {
         await supabase.auth.signOut();
         toast({
           variant: "destructive",
           title: "Access Denied",
-          description: "This portal is for authorized supervisors only. Please contact your administrator.",
+          description: "This portal is restricted to authorized supervisors only.",
         });
         return;
       }

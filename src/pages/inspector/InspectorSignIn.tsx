@@ -34,21 +34,38 @@ export default function InspectorSignIn() {
         return;
       }
 
-      // Check if user is an inspector
-      const { data: inspectorRecord } = await supabase
-        .from("inspectors")
-        .select("id")
-        .eq("user_id", data.session.user.id)
-        .eq("is_active", true)
-        .limit(1)
-        .maybeSingle();
+      const userId = data.session.user.id;
 
-      if (!inspectorRecord) {
+      // Inspector portal allows: active inspectors OR inspector managers only.
+      // All other admin roles (super_admin, admin, certification_officer, etc.) are blocked.
+      const [{ data: inspectorRecord }, { data: managerRole }, { data: otherAdminRole }] = await Promise.all([
+        supabase.from("inspectors").select("id").eq("user_id", userId).eq("is_active", true).maybeSingle(),
+        supabase
+          .from("user_roles")
+          .select("role_id, admin_roles!inner(name, status)")
+          .eq("user_id", userId)
+          .eq("admin_roles.name", "inspector_manager")
+          .eq("admin_roles.status", "active")
+          .maybeSingle(),
+        supabase
+          .from("user_roles")
+          .select("role_id, admin_roles!inner(name, status)")
+          .eq("user_id", userId)
+          .in("admin_roles.name", ["super_admin", "admin", "certification_officer", "support_officer", "finance_officer", "documentation_officer"])
+          .eq("admin_roles.status", "active")
+          .maybeSingle(),
+      ]);
+
+      const isInspector = !!inspectorRecord;
+      const isManager = !!managerRole;
+      const isOtherAdmin = !!otherAdminRole;
+
+      if (isOtherAdmin || (!isInspector && !isManager)) {
         await supabase.auth.signOut();
         toast({
           variant: "destructive",
           title: "Access Denied",
-          description: "This portal is for authorized inspectors only. Please contact your administrator.",
+          description: "This portal is restricted to authorized inspectors and inspector managers only.",
         });
         return;
       }
