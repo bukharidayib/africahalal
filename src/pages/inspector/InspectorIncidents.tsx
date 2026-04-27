@@ -30,7 +30,13 @@ export default function InspectorIncidents() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await (supabase.from("inspector_incidents" as any).select("*").order("created_at", { ascending: false }) as any);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setIsLoading(false); return; }
+      const { data } = await (supabase
+        .from("inspector_incidents" as any)
+        .select("*")
+        .eq("reported_by", session.user.id)
+        .order("created_at", { ascending: false }) as any);
       setIncidents((data as any[]) || []);
       setIsLoading(false);
     }

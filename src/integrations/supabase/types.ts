@@ -1212,6 +1212,53 @@ export type Database = {
         }
         Relationships: []
       }
+      Inspector_checklist_items: {
+        Row: {
+          category: string
+          created_at: string
+          evidence_urls: string[] | null
+          id: string
+          item_description: string
+          observation_notes: string | null
+          observation_time: string | null
+          report_id: string
+          response: string | null
+          sort_order: number | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          evidence_urls?: string[] | null
+          id?: string
+          item_description: string
+          observation_notes?: string | null
+          observation_time?: string | null
+          report_id: string
+          response?: string | null
+          sort_order?: number | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          evidence_urls?: string[] | null
+          id?: string
+          item_description?: string
+          observation_notes?: string | null
+          observation_time?: string | null
+          report_id?: string
+          response?: string | null
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "Inspector_checklist_items_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "inspector_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inspector_conflicts: {
         Row: {
           declared_at: string
@@ -1472,6 +1519,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inspector_reports: {
+        Row: {
+          compliance_score: number | null
+          created_at: string
+          id: string
+          inspector_id: string
+          notes: string | null
+          organization_id: string
+          report_content: Json
+          report_date: string
+          report_type: string
+          risk_level: string | null
+          status: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          compliance_score?: number | null
+          created_at?: string
+          id?: string
+          inspector_id: string
+          notes?: string | null
+          organization_id: string
+          report_content?: Json
+          report_date?: string
+          report_type: string
+          risk_level?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          compliance_score?: number | null
+          created_at?: string
+          id?: string
+          inspector_id?: string
+          notes?: string | null
+          organization_id?: string
+          report_content?: Json
+          report_date?: string
+          report_type?: string
+          risk_level?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       inspectors: {
         Row: {
@@ -3077,6 +3172,7 @@ export type Database = {
         }
         Returns: string
       }
+      submit_Inspector_report: { Args: { _report_id: string }; Returns: Json }
       submit_supervisor_report: { Args: { _report_id: string }; Returns: Json }
       validate_dual_approval: {
         Args: { _application_id: string; _approver_id: string }
