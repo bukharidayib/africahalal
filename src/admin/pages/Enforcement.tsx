@@ -65,6 +65,8 @@ interface NCN {
   status: string;
   due_date: string;
   issued_at: string;
+  source?: 'admin' | 'supervisor' | 'inspector' | null;
+  raised_by?: string | null;
   certification_applications?: {
     application_number: string;
     organizations?: {
