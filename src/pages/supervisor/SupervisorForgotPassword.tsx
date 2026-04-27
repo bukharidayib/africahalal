@@ -28,6 +28,7 @@ export default function SupervisorForgotPassword() {
           body: JSON.stringify({
             email,
             redirect_to: window.location.origin + "/supervisor/reset-password",
+            portal: "supervisor",
           }),
         }
       );
