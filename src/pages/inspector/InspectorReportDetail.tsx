@@ -54,10 +54,15 @@ export default function InspectorReportDetail() {
   const [report, setReport] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [scores, setScores] = useState<any>(null);
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id ?? null);
+
       const { data: reportData } = await (supabase.from("inspector_reports" as any).select("*").eq("id", id).single() as any);
       setReport(reportData);
 
@@ -67,6 +72,17 @@ export default function InspectorReportDetail() {
 
         const { data: scoreData } = await (supabase.from("Inspector_compliance_scores" as any).select("*").eq("report_id", id).single() as any);
         setScores(scoreData);
+      }
+
+      if ((reportData as any)?.organization_id) {
+        const { data: app } = await supabase
+          .from("certification_applications")
+          .select("id")
+          .eq("organization_id", (reportData as any).organization_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        setApplicationId(app?.id ?? null);
       }
 
       setIsLoading(false);
@@ -93,7 +109,12 @@ export default function InspectorReportDetail() {
             <h1 className="text-2xl font-bold font-serif">Report Detail</h1>
             <p className="text-muted-foreground mt-1">{reportTypeLabel} — {format(new Date(report.report_date), "dd MMMM yyyy")}</p>
           </div>
-          <Badge variant={report.status === "submitted" ? "default" : "secondary"}>{report.status}</Badge>
+          <div className="flex items-center gap-2">
+            {applicationId && userId && (
+              <RaiseNCRDialog source="inspector" applicationId={applicationId} reportId={report.id} raisedBy={userId} />
+            )}
+            <Badge variant={report.status === "submitted" ? "default" : "secondary"}>{report.status}</Badge>
+          </div>
         </div>
 
         {/* === DAILY CHECKLIST VIEW === */}
