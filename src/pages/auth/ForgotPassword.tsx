@@ -29,6 +29,7 @@ export default function ForgotPassword() {
                     body: JSON.stringify({
                         email,
                         redirect_to: window.location.origin + '/auth/reset-password',
+                        portal: 'client',
                     }),
                 }
             );

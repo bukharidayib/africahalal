@@ -40,6 +40,34 @@ export default function SignIn() {
 
       // Send welcome email on first login (fire and forget)
       const { data: userData } = await supabase.auth.getUser();
+
+      // Client portal is restricted to clients only — block any admin role,
+      // inspector, or supervisor accounts.
+      if (userData?.user) {
+        const userId = userData.user.id;
+        const [{ data: anyAdminRole }, { data: inspectorRecord }, { data: supervisorRecord }] = await Promise.all([
+          supabase
+            .from("user_roles")
+            .select("role_id, admin_roles!inner(status)")
+            .eq("user_id", userId)
+            .eq("admin_roles.status", "active")
+            .maybeSingle(),
+          supabase.from("inspectors").select("id").eq("user_id", userId).eq("is_active", true).maybeSingle(),
+          supabase.from("organization_supervisors").select("id").eq("supervisor_id", userId).limit(1).maybeSingle(),
+        ]);
+
+        if (anyAdminRole || inspectorRecord || supervisorRecord) {
+          await supabase.auth.signOut();
+          toast({
+            variant: "destructive",
+            title: "Access Denied",
+            description: "This portal is restricted to client accounts only. Please use your designated portal.",
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+
       if (userData?.user) {
         const lastSignIn = userData.user.last_sign_in_at;
         const createdAt = userData.user.created_at;

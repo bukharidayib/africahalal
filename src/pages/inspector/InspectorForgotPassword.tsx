@@ -28,6 +28,7 @@ export default function InspectorForgotPassword() {
           body: JSON.stringify({
             email,
             redirect_to: window.location.origin + "/inspector/reset-password",
+            portal: "inspector",
           }),
         }
       );
