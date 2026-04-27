@@ -1,111 +1,45 @@
-## Goals
+## Goal
 
-1. New **admin "Reports"** module that surfaces all reports & incidents from the Inspector and Supervisor portals (Daily Checklist, Weekly Summary, Monthly Performance, Incidents) with filtering, drill-down detail, and a professional, "giant" listing UI.
-2. Add a **"Reports" tab** inside the admin Business detail page showing every report/incident tied to that business.
-3. In the **Inspector portal**: allow draft reports to be re-opened, edited, and submitted (currently the row click goes to a read-only detail).
-4. **Remove the Observations module** entirely from both Inspector and Supervisor portals (page, route, sidebar entry, references).
+Fix the `supervisor_ingredient_collections_site_id_fkey` violation when supervisors submit ingredient collections, and ensure the admin Ingredient Tracker correctly shows business/company names alongside each submission.
 
-No DB schema changes — `inspector_reports`, `supervisor_reports`, `inspector_incidents`, `supervisor_incidents` already exist with all the data we need. Admin RLS policies on these tables already grant `is_admin_user(auth.uid())` SELECT access.
+## Root cause
 
----
+In `SupervisorIngredientForm.tsx`, the form tries to look up (or create) a `supervisor_sites` row, then uses its `id` as `site_id` on `supervisor_ingredient_collections`. The current flow has multiple fragile points:
 
-## 1. Admin Reports module
+1. `.maybeSingle()` returns `null` data not only when zero rows match, but also when RLS hides matching rows or when more than one active row exists for the same supervisor/org pair.
+2. When the lookup returns null, the code inserts a new `supervisor_sites` row, but the freshly inserted row's id can fail the immediate FK check from the subsequent `supervisor_ingredient_collections` insert in some race/RLS scenarios.
+3. The two-step client flow runs under the supervisor's RLS, while the FK constraint is checked at the database level — any mismatch (e.g. RLS hiding the new row from `select("id")`) leads to the FK error the user is seeing.
 
-**New files**
-- `src/admin/pages/AdminReports.tsx` — main hub page
-- `src/admin/pages/AdminInspectorReportDetail.tsx` — detail view for an inspector report (mirrors `InspectorReportDetail` but inside `AdminLayout`, read-only)
-- `src/admin/pages/AdminIncidentDetail.tsx` — detail view for an incident (inspector or supervisor) with admin-only actions (update status, add review notes)
+The reliable fix is to move the "resolve or create supervisor_site for this supervisor + organization" logic into a single `SECURITY DEFINER` Postgres function that returns a guaranteed-valid `site_id`.
 
-**Routing (`src/App.tsx`)**
-- Add `/admin/reports` → `AdminReports`
-- Add `/admin/reports/inspector/:id` → `AdminInspectorReportDetail`
-- Existing `/admin/supervisor-reports/:id` is reused for supervisor report detail
-- Add `/admin/incidents/:source/:id` (source = `inspector` | `supervisor`) → `AdminIncidentDetail`
-- All gated by `PermissionGate` (reuse `canViewSupervisors` or add a sensible existing permission key).
+## Changes
 
-**Sidebar (`src/admin/components/layout/AdminSidebar.tsx`)**
-- Insert a new `Reports` entry (icon `FileText`) above `Inspectors`.
+### 1. Database migration
 
-**`AdminReports` page features**
-- Header KPIs: total reports, submitted today, open incidents, average compliance score (last 30 days).
-- Tabs: `All`, `Inspector Reports`, `Supervisor Reports`, `Incidents`.
-- Each tab uses a unified table with columns: Date, Source (Inspector/Supervisor), Author, Organization, Type, Status, Score, Risk, Actions (View).
-- Filters: report type (daily / weekly / monthly / incident), status (draft/submitted/open/closed), date range, organization (`OrgCombobox`), risk level, free-text search (organization or author).
-- Data fetching: parallel queries to `inspector_reports`, `supervisor_reports`, `inspector_incidents`, `supervisor_incidents`. Resolve author name via `profiles` and `inspectors`/`supervisors`. For inspector reports the `organization_id` actually references `supervisor_sites.id` — resolve through `supervisor_sites` → `organizations.name`. For supervisor reports, resolve through `supervisor_sites.organization_id` → `organizations.name`.
-- "Professional/giant" treatment: large summary cards, color-coded risk badges, sticky table header, empty-states with iconography, CSV export button (client-side generation from the active tab).
+Create a SECURITY DEFINER RPC `ensure_supervisor_site(_organization_id uuid, _site_name text)`:
+- Verifies the caller is the supervisor (`auth.uid()`).
+- Returns the existing active `supervisor_sites.id` for `(supervisor_id = auth.uid(), organization_id, is_active = true)`.
+- If none exists, inserts a new row using the org name (or provided `_site_name`) and returns the new id.
+- Grants `EXECUTE` to `authenticated`.
 
-**`AdminInspectorReportDetail` / `AdminIncidentDetail`**
-- Reuse the visual breakdown logic already in `InspectorReportDetail` (Daily Checklist categorized view, Weekly Summary sections, Monthly Performance charts) wrapped in `AdminLayout`.
-- Show inspector/supervisor profile, organization, evidence files (signed URLs from `Inspector-evidence` storage bucket).
-- Incidents: show severity, incident type, description, immediate action, evidence; allow admin to update status (`open` → `investigating` → `closed`).
+This eliminates RLS visibility issues and guarantees the returned id exists at FK check time.
 
----
+### 2. `src/pages/supervisor/SupervisorIngredientForm.tsx`
 
-## 2. Business detail "Reports" tab
+- Replace the manual `select` + conditional `insert` block on `supervisor_sites` with a single `supabase.rpc("ensure_supervisor_site", { _organization_id, _site_name })` call.
+- Use the returned id directly as `site_id` for the `supervisor_ingredient_collections` insert.
+- Keep existing validation (company required, product name required, percentage 0–100, at least one ingredient).
+- Improve error messages so the user sees a clear reason if RPC fails.
 
-**File**: `src/admin/pages/BusinessDetail.tsx`
+### 3. `src/admin/pages/IngredientTracker.tsx` (verify + minor polish)
 
-- Add a new `<TabsTrigger value="reports">` (icon `ClipboardList`) in the tab bar between `Documents` and `Chats`.
-- New `<TabsContent value="reports">` containing a sub-tab list: `Inspector Reports`, `Supervisor Reports`, `Incidents`.
-- In `load()`, after we have `org.id`, run additional queries:
-  - `supervisor_sites` where `organization_id = org.id` → collect `siteIds`.
-  - `inspector_reports` where `organization_id IN (siteIds)`.
-  - `supervisor_reports` where `site_id IN (siteIds)`.
-  - `inspector_incidents` where `organization_id = org.id`.
-  - `supervisor_incidents` where `site_id IN (siteIds)`.
-- Render compact tables for each, each row links to the appropriate admin detail route from section 1.
+The page already joins `organizations(name)` and shows it in the Company column. Confirm:
+- Search across product, brand, **and** company name (already present).
+- Display business name with a sensible fallback when the org row is missing.
+- No schema change needed — admin RLS (`Admins can view all collections`) already exposes every supervisor submission once the insert path is fixed.
 
----
+## Technical notes
 
-## 3. Inspector portal — editable drafts
-
-**Files**
-- `src/pages/inspector/InspectorReports.tsx`: when a row is `draft`, navigate to `/inspector/reports/:id/edit`; when `submitted`, keep current `/inspector/reports/:id` read-only view. Add a "Draft" badge action button in the row.
-- `src/pages/inspector/InspectorReportForm.tsx`: convert to dual-mode (create vs edit). Read `id` from `useParams`. If present:
-  1. Fetch report via `inspector_reports`.
-  2. Guard: only `status = 'draft'` and `inspector_id = auth.uid()` can edit (otherwise redirect).
-  3. Pre-fill `reportType`, `selectedSite` (resolve `supervisor_sites.organization_id`), `notes`, weekly sections from `report_content`, and checklist items from `Inspector_checklist_items` (sorted by `sort_order`).
-  4. Save = `UPDATE inspector_reports` + delete-then-insert checklist items (simpler than diffing).
-  5. Submit = same plus call `submit_Inspector_report` RPC for daily, or set `status='submitted'` for weekly.
-- New route in `App.tsx`: `/inspector/reports/:id/edit` → `InspectorReportForm`.
-- The "New Report" link continues to use `/inspector/reports/new` (no `id`).
-
----
-
-## 4. Remove Observations module
-
-**Inspector**
-- Delete `src/pages/inspector/InspectorObservations.tsx`.
-- Remove import + `<Route path="/inspector/observations">` from `src/App.tsx`.
-- Remove the `Observations` entry from `src/components/layout/InspectorSidebar.tsx`.
-
-**Supervisor**
-- Delete `src/pages/supervisor/SupervisorObservations.tsx`.
-- Remove import + `<Route path="/supervisor/observations">` from `src/App.tsx`.
-- Remove the `Observations` entry from `src/components/layout/SupervisorSidebar.tsx`.
-
-The underlying `inspector_observations` / supervisor observations DB tables (if any) are left untouched so existing data is preserved; UI just no longer exposes them.
-
----
-
-## Files summary
-
-Create:
-- `src/admin/pages/AdminReports.tsx`
-- `src/admin/pages/AdminInspectorReportDetail.tsx`
-- `src/admin/pages/AdminIncidentDetail.tsx`
-
-Edit:
-- `src/App.tsx` (add 4 routes, remove 2 routes & 2 imports)
-- `src/admin/components/layout/AdminSidebar.tsx` (add Reports entry)
-- `src/admin/pages/BusinessDetail.tsx` (add Reports tab + queries)
-- `src/pages/inspector/InspectorReports.tsx` (route drafts to edit)
-- `src/pages/inspector/InspectorReportForm.tsx` (edit-mode support)
-- `src/components/layout/InspectorSidebar.tsx` (remove Observations)
-- `src/components/layout/SupervisorSidebar.tsx` (remove Observations)
-
-Delete:
-- `src/pages/inspector/InspectorObservations.tsx`
-- `src/pages/supervisor/SupervisorObservations.tsx`
-
-No database migrations required.
+- No changes to existing tables or constraints; only a new function is added.
+- No changes to `supervisor_collected_ingredients` insert logic — it keys off the new collection id, which will now reliably exist.
+- Existing supervisor_sites rows continue to work; the RPC reuses them when present.
