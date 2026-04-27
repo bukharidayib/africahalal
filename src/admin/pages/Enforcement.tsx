@@ -513,6 +513,11 @@ export default function Enforcement() {
                               </div>
                             </TableCell>
                             <TableCell>
+                              <Badge variant="outline" className="capitalize">
+                                {ncn.source || 'admin'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
                               <div className="flex items-center gap-2">
                                 <Building2 className="h-4 w-4 text-muted-foreground" />
                                 <span>{ncn.certification_applications?.organizations?.name || 'Unknown'}</span>
