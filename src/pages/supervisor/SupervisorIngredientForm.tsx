@@ -120,36 +120,19 @@ export default function SupervisorIngredientForm() {
         throw new Error("Ingredient percentage must be a number between 0 and 100.");
       }
 
-      let { data: supervisorSite, error: siteLookupError } = await supabase
-        .from("supervisor_sites")
-        .select("id")
-        .eq("supervisor_id", session.user.id)
-        .eq("organization_id", orgId)
-        .eq("is_active", true)
-        .maybeSingle();
+      const { data: siteId, error: siteRpcError } = await (supabase.rpc("ensure_supervisor_site" as any, {
+        _organization_id: orgId,
+        _site_name: orgName,
+      } as any) as any);
 
-      if (siteLookupError) throw siteLookupError;
-
-      if (!supervisorSite) {
-        const { data: newSite, error: siteCreateError } = await supabase
-          .from("supervisor_sites")
-          .insert({
-            supervisor_id: session.user.id,
-            organization_id: orgId,
-            site_name: orgName,
-          })
-          .select("id")
-          .single();
-
-        if (siteCreateError) throw siteCreateError;
-        supervisorSite = newSite;
-      }
+      if (siteRpcError) throw siteRpcError;
+      if (!siteId) throw new Error("Could not resolve supervisor site for the selected company.");
 
       const { data: collection, error: colError } = await (supabase
         .from("supervisor_ingredient_collections" as any)
         .insert({
           supervisor_id: session.user.id,
-          site_id: supervisorSite.id,
+          site_id: siteId,
           organization_id: orgId,
           product_name: productName,
           brand: brand || null,
