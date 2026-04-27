@@ -36,7 +36,7 @@ interface UnifiedRow {
   source: "inspector" | "supervisor";
   kind: "report" | "incident";
   date: string;
-  authorName: string;
+  authorName: string | unknown;
   orgName: string;
   type: string;
   status: string;
