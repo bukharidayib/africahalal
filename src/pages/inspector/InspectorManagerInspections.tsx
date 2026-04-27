@@ -82,12 +82,12 @@ export default function InspectorManagerInspections() {
         const queries: Promise<any>[] = [];
         if (inspectorIdsToQuery.length) {
           queries.push(
-            supabase.from('inspections').select(baseSelect).in('inspector_id', inspectorIdsToQuery)
+            Promise.resolve(supabase.from('inspections').select(baseSelect).in('inspector_id', inspectorIdsToQuery))
           );
         }
         if (appIds.length) {
           queries.push(
-            supabase.from('inspections').select(baseSelect).in('application_id', appIds)
+            Promise.resolve(supabase.from('inspections').select(baseSelect).in('application_id', appIds))
           );
         }
 
