@@ -185,13 +185,15 @@ export default function Enforcement() {
           non_conformance_notices (
             ncn_number,
             category,
-            severity
+            severity,
+            description,
+            due_date
           )
         `)
         .order('submitted_at', { ascending: false });
 
       if (caError) throw caError;
-      setCorrectiveActions(caData || []);
+      setCorrectiveActions((caData as any) || []);
     } catch (error) {
       console.error('Error fetching enforcement data:', error);
     } finally {
