@@ -1,74 +1,72 @@
-## Goal
+# Fix Inspector Manager modules + NCR visibility for field staff
 
-Make `non_conformance_notices` (NCN) the **single source of truth** for all NCRs across the platform. Supervisor and Inspector portals will read from this same table (scoped by who raised/owns the related inspection/report) and respond via `corrective_actions` — exactly like the Client portal already does.
+## What's actually wrong (investigation results)
 
-The orphaned `supervisor_ncrs` / `inspector_ncrs` tables will be deprecated.
+### 1. Inspector Manager → Supervisors
+The query is correct: it walks `inspectors.is_manager` → `inspector_organizations` (manager's businesses) → `organization_supervisors` → `profiles`. Database has data: manager `Ahmed Fraah` has 2 businesses, one of which has supervisor `49140af5...`. So this page **should already render the supervisor**. If you still see "No supervisors", the most likely cause is that the manager's `inspectors.user_id` doesn't match the currently signed-in user, or the supervisor's profile row is missing. We'll add a small diagnostic + fall back to showing supervisors of the manager's organizations regardless of whether `profiles` has a row, by joining through `auth.users` email via a backfill profile.
 
----
+### 2. Inspector Manager → All Inspections (THE REAL BUG)
+`InspectorManagerInspections.tsx` builds this filter:
+```
+.or("inspector_id.in.(...),certification_applications.organization_id.in.(...)")
+```
+PostgREST does **not** support nested-relation columns inside a top-level `.or()`. The clause silently matches nothing → page shows "No inspections found". 
 
-## What changes
+**Fix**: do two simple `.in()` queries (one by `inspector_id`, one by `application_id` resolved from `organization_id`) and merge the results client-side. Also include the manager's own inspections and inspections supervised by org-linked supervisors so the manager sees the full picture for their assigned businesses.
 
-### 1. Database (one migration)
+### 3. NCR module empty in Supervisor & Inspector portals
+Database has 6 NCRs — all `source='admin'`, `raised_by=NULL`, `inspection_id=NULL`. The RLS policies we added in the last migration only allow field staff to see NCRs they raised themselves OR NCRs tied to their own inspection. **Admin-issued NCRs are completely invisible to field staff**, even when the NCR is for an organization they supervise / inspect.
 
-- Add two nullable columns to `non_conformance_notices` to allow NCNs raised from supervisor/inspector field reports (not only from formal inspections):
-  - `report_id uuid` (links to supervisor/inspector report)
-  - `raised_by uuid` (the supervisor or inspector who raised it; distinct from `issued_by` which is the admin officer)
-  - `source text` default `'admin'` — one of `admin | supervisor | inspector` so each portal can filter cleanly
-- Add RLS policies on `non_conformance_notices`:
-  - Supervisors can `SELECT` rows where `raised_by = auth.uid()` OR linked to inspections they supervise
-  - Inspectors can `SELECT` rows where `raised_by = auth.uid()` OR linked to inspections they performed
-  - Both can `INSERT` rows where `raised_by = auth.uid()` and `source` matches their role
-- Add RLS on `corrective_actions` so supervisors/inspectors who raised the NCN can view responses to it.
-- Leave `supervisor_ncrs` / `inspector_ncrs` tables in place (empty, no code referencing them after this change) — safe to drop later.
+This is the missing link. Admins issue NCRs against an `application_id` (which belongs to an `organization_id`). Supervisors are linked to organizations via `organization_supervisors`; inspectors via `inspector_organizations`. We just need RLS that says: *"a supervisor/inspector can SEE an NCR whose application's organization is one of theirs"* — and the same for `corrective_actions` so they can review the client's response.
 
-### 2. Supervisor portal
-
-- `SupervisorNCRs.tsx` — fetch from `non_conformance_notices` filtered by `raised_by = currentUser` OR by inspections supervised. Display `ncn_number`, category, severity, status, due date.
-- `SupervisorNCRDetail.tsx` — read NCN + its `corrective_actions`. Status timeline driven by NCN `status` + corrective action state. Supervisor cannot submit corrective actions (that's the client's job) — instead supervisor can **view client response and add review notes**.
-- Add **"Raise NCR"** button on supervisor inspection report pages so supervisors can create new NCNs from a report (writes to `non_conformance_notices` with `source='supervisor'`, `raised_by=auth.uid()`, `report_id=...`).
-
-### 3. Inspector portal
-
-- `InspectorNCRs.tsx` — fetch from `non_conformance_notices` filtered by inspections the inspector performed OR raised by them.
-- `InspectorNCRDetail.tsx` — read-only view of NCN + corrective action response + admin review status. Remove the inspector-submits-corrective-action UI (incorrect role).
-- Add **"Raise NCR"** action on inspector report detail page (`source='inspector'`).
-
-### 4. Admin Enforcement
-
-- Already reads `non_conformance_notices` — no fetch changes needed.
-- Add a **Source** column/badge in the NCN table (`Admin / Supervisor / Inspector`) so admins can see field-raised NCNs.
-- Field-raised NCNs (`source != 'admin'`) get a **"Review & Issue"** action so an officer can validate and formally promote them (sets `issued_by`, sends email to client via existing `send-ncn-notification` edge function).
-
-### 5. Client portal
-
-- No changes — `NCRManagement.tsx` already reads `non_conformance_notices` and submits `corrective_actions`. Will automatically see field-raised NCNs once an admin issues them.
+No new admin module is needed — Admin Enforcement already issues NCRs. We're just opening the read path so field staff can monitor compliance for their assigned businesses.
 
 ---
 
-## Technical notes
+## Plan
 
-- Severity enum stays as-is on `non_conformance_notices`.
-- NCN number generator: keep existing format `NCR-YYYY-XXXXX`. Add `NCR-SUP-YYYY-XXXXX` for supervisor-raised and `NCR-INS-YYYY-XXXXX` for inspector-raised (matches memory rule on entity formats).
-- Client UUID generation via `crypto.randomUUID()` on all inserts (per memory rule).
-- All new RLS uses strict equality joins; no `OR true`.
-- No schema changes to `corrective_actions` itself — already has all needed columns.
+### A. Database migration — RLS only (no schema changes)
+
+Add SELECT policies on `non_conformance_notices`:
+- **Supervisors view org NCRs**: NCR's `application_id` belongs to an organization in `organization_supervisors` where `supervisor_id = auth.uid()`.
+- **Inspectors view org NCRs**: NCR's `application_id` belongs to an organization in `inspector_organizations` where the inspector record's `user_id = auth.uid()`. Manager inspectors also see NCRs for organizations of inspectors they manage (via `inspector_manager_inspectors`).
+
+Add matching SELECT policies on `corrective_actions` so the same scope can read client responses.
+
+(Existing "raised_by = auth.uid()" / "linked to my inspection" policies stay — these new ones are additive.)
+
+### B. Frontend — Inspector Manager pages
+
+`src/pages/inspector/InspectorManagerInspections.tsx`
+- Replace the broken `.or(...)` with two parallel queries:
+  1. `inspections` where `inspector_id IN (managedInspectorIds + me.id)`
+  2. `inspections` where `application_id IN (apps for orgIds)` — resolve apps first via `certification_applications.select('id').in('organization_id', orgIds)`
+- Merge + dedupe by `id`, sort by `created_at desc`.
+- Show empty state only if both result sets are empty.
+
+`src/pages/inspector/InspectorManagerSupervisors.tsx`
+- Keep current logic (it's correct). Add a small "scope" line: *"Supervisors assigned to your N businesses"*, and show the org name(s) each supervisor is linked to so the manager sees coverage at a glance.
+
+### C. Frontend — NCR pages (no logic change, just verify)
+
+`SupervisorNCRs.tsx` and `InspectorNCRs.tsx` already query `non_conformance_notices` with no client-side filter — they rely on RLS. Once policies in (A) land, admin-issued NCRs for assigned organizations will appear automatically. The existing `Source` badge already differentiates admin vs field-raised.
+
+`SupervisorNCRDetail.tsx` / `InspectorNCRDetail.tsx` will then show the NCR + any `corrective_actions` submitted by the client, so field staff can monitor remediation without admin intervention.
+
+### D. Optional polish (admin side)
+In `src/admin/pages/Enforcement.tsx`, add a small "Visible to" hint on each NCR row showing the count of supervisors/inspectors who will see it (computed from org assignments). Helps admins understand who's in the loop.
 
 ---
 
-## Out of scope
+## Files changed
+- New SQL migration: RLS additions for `non_conformance_notices` + `corrective_actions`
+- `src/pages/inspector/InspectorManagerInspections.tsx` — fix query
+- `src/pages/inspector/InspectorManagerSupervisors.tsx` — add scope/coverage info
+- `src/admin/pages/Enforcement.tsx` — (optional) "Visible to" hint
 
-- Dropping `supervisor_ncrs` / `inspector_ncrs` tables (left for a later cleanup pass once we're sure nothing breaks).
-- Bulk-migrating existing rows (both legacy tables are empty — nothing to migrate).
+## What stays the same
+- No new admin module needed — existing Enforcement page is the source of truth
+- No schema changes (last migration already added `source`/`raised_by`/`report_id`)
+- Field-raised NCR flow (RaiseNCRDialog) is unchanged
 
----
-
-## Files to change
-
-- `supabase/migrations/<new>.sql` — schema + RLS
-- `src/pages/supervisor/SupervisorNCRs.tsx`
-- `src/pages/supervisor/SupervisorNCRDetail.tsx`
-- `src/pages/supervisor/SupervisorReportDetail.tsx` — add "Raise NCR" button
-- `src/pages/inspector/InspectorNCRs.tsx`
-- `src/pages/inspector/InspectorNCRDetail.tsx`
-- `src/pages/inspector/InspectorReportDetail.tsx` — add "Raise NCR" button
-- `src/admin/pages/Enforcement.tsx` — add Source column + Review action for field-raised
+Approve to proceed.
