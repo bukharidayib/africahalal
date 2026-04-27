@@ -202,6 +202,7 @@ export default function AdminReports() {
   const allFiltered = applyFilters(rows);
   const inspectorReportRows = applyFilters(rows.filter((r) => r.source === "inspector" && r.kind === "report"));
   const supervisorReportRows = applyFilters(rows.filter((r) => r.source === "supervisor" && r.kind === "report"));
+  const monthlyReportRows = applyFilters(rows.filter((r) => r.kind === "report" && r.type === "monthly_performance"));
   const incidentRows = applyFilters(rows.filter((r) => r.kind === "incident"));
 
   const exportCsv = (data: UnifiedRow[], name: string) => {
@@ -285,10 +286,11 @@ export default function AdminReports() {
         ) : (
           <Tabs defaultValue="all" className="space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
-              <TabsList>
+              <TabsList className="flex-wrap h-auto">
                 <TabsTrigger value="all">All ({allFiltered.length})</TabsTrigger>
                 <TabsTrigger value="inspector">Inspector Reports ({inspectorReportRows.length})</TabsTrigger>
                 <TabsTrigger value="supervisor">Supervisor Reports ({supervisorReportRows.length})</TabsTrigger>
+                <TabsTrigger value="monthly">Monthly Performance ({monthlyReportRows.length})</TabsTrigger>
                 <TabsTrigger value="incidents">Incidents ({incidentRows.length})</TabsTrigger>
               </TabsList>
             </div>
@@ -296,6 +298,7 @@ export default function AdminReports() {
             <TabsContent value="all"><ReportTable data={allFiltered} onExport={() => exportCsv(allFiltered, "all-reports")} /></TabsContent>
             <TabsContent value="inspector"><ReportTable data={inspectorReportRows} onExport={() => exportCsv(inspectorReportRows, "inspector-reports")} /></TabsContent>
             <TabsContent value="supervisor"><ReportTable data={supervisorReportRows} onExport={() => exportCsv(supervisorReportRows, "supervisor-reports")} /></TabsContent>
+            <TabsContent value="monthly"><ReportTable data={monthlyReportRows} onExport={() => exportCsv(monthlyReportRows, "monthly-performance")} /></TabsContent>
             <TabsContent value="incidents"><ReportTable data={incidentRows} onExport={() => exportCsv(incidentRows, "incidents")} showSeverity /></TabsContent>
           </Tabs>
         )}

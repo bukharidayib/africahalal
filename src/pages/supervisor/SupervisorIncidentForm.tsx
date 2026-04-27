@@ -59,12 +59,22 @@ export default function SupervisorIncidentForm() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
+      // Resolve organization_id -> supervisor_sites.id (find or create) via SECURITY DEFINER RPC
+      const orgName = sites.find((s: any) => s.organization_id === selectedSite)?.organizations?.name || null;
+      const { data: siteId, error: siteRpcError } = await supabase.rpc("ensure_supervisor_site" as any, {
+        _organization_id: selectedSite,
+        _site_name: orgName,
+      } as any);
+      if (siteRpcError) throw siteRpcError;
+      if (!siteId) throw new Error("Could not resolve site for selected company");
+
       // Generate incident number
       const { data: incNum } = await supabase.rpc("generate_supervisor_incident_number" as any);
 
       const { error } = await (supabase.from("supervisor_incidents" as any).insert({
+        id: crypto.randomUUID(),
         incident_number: incNum,
-        site_id: selectedSite,
+        site_id: siteId,
         incident_type: incidentType,
         severity,
         description,
