@@ -3154,6 +3154,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      inspector_application_ids_full: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
       is_admin_user: { Args: { _user_id: string }; Returns: boolean }
       log_audit: {
         Args: {
@@ -3187,6 +3191,10 @@ export type Database = {
       }
       submit_Inspector_report: { Args: { _report_id: string }; Returns: Json }
       submit_supervisor_report: { Args: { _report_id: string }; Returns: Json }
+      supervisor_application_ids: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
       validate_dual_approval: {
         Args: { _application_id: string; _approver_id: string }
         Returns: boolean
