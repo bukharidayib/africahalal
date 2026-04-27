@@ -20,9 +20,18 @@ interface IngredientRow {
   notes: string;
 }
 
+interface AssignedCompany {
+  id: string;
+  organization_id: string;
+  organizations?: {
+    id: string;
+    name: string | null;
+  } | null;
+}
+
 export default function SupervisorIngredientForm() {
-  const [sites, setSites] = useState<any[]>([]);
-  const [selectedSite, setSelectedSite] = useState("");
+  const [companies, setCompanies] = useState<AssignedCompany[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [productName, setProductName] = useState("");
   const [brand, setBrand] = useState("");
   const [notes, setNotes] = useState("");
@@ -37,18 +46,29 @@ export default function SupervisorIngredientForm() {
   useEffect(() => {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { data } = await (supabase
+      if (!session) {
+        setIsLoading(false);
+        return;
+      }
+
+      const { data, error } = await (supabase
         .from("organization_supervisors" as any)
-        .select("*, organizations(name, id)")
+        .select("id, organization_id, organizations(id, name)")
         .eq("supervisor_id", session.user.id) as any);
-      const siteList = (data as any[]) || [];
-      setSites(siteList);
-      if (siteList.length === 1) setSelectedSite(siteList[0].organization_id);
+
+      if (error) {
+        toast({ variant: "destructive", title: "Unable to load companies", description: error.message });
+        setIsLoading(false);
+        return;
+      }
+
+      const assignedCompanies = ((data as AssignedCompany[]) || []).filter((company) => Boolean(company.organization_id));
+      setCompanies(assignedCompanies);
+      if (assignedCompanies.length === 1) setSelectedCompanyId(assignedCompanies[0].organization_id);
       setIsLoading(false);
     }
     load();
-  }, []);
+  }, [toast]);
 
   const addRow = () => {
     setIngredients(prev => [...prev, {
@@ -67,7 +87,7 @@ export default function SupervisorIngredientForm() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedSite || !productName.trim()) {
+    if (!selectedCompanyId || !productName.trim()) {
       toast({ variant: "destructive", title: "Incomplete", description: "Company and product name are required." });
       return;
     }
@@ -82,18 +102,54 @@ export default function SupervisorIngredientForm() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
-      const siteObj = sites.find((s: any) => s.organization_id === selectedSite);
-      const orgId = siteObj?.organization_id || siteObj?.organizations?.id || selectedSite;
+      const selectedCompany = companies.find((company) => company.organization_id === selectedCompanyId);
+      const orgId = selectedCompany?.organization_id;
+      const orgName = selectedCompany?.organizations?.name || "Assigned Company";
 
       if (!orgId) {
         throw new Error("Could not resolve organization for the selected company.");
+      }
+
+      const invalidPercentage = validIngredients.find((ingredient) => {
+        if (!ingredient.percentage) return false;
+        const value = Number(ingredient.percentage);
+        return Number.isNaN(value) || value < 0 || value > 100;
+      });
+
+      if (invalidPercentage) {
+        throw new Error("Ingredient percentage must be a number between 0 and 100.");
+      }
+
+      let { data: supervisorSite, error: siteLookupError } = await supabase
+        .from("supervisor_sites")
+        .select("id")
+        .eq("supervisor_id", session.user.id)
+        .eq("organization_id", orgId)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (siteLookupError) throw siteLookupError;
+
+      if (!supervisorSite) {
+        const { data: newSite, error: siteCreateError } = await supabase
+          .from("supervisor_sites")
+          .insert({
+            supervisor_id: session.user.id,
+            organization_id: orgId,
+            site_name: orgName,
+          })
+          .select("id")
+          .single();
+
+        if (siteCreateError) throw siteCreateError;
+        supervisorSite = newSite;
       }
 
       const { data: collection, error: colError } = await (supabase
         .from("supervisor_ingredient_collections" as any)
         .insert({
           supervisor_id: session.user.id,
-          site_id: orgId,
+          site_id: supervisorSite.id,
           organization_id: orgId,
           product_name: productName,
           brand: brand || null,
@@ -106,10 +162,10 @@ export default function SupervisorIngredientForm() {
 
       const ingredientRows = validIngredients.map(i => ({
         collection_id: (collection as any).id,
-        ingredient_name: i.ingredient_name,
+        ingredient_name: i.ingredient_name.trim(),
         source: i.source || null,
         supplier_name: i.supplier_name || null,
-        percentage: i.percentage ? parseFloat(i.percentage) : null,
+        percentage: i.percentage ? Number(i.percentage) : null,
         notes: i.notes || null,
       }));
 
@@ -154,18 +210,19 @@ export default function SupervisorIngredientForm() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Company *</Label>
-                {sites.length <= 1 ? (
-                  <Input value={sites[0]?.organizations?.name || "No company assigned"} disabled className="bg-muted" />
+                {companies.length <= 1 ? (
+                  <Input value={companies[0]?.organizations?.name || "No company assigned"} disabled className="bg-muted" />
                 ) : (
-                  <Select value={selectedSite} onValueChange={setSelectedSite}>
+                  <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
                     <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
                     <SelectContent>
-                      {sites.map((s: any) => (
-                        <SelectItem key={s.id} value={s.organization_id}>{s.organizations?.name}</SelectItem>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.organization_id}>{company.organizations?.name || "Assigned Company"}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 )}
+                {companies.length === 0 && <p className="text-xs text-destructive">No assigned business found for your supervisor account.</p>}
               </div>
               <div className="space-y-2">
                 <Label>Product Name *</Label>
@@ -233,7 +290,7 @@ export default function SupervisorIngredientForm() {
         </Card>
 
         <div className="flex justify-end pb-8">
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
+          <Button onClick={handleSubmit} disabled={isSubmitting || companies.length === 0}>
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
             Submit Collection
           </Button>
