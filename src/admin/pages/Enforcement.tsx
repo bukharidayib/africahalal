@@ -566,8 +566,10 @@ export default function Enforcement() {
                 ) : filteredCAs.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <h3 className="font-medium mb-1">No corrective actions found</h3>
-                    <p className="text-sm">Submitted corrective actions will appear here</p>
+                    <h3 className="font-medium mb-1">No corrective actions submitted yet</h3>
+                    <p className="text-sm max-w-md mx-auto">
+                      When clients respond to an issued NCN through their NCR Management module, their submissions appear here for review.
+                    </p>
                   </div>
                 ) : (
                   <Table>
