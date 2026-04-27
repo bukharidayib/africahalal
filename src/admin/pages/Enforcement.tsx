@@ -177,7 +177,7 @@ export default function Enforcement() {
 
       const { data: ncnData, error: ncnError } = await ncnQuery;
       if (ncnError) throw ncnError;
-      setNCNs(ncnData || []);
+      setNCNs((ncnData as any) || []);
 
       // Fetch Corrective Actions
       const { data: caData, error: caError } = await supabase
