@@ -11,7 +11,8 @@ import {
     FolderOpen,
     HeadphonesIcon,
     Receipt,
-    Building2
+    Building2,
+    AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +27,7 @@ const navigation = [
     { name: "My Documents", href: "/client/documents", icon: Files },
     { name: "Inspections", href: "/client/inspections", icon: ClipboardCheck },
     { name: "Compliance Center", href: "/client/compliance", icon: ShieldCheck },
+    { name: "NCR Management", href: "/client/ncrs", icon: AlertTriangle },
     { name: "Certificate Vault", href: "/client/certificates", icon: Award },
     { name: "Billing & Payments", href: "/client/billing", icon: Receipt },
     { name: "Support Center", href: "/client/support", icon: HeadphonesIcon },
