@@ -79,10 +79,17 @@ interface CorrectiveAction {
   response: string;
   status: CorrectiveActionStatus;
   submitted_at: string;
+  submitted_by?: string;
+  evidence_files?: string[] | null;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  review_notes?: string | null;
   non_conformance_notices?: {
     ncn_number: string;
     category: string;
     severity: NCNSeverity;
+    description?: string;
+    due_date?: string;
   };
 }
 
@@ -178,13 +185,15 @@ export default function Enforcement() {
           non_conformance_notices (
             ncn_number,
             category,
-            severity
+            severity,
+            description,
+            due_date
           )
         `)
         .order('submitted_at', { ascending: false });
 
       if (caError) throw caError;
-      setCorrectiveActions(caData || []);
+      setCorrectiveActions((caData as any) || []);
     } catch (error) {
       console.error('Error fetching enforcement data:', error);
     } finally {
@@ -557,8 +566,10 @@ export default function Enforcement() {
                 ) : filteredCAs.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <h3 className="font-medium mb-1">No corrective actions found</h3>
-                    <p className="text-sm">Submitted corrective actions will appear here</p>
+                    <h3 className="font-medium mb-1">No corrective actions submitted yet</h3>
+                    <p className="text-sm max-w-md mx-auto">
+                      When clients respond to an issued NCN through their NCR Management module, their submissions appear here for review.
+                    </p>
                   </div>
                 ) : (
                   <Table>
@@ -609,15 +620,13 @@ export default function Enforcement() {
                               {format(new Date(ca.submitted_at), 'dd MMM yyyy')}
                             </TableCell>
                             <TableCell>
-                              {(ca.status === 'pending' || ca.status === 'under_review') && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => setSelectedCA(ca)}
-                                >
-                                  Review
-                                </Button>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedCA(ca)}
+                              >
+                                {(ca.status === 'pending' || ca.status === 'under_review') ? 'Review' : 'View'}
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );
@@ -632,54 +641,154 @@ export default function Enforcement() {
       </div>
 
       {/* Review Dialog */}
-      <Dialog open={!!selectedCA} onOpenChange={() => setSelectedCA(null)}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={!!selectedCA} onOpenChange={() => { setSelectedCA(null); setReviewNotes(''); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Review Corrective Action</DialogTitle>
             <DialogDescription>
-              Review the submitted corrective action for {selectedCA?.non_conformance_notices?.ncn_number}
+              {selectedCA?.non_conformance_notices?.ncn_number} — {selectedCA?.non_conformance_notices?.category}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <Label className="text-muted-foreground">Submitted Response</Label>
-              <p className="mt-1 p-3 bg-muted rounded-lg text-sm">
-                {selectedCA?.response}
-              </p>
-            </div>
+          {selectedCA && (
+            <div className="space-y-5">
+              {selectedCA.non_conformance_notices?.description && (
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Original NCN</Label>
+                  <p className="mt-1 text-sm">{selectedCA.non_conformance_notices.description}</p>
+                  {selectedCA.non_conformance_notices.due_date && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Due {format(new Date(selectedCA.non_conformance_notices.due_date), 'dd MMM yyyy')}
+                    </p>
+                  )}
+                </div>
+              )}
 
-            <div>
-              <Label htmlFor="review-notes">Review Notes</Label>
-              <Textarea
-                id="review-notes"
-                value={reviewNotes}
-                onChange={(e) => setReviewNotes(e.target.value)}
-                placeholder="Add your review notes..."
-                className="mt-1"
-              />
+              <div>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Status Timeline</Label>
+                <ol className="mt-2 relative border-l border-border ml-2 space-y-4">
+                  <li className="ml-4 relative">
+                    <span className="absolute -left-[22px] top-1 flex h-3 w-3 items-center justify-center rounded-full bg-blue-500 ring-4 ring-background" />
+                    <p className="text-sm font-medium">Submitted by client</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(selectedCA.submitted_at), 'dd MMM yyyy, HH:mm')}
+                    </p>
+                  </li>
+                  <li className="ml-4 relative">
+                    <span className={cn(
+                      "absolute -left-[22px] top-1 flex h-3 w-3 items-center justify-center rounded-full ring-4 ring-background",
+                      selectedCA.status === 'pending' ? 'bg-amber-500 animate-pulse' : 'bg-muted-foreground'
+                    )} />
+                    <p className="text-sm font-medium">Under review</p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedCA.status === 'pending' ? 'Awaiting officer decision' : 'Reviewed'}
+                    </p>
+                  </li>
+                  <li className="ml-4 relative">
+                    <span className={cn(
+                      "absolute -left-[22px] top-1 flex h-3 w-3 items-center justify-center rounded-full ring-4 ring-background",
+                      selectedCA.status === 'accepted' ? 'bg-green-600' :
+                      selectedCA.status === 'rejected' ? 'bg-red-600' : 'bg-muted'
+                    )} />
+                    <p className="text-sm font-medium">
+                      {selectedCA.status === 'accepted' ? 'Accepted' :
+                       selectedCA.status === 'rejected' ? 'Rejected' : 'Pending decision'}
+                    </p>
+                    {selectedCA.reviewed_at && (
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(selectedCA.reviewed_at), 'dd MMM yyyy, HH:mm')}
+                      </p>
+                    )}
+                  </li>
+                </ol>
+              </div>
+
+              <div>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Client Response</Label>
+                <p className="mt-1 p-3 bg-muted rounded-lg text-sm whitespace-pre-wrap">
+                  {selectedCA.response}
+                </p>
+              </div>
+
+              <div>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Evidence ({selectedCA.evidence_files?.length || 0})
+                </Label>
+                {selectedCA.evidence_files && selectedCA.evidence_files.length > 0 ? (
+                  <ul className="mt-2 space-y-2">
+                    {selectedCA.evidence_files.map((url, idx) => {
+                      const name = url.split('/').pop()?.split('?')[0] || `Evidence ${idx + 1}`;
+                      return (
+                        <li key={idx} className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm">
+                          <span className="truncate flex items-center gap-2">
+                            <FileWarning className="h-4 w-4 text-muted-foreground shrink-0" />
+                            {name}
+                          </span>
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline text-xs shrink-0"
+                          >
+                            View
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground italic">No evidence files attached</p>
+                )}
+              </div>
+
+              {selectedCA.review_notes && selectedCA.status !== 'pending' && (
+                <div>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Previous Review Notes</Label>
+                  <p className="mt-1 p-3 bg-muted rounded-lg text-sm whitespace-pre-wrap">
+                    {selectedCA.review_notes}
+                  </p>
+                </div>
+              )}
+
+              {(selectedCA.status === 'pending' || selectedCA.status === 'under_review') && (
+                <div>
+                  <Label htmlFor="review-notes">Review Notes</Label>
+                  <Textarea
+                    id="review-notes"
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                    placeholder="Add your decision rationale..."
+                    className="mt-1"
+                    rows={3}
+                  />
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setSelectedCA(null)}>
-              Cancel
+            <Button variant="outline" onClick={() => { setSelectedCA(null); setReviewNotes(''); }}>
+              Close
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => handleReviewCA('rejected')}
-              disabled={isSubmitting}
-            >
-              <XCircle className="mr-2 h-4 w-4" />
-              Reject
-            </Button>
-            <Button
-              onClick={() => handleReviewCA('accepted')}
-              disabled={isSubmitting}
-            >
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              Accept
-            </Button>
+            {(selectedCA?.status === 'pending' || selectedCA?.status === 'under_review') && (
+              <>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleReviewCA('rejected')}
+                  disabled={isSubmitting}
+                >
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Reject
+                </Button>
+                <Button
+                  onClick={() => handleReviewCA('accepted')}
+                  disabled={isSubmitting}
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Accept
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
