@@ -19,13 +19,87 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, redirect_to } = await req.json();
+    const { email, redirect_to, portal } = await req.json();
 
     if (!email) {
       throw new Error("Email is required");
     }
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Portal-scoped recovery: ensure the email belongs to a user authorized for the portal.
+    // We never reveal whether an email exists — silently succeed when not authorized.
+    const allowedPortals = ["client", "inspector", "supervisor"];
+    if (portal && allowedPortals.includes(portal)) {
+      try {
+        const { data: userLookup } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("email", email)
+          .maybeSingle();
+
+        let userId: string | null = userLookup?.id ?? null;
+
+        // Fallback: look up via auth admin if no profile row matched.
+        if (!userId) {
+          const { data: list } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+          const match = list?.users?.find((u: any) => (u.email || "").toLowerCase() === email.toLowerCase());
+          userId = match?.id ?? null;
+        }
+
+        if (!userId) {
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+
+        // Gather role/membership signals
+        const [{ data: anyActiveAdminRole }, { data: inspectorMgrRole }, { data: inspectorRow }, { data: supervisorRow }] =
+          await Promise.all([
+            supabaseAdmin
+              .from("user_roles")
+              .select("role_id, admin_roles!inner(name, status)")
+              .eq("user_id", userId)
+              .eq("admin_roles.status", "active")
+              .maybeSingle(),
+            supabaseAdmin
+              .from("user_roles")
+              .select("role_id, admin_roles!inner(name, status)")
+              .eq("user_id", userId)
+              .eq("admin_roles.name", "inspector_manager")
+              .eq("admin_roles.status", "active")
+              .maybeSingle(),
+            supabaseAdmin.from("inspectors").select("id").eq("user_id", userId).eq("is_active", true).maybeSingle(),
+            supabaseAdmin.from("organization_supervisors").select("id").eq("supervisor_id", userId).limit(1).maybeSingle(),
+          ]);
+
+        let allowed = false;
+        if (portal === "inspector") {
+          allowed = !!inspectorRow || !!inspectorMgrRole;
+          // Block other admin roles even if they happen to also be inspectors
+          if (anyActiveAdminRole && !inspectorMgrRole && !inspectorRow) allowed = false;
+        } else if (portal === "supervisor") {
+          allowed = !!supervisorRow && !anyActiveAdminRole && !inspectorRow;
+        } else if (portal === "client") {
+          allowed = !anyActiveAdminRole && !inspectorRow && !supervisorRow;
+        }
+
+        if (!allowed) {
+          // Silent success to avoid email enumeration
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+      } catch (gateErr) {
+        console.error("Portal gate check failed:", gateErr);
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+    }
 
     // Generate the recovery link using admin API
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
