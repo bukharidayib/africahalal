@@ -3110,6 +3110,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      ensure_supervisor_site: {
+        Args: { _organization_id: string; _site_name?: string }
+        Returns: string
+      }
       expire_lapsed_applications: { Args: never; Returns: number }
       generate_application_number: { Args: never; Returns: string }
       generate_certificate_number: { Args: never; Returns: string }
