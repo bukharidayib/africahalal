@@ -1,45 +1,50 @@
-# Fix Inspector Incident, Observation, and NCN Issues
+# Inspector Portal Fixes
 
-Three separate issues, all root-caused. Fixing them requires database migrations + a small RLS/bucket setup. No frontend changes needed.
+## Findings
 
-## Root Causes
+1. **Incident Reports list**: The DB does have records (4 rows for inspector `bukhariproduction@gmail.com`, 0 for `inspector@africanhalaal.com`). Both RLS and the query are correct. The empty state shown is likely because the currently-logged-in inspector has no incidents. We will tighten the query to explicitly filter `reported_by = auth.uid()` so admins testing with the inspector role still see the right scope, and double-check that newly created incidents render immediately.
 
-1. **Inspector → Report Incident** fails with two errors:
-   - `Could not find the table "public.inspector_incidents"` — the table was never created (only `supervisor_incidents` exists).
-   - `Upload failed Bucket not Found` — the `Inspector-evidence` storage bucket referenced by the form does not exist (only `inspection-evidence` and `supervisor-evidence` exist).
+2. **New Report — "Could not find the table public.inspector_reports"**: That table genuinely does not exist. `InspectorReportForm.tsx` writes to `inspector_reports` and `Inspector_checklist_items`, then calls RPC `submit_Inspector_report`. None exist. We must create them.
 
-2. **Inspector → New Observation** fails with `Could not find the table "public.inspector_observations"` — the table was never created (only `supervisor_observations` exists).
+3. **Notifications module**: `inspection_notifications` table is empty, and the user wants the page to actually list inspections assigned to the inspector (not generic notifications). We will rewrite `InspectorNotifications.tsx` to query `inspections` filtered by the inspector's id with org/application info.
 
-3. **Admin → Issue NCN** fails with `Failed to issue NCN`. The actual error from the RPC is `invalid input syntax for type integer: "026-00001"`. The `generate_ncn_number()` function uses `SUBSTRING(ncn_number FROM 11)` but the NCN format is `AHIS-NCN-YYYY-NNNNN` where the sequence starts at position **15**, not 11. The current function tries to cast `"026-00001"` to integer and crashes.
+4. **My Inspections**: The query in `InspectorInspections.tsx` is already correct (joins inspections → applications → organizations, filtered by `inspector_id`). DB shows 3 inspections assigned to `inspector@africanhalaal.com`. We will verify on render; if data still appears empty it is a client-side filter issue we will trace and fix.
 
 ## Plan
 
-### 1. Database migration — create `inspector_incidents` table
-- Columns: `id`, `incident_number` (unique), `organization_id` (FK organizations), `incident_type`, `severity`, `description`, `immediate_action_taken`, `evidence_urls (text[])`, `reported_by` (FK auth.users), `status` (default 'open'), `created_at`, `updated_at`.
-- Enable RLS.
-- Policies:
-  - Inspectors can `INSERT` their own (`reported_by = auth.uid()`).
-  - Inspectors can `SELECT` their own.
-  - Admins can `SELECT`/`UPDATE` all (using `is_admin_user`).
-- Create RPC `generate_Inspector_incident_number()` returning `INC-INS-YYYY-NNNNN` (matches frontend call).
-- Create RPC `log_Inspector_activity(...)` no-op-style insert into a small `inspector_activity_log` table (or reuse pattern from `log_supervisor_activity`).
+### A. Database migration
 
-### 2. Database migration — create `inspector_observations` table
-- Columns: `id`, `organization_id` (FK), `tag`, `observation`, `recommendation` (nullable), `created_by` (FK auth.users), `created_at`, `updated_at`.
-- Enable RLS.
-- Policies:
-  - Inspectors `INSERT`/`SELECT` own (`created_by = auth.uid()`).
-  - Admins `SELECT` all.
+Create the missing inspector report tables, RPC, and storage policies:
 
-### 3. Storage bucket — create `Inspector-evidence`
-- Private bucket.
-- Policies: authenticated users may upload to `${auth.uid()}/...` path; only owner (and admins) can read.
+- `inspector_reports` — mirrors `supervisor_reports` (inspector_id, organization_id (FK to supervisor_sites or organizations as used in code), report_type, report_date, status, notes, report_content jsonb, compliance_score, risk_level, submitted_at, created_at, updated_at).
+- `Inspector_checklist_items` — mirrors `supervisor_checklist_items` (report_id, category, item_description, response, observation_notes, observation_time, evidence_urls, sort_order).
+- RPC `submit_Inspector_report(_report_id uuid)` — same logic as `submit_supervisor_report` but writes to inspector tables and uses `log_Inspector_activity`.
+- Enable RLS:
+  - Inspectors can insert/select/update own reports (`inspector_id = auth.uid()`).
+  - Admins can view all (via `is_admin_user`).
+  - Checklist items follow the parent report's RLS via subquery.
 
-### 4. Fix `generate_ncn_number()` function
-- Change `SUBSTRING(ncn_number FROM 11)` → `SUBSTRING(ncn_number FROM 15)` so it correctly parses `AHIS-NCN-YYYY-NNNNN` (prefix `AHIS-NCN-YYYY-` is 14 chars, sequence starts at position 15).
-- Tighten the `LIKE` filter to `^AHIS-NCN-YYYY-[0-9]+$` to ignore any malformed legacy rows.
+### B. Frontend changes
 
-## Files
+1. **`src/pages/inspector/InspectorIncidents.tsx`**
+   - Add `.eq("reported_by", session.user.id)` for explicit per-user scope.
+   - Keep `created_at` ordering.
 
-- New migration: creates 2 tables + 1 activity log table + RLS + 2 RPCs + bucket + bucket policies + replaces `generate_ncn_number()`.
-- No frontend file changes — existing code in `InspectorIncidentForm.tsx`, `InspectorObservations.tsx`, and `Enforcement.tsx` already references these exact names.
+2. **`src/pages/inspector/InspectorNotifications.tsx`** — rewrite to show **assigned inspections**:
+   - Query `inspections` joined with `certification_applications → organizations` filtered by the inspector's id.
+   - Show org name, application number, scheduled date, status badge, assignment time.
+   - Click row → navigate to `/inspector/inspections/:id`.
+   - Keep the existing layout/header but rename empty-state copy to "No assigned inspections yet".
+
+3. **`src/pages/inspector/InspectorInspections.tsx`** — verify; no schema change needed. Add safe fallback: if `inspector` lookup fails, show a clear "Inspector profile not found" message instead of silently returning an empty list.
+
+### C. Verification
+
+After migration and code changes:
+- Sign in as `inspector@africanhalaal.com` and confirm: My Inspections lists 3 records; Notifications lists the same 3; Incidents shows correct scoped list (likely empty for this user); New Report can be saved as draft and submitted without the missing-table error.
+
+## Technical notes
+
+- The new `inspector_reports.organization_id` column should reference `supervisor_sites.id` (the form already resolves a supervisor_sites row before insert) to keep parity with the existing supervisor flow and avoid changing the report form logic.
+- Storage bucket `Inspector-evidence` already exists with policies, so uploads continue to work.
+- RPC will be created with `SECURITY DEFINER`, `search_path = public`, matching the existing supervisor RPC pattern.
