@@ -52,29 +52,52 @@ export default function InspectorManagerInspections() {
           .eq('inspector_id', me.id);
         const orgIds = (orgLinks || []).map((r: any) => r.organization_id);
 
-        if (managedInspectorIds.length === 0 && orgIds.length === 0) {
+        // Always include the manager themselves so their own inspections appear
+        const inspectorIdsToQuery = Array.from(new Set([me.id, ...managedInspectorIds]));
+
+        if (inspectorIdsToQuery.length === 0 && orgIds.length === 0) {
           setInspections([]);
           setIsLoading(false);
           return;
         }
 
-        let query = supabase
-          .from('inspections')
-          .select(`
-            *,
-            inspectors ( inspector_number, profiles (full_name) ),
-            certification_applications!inner ( application_number, organization_id, organizations (name) )
-          `)
-          .order("created_at", { ascending: false });
+        const baseSelect = `
+          *,
+          inspectors ( inspector_number, profiles (full_name) ),
+          certification_applications ( application_number, organization_id, organizations (name) )
+        `;
 
-        // Scope: inspections assigned to managed inspectors OR for managed organizations
-        const filters: string[] = [];
-        if (managedInspectorIds.length) filters.push(`inspector_id.in.(${managedInspectorIds.join(',')})`);
-        if (orgIds.length) filters.push(`certification_applications.organization_id.in.(${orgIds.join(',')})`);
-        if (filters.length) query = query.or(filters.join(',')) as any;
+        // Resolve the application IDs that belong to the manager's organizations.
+        // PostgREST doesn't support filtering on a nested relation inside a top-level .or(),
+        // so we resolve application IDs first and then filter inspections by application_id.
+        let appIds: string[] = [];
+        if (orgIds.length) {
+          const { data: apps } = await supabase
+            .from('certification_applications')
+            .select('id')
+            .in('organization_id', orgIds);
+          appIds = (apps || []).map((a: any) => a.id);
+        }
 
-        const { data } = await query;
-        setInspections((data as any[]) || []);
+        const queries: Promise<any>[] = [];
+        if (inspectorIdsToQuery.length) {
+          queries.push(
+            Promise.resolve(supabase.from('inspections').select(baseSelect).in('inspector_id', inspectorIdsToQuery))
+          );
+        }
+        if (appIds.length) {
+          queries.push(
+            Promise.resolve(supabase.from('inspections').select(baseSelect).in('application_id', appIds))
+          );
+        }
+
+        const results = await Promise.all(queries);
+        const merged = new Map<string, any>();
+        results.forEach((r: any) => (r?.data || []).forEach((row: any) => merged.set(row.id, row)));
+        const list = Array.from(merged.values()).sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        setInspections(list);
       } catch (e) {
         console.error(e);
       } finally {
