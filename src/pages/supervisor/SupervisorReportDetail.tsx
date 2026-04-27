@@ -53,10 +53,15 @@ export default function SupervisorReportDetail() {
   const [report, setReport] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [scores, setScores] = useState<any>(null);
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id ?? null);
+
       const { data: reportData } = await (supabase.from("supervisor_reports" as any).select("*").eq("id", id).single() as any);
       setReport(reportData);
 
@@ -66,6 +71,21 @@ export default function SupervisorReportDetail() {
 
         const { data: scoreData } = await (supabase.from("supervisor_compliance_scores" as any).select("*").eq("report_id", id).single() as any);
         setScores(scoreData);
+      }
+
+      // Resolve application_id via site -> organization -> latest application
+      if (reportData?.site_id) {
+        const { data: site } = await (supabase.from("supervisor_sites" as any).select("organization_id").eq("id", reportData.site_id).maybeSingle() as any);
+        if ((site as any)?.organization_id) {
+          const { data: app } = await supabase
+            .from("certification_applications")
+            .select("id")
+            .eq("organization_id", (site as any).organization_id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          setApplicationId(app?.id ?? null);
+        }
       }
 
       setIsLoading(false);
@@ -92,7 +112,12 @@ export default function SupervisorReportDetail() {
             <h1 className="text-2xl font-bold font-serif">Report Detail</h1>
             <p className="text-muted-foreground mt-1">{reportTypeLabel} — {format(new Date(report.report_date), "dd MMMM yyyy")}</p>
           </div>
-          <Badge variant={report.status === "submitted" ? "default" : "secondary"}>{report.status}</Badge>
+          <div className="flex items-center gap-2">
+            {applicationId && userId && (
+              <RaiseNCRDialog source="supervisor" applicationId={applicationId} reportId={report.id} raisedBy={userId} />
+            )}
+            <Badge variant={report.status === "submitted" ? "default" : "secondary"}>{report.status}</Badge>
+          </div>
         </div>
 
         {/* === DAILY CHECKLIST VIEW === */}
