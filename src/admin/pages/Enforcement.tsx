@@ -490,6 +490,7 @@ export default function Enforcement() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>NCN #</TableHead>
+                        <TableHead>Source</TableHead>
                         <TableHead>Organization</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Severity</TableHead>
