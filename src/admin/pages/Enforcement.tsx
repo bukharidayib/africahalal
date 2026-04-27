@@ -79,10 +79,17 @@ interface CorrectiveAction {
   response: string;
   status: CorrectiveActionStatus;
   submitted_at: string;
+  submitted_by?: string;
+  evidence_files?: string[] | null;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  review_notes?: string | null;
   non_conformance_notices?: {
     ncn_number: string;
     category: string;
     severity: NCNSeverity;
+    description?: string;
+    due_date?: string;
   };
 }
 
