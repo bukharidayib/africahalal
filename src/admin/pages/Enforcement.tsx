@@ -65,6 +65,8 @@ interface NCN {
   status: string;
   due_date: string;
   issued_at: string;
+  source?: 'admin' | 'supervisor' | 'inspector' | null;
+  raised_by?: string | null;
   certification_applications?: {
     application_number: string;
     organizations?: {
@@ -175,7 +177,7 @@ export default function Enforcement() {
 
       const { data: ncnData, error: ncnError } = await ncnQuery;
       if (ncnError) throw ncnError;
-      setNCNs(ncnData || []);
+      setNCNs((ncnData as any) || []);
 
       // Fetch Corrective Actions
       const { data: caData, error: caError } = await supabase
@@ -488,6 +490,7 @@ export default function Enforcement() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>NCN #</TableHead>
+                        <TableHead>Source</TableHead>
                         <TableHead>Organization</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Severity</TableHead>
@@ -508,6 +511,11 @@ export default function Enforcement() {
                                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                                 {ncn.ncn_number}
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize">
+                                {ncn.source || 'admin'}
+                              </Badge>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">

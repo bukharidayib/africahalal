@@ -1828,9 +1828,12 @@ export type Database = {
           id: string
           inspection_id: string | null
           issued_at: string
-          issued_by: string
+          issued_by: string | null
           ncn_number: string
+          raised_by: string | null
+          report_id: string | null
           severity: Database["public"]["Enums"]["ncn_severity"]
+          source: string
           status: string
         }
         Insert: {
@@ -1842,9 +1845,12 @@ export type Database = {
           id?: string
           inspection_id?: string | null
           issued_at?: string
-          issued_by: string
+          issued_by?: string | null
           ncn_number: string
+          raised_by?: string | null
+          report_id?: string | null
           severity: Database["public"]["Enums"]["ncn_severity"]
+          source?: string
           status?: string
         }
         Update: {
@@ -1856,9 +1862,12 @@ export type Database = {
           id?: string
           inspection_id?: string | null
           issued_at?: string
-          issued_by?: string
+          issued_by?: string | null
           ncn_number?: string
+          raised_by?: string | null
+          report_id?: string | null
           severity?: Database["public"]["Enums"]["ncn_severity"]
+          source?: string
           status?: string
         }
         Relationships: [
