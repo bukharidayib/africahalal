@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { InspectorLayout } from "@/components/layout/InspectorLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,13 +14,7 @@ const severityColors: Record<string, string> = {
   critical: "bg-red-200 text-red-900 dark:bg-red-800/40 dark:text-red-300",
 };
 
-const statusColors: Record<string, string> = {
-  open: "secondary",
-  corrective_action_submitted: "outline",
-  under_review: "default",
-  closed: "default",
-  escalated: "destructive",
-};
+const statusVariant = (s: string): any => s === "open" ? "destructive" : s === "closed" ? "default" : "secondary";
 
 export default function InspectorNCRs() {
   const [ncrs, setNcrs] = useState<any[]>([]);
@@ -28,7 +22,13 @@ export default function InspectorNCRs() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await (supabase.from("inspector_ncrs" as any).select("*").order("created_at", { ascending: false }) as any);
+      const { data } = await supabase
+        .from("non_conformance_notices")
+        .select(`
+          id, ncn_number, category, severity, status, due_date, issued_at, source,
+          certification_applications ( application_number, organizations ( name ) )
+        `)
+        .order("issued_at", { ascending: false });
       setNcrs((data as any[]) || []);
       setIsLoading(false);
     }
@@ -40,7 +40,7 @@ export default function InspectorNCRs() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold font-serif">NCR Management</h1>
-          <p className="text-muted-foreground mt-1">Non-Conformance Reports from your site inspections</p>
+          <p className="text-muted-foreground mt-1">Non-Conformance Reports you raised, or linked to your inspections.</p>
         </div>
 
         {isLoading ? (
@@ -49,7 +49,7 @@ export default function InspectorNCRs() {
           <Card>
             <CardContent className="py-12 text-center">
               <AlertOctagon className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
-              <p className="text-muted-foreground">No NCRs recorded. NCRs are automatically created when major non-compliance is detected in reports.</p>
+              <p className="text-muted-foreground">No NCRs visible. Raise one from an inspection report when major non-compliance is detected.</p>
             </CardContent>
           </Card>
         ) : (
@@ -57,18 +57,21 @@ export default function InspectorNCRs() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>NCR #</TableHead>
+                  <TableHead>NCN #</TableHead>
+                  <TableHead>Organization</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Severity</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Due Date</TableHead>
+                  <TableHead>Source</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {ncrs.map((ncr: any) => (
                   <TableRow key={ncr.id} className="cursor-pointer hover:bg-muted/50">
                     <Link to={`/inspector/ncrs/${ncr.id}`} className="contents">
-                      <TableCell className="font-mono text-xs">{ncr.ncr_number}</TableCell>
+                      <TableCell className="font-mono text-xs">{ncr.ncn_number}</TableCell>
+                      <TableCell className="text-sm">{ncr.certification_applications?.organizations?.name || "—"}</TableCell>
                       <TableCell className="text-sm">{ncr.category}</TableCell>
                       <TableCell>
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${severityColors[ncr.severity] || ""}`}>
@@ -76,13 +79,14 @@ export default function InspectorNCRs() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={(statusColors[ncr.status] as any) || "outline"}>
+                        <Badge variant={statusVariant(ncr.status)}>
                           {ncr.status?.replace(/_/g, " ")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm">
                         {ncr.due_date ? format(new Date(ncr.due_date), "dd MMM yyyy") : "—"}
                       </TableCell>
+                      <TableCell><Badge variant="outline" className="capitalize">{ncr.source || "admin"}</Badge></TableCell>
                     </Link>
                   </TableRow>
                 ))}
