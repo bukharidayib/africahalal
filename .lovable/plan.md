@@ -1,101 +1,74 @@
-# Reports, Incidents & NCR/Corrective Action Fixes
+## Goal
 
-## Root-cause analysis
+Make `non_conformance_notices` (NCN) the **single source of truth** for all NCRs across the platform. Supervisor and Inspector portals will read from this same table (scoped by who raised/owns the related inspection/report) and respond via `corrective_actions` — exactly like the Client portal already does.
 
-### 1. Admin Reports — no "Monthly Performance" tab
-`AdminReports.tsx` already loads `supervisor_reports` (including `report_type='monthly_performance'`) and exposes a type filter, but there is no dedicated tab to view them as a KPI-style list. The data is there; only the UI tab is missing.
+The orphaned `supervisor_ncrs` / `inspector_ncrs` tables will be deprecated.
 
-### 2. Supervisor → Report Incident fails / broken
-In `SupervisorIncidentForm.tsx` the form stores the user's **organization_id** in `selectedSite`, then inserts it directly as `site_id` on `supervisor_incidents`. But `supervisor_incidents.site_id` has a **foreign key to `supervisor_sites(id)`**, not to `organizations`. Result: FK violation `supervsior_incidents_site_id_fkey` (and silent insert failure for any first-time submission).
+---
 
-Same root cause we already fixed for the Ingredient Collection form. The fix is to call the existing `ensure_supervisor_site` RPC to resolve/create the `supervisor_sites` row and use the returned `site_id`.
+## What changes
 
-The listing screen `SupervisorIncidents.tsx` is fine but should refresh after submission and show the company name.
+### 1. Database (one migration)
 
-### 3. Admin Enforcement → "Corrective Actions" tab empty
-Database currently has **0 rows in `corrective_actions`** because clients have no way to submit them. RLS on `corrective_actions` only allows admins to manage; clients can SELECT their own but cannot INSERT. There is also no client UI to respond to NCNs. Once we ship #4, this tab will start filling in.
+- Add two nullable columns to `non_conformance_notices` to allow NCNs raised from supervisor/inspector field reports (not only from formal inspections):
+  - `report_id uuid` (links to supervisor/inspector report)
+  - `raised_by uuid` (the supervisor or inspector who raised it; distinct from `issued_by` which is the admin officer)
+  - `source text` default `'admin'` — one of `admin | supervisor | inspector` so each portal can filter cleanly
+- Add RLS policies on `non_conformance_notices`:
+  - Supervisors can `SELECT` rows where `raised_by = auth.uid()` OR linked to inspections they supervise
+  - Inspectors can `SELECT` rows where `raised_by = auth.uid()` OR linked to inspections they performed
+  - Both can `INSERT` rows where `raised_by = auth.uid()` and `source` matches their role
+- Add RLS on `corrective_actions` so supervisors/inspectors who raised the NCN can view responses to it.
+- Leave `supervisor_ncrs` / `inspector_ncrs` tables in place (empty, no code referencing them after this change) — safe to drop later.
 
-### 4. Client → Compliance Center / NCR Management not fetching
-- `non_conformance_notices` has **no SELECT policy for clients**, so clients can never see NCNs raised against them — they can only see Corrective Actions they themselves are linked to (which they cannot create today).
-- The Compliance Center page lists CARs but they are always empty.
-- There is no client "NCR Management" module to list/respond to NCNs.
+### 2. Supervisor portal
 
-## Plan
+- `SupervisorNCRs.tsx` — fetch from `non_conformance_notices` filtered by `raised_by = currentUser` OR by inspections supervised. Display `ncn_number`, category, severity, status, due date.
+- `SupervisorNCRDetail.tsx` — read NCN + its `corrective_actions`. Status timeline driven by NCN `status` + corrective action state. Supervisor cannot submit corrective actions (that's the client's job) — instead supervisor can **view client response and add review notes**.
+- Add **"Raise NCR"** button on supervisor inspection report pages so supervisors can create new NCNs from a report (writes to `non_conformance_notices` with `source='supervisor'`, `raised_by=auth.uid()`, `report_id=...`).
 
-### A. Database migration
-1. **RLS — let clients view their own NCNs**
-   ```
-   CREATE POLICY "Clients can view own organization NCNs"
-   ON public.non_conformance_notices FOR SELECT TO authenticated
-   USING (
-     application_id IN (
-       SELECT ca.id FROM certification_applications ca
-       JOIN profiles p ON p.organization_id = ca.organization_id
-       WHERE p.id = auth.uid()
-     )
-   );
-   ```
-2. **RLS — let clients insert/view corrective actions for their own NCNs**
-   ```
-   CREATE POLICY "Clients can insert own corrective actions"
-   ON public.corrective_actions FOR INSERT TO authenticated
-   WITH CHECK (
-     submitted_by = auth.uid()
-     AND ncn_id IN (
-       SELECT n.id FROM non_conformance_notices n
-       JOIN certification_applications ca ON ca.id = n.application_id
-       JOIN profiles p ON p.organization_id = ca.organization_id
-       WHERE p.id = auth.uid()
-     )
-   );
-   ```
-   (SELECT policy for clients already exists.)
-3. **Storage** — ensure a `client-evidence` bucket exists (or reuse an existing one) for corrective-action evidence uploads, with a policy letting authenticated users upload to their own user-id folder.
+### 3. Inspector portal
 
-### B. Supervisor portal — fix Incident submission
-Edit `src/pages/supervisor/SupervisorIncidentForm.tsx`:
-- Replace direct `site_id: selectedSite` insert with `supabase.rpc('ensure_supervisor_site', { _organization_id: selectedSite, _site_name: orgName })` (same pattern used in `SupervisorIngredientForm`).
-- Use the returned uuid as `site_id`.
-- Keep current org-vs-site selector logic.
-- Surface clear toasts on success/error.
+- `InspectorNCRs.tsx` — fetch from `non_conformance_notices` filtered by inspections the inspector performed OR raised by them.
+- `InspectorNCRDetail.tsx` — read-only view of NCN + corrective action response + admin review status. Remove the inspector-submits-corrective-action UI (incorrect role).
+- Add **"Raise NCR"** action on inspector report detail page (`source='inspector'`).
 
-Also tweak `SupervisorIncidents.tsx` to display the company name (resolve via `supervisor_sites` → `organizations`) so supervisors see context.
+### 4. Admin Enforcement
 
-### C. Admin Reports — Monthly Performance tab
-Edit `src/admin/pages/AdminReports.tsx`:
-- Add a `monthly` derived list = supervisor reports where `type === 'monthly_performance'`.
-- Add a new `<TabsTrigger value="monthly">Monthly Performance ({n})</TabsTrigger>`.
-- Add a `<TabsContent value="monthly">` rendering the existing `ReportTable` plus a small KPI strip pulled from `report_content.kpis` of the latest report (compliance %, NCRs, inspections).
-- Keep the existing "Supervisor Reports" tab (covers all supervisor types).
+- Already reads `non_conformance_notices` — no fetch changes needed.
+- Add a **Source** column/badge in the NCN table (`Admin / Supervisor / Inspector`) so admins can see field-raised NCNs.
+- Field-raised NCNs (`source != 'admin'`) get a **"Review & Issue"** action so an officer can validate and formally promote them (sets `issued_by`, sends email to client via existing `send-ncn-notification` edge function).
 
-Detail page reuse: clicking a monthly row continues to navigate to `/admin/supervisor-reports/{id}` (existing `AdminSupervisorReportDetail`).
+### 5. Client portal
 
-### D. Client portal — NCR Management module + Corrective Action submission
-1. **New route** `/client/ncrs` → `src/pages/client/NCRManagement.tsx`:
-   - Lists NCNs for the client's organization (number, category, severity, status, due date, days remaining).
-   - Click row → opens detail dialog with description and a "Submit Corrective Action" form (textarea response + multiple evidence file upload to storage, then INSERT into `corrective_actions` with `submitted_by = auth.uid()`).
-   - After submission, automatically transition the NCN status to `corrective_action_submitted` (admin will review in Enforcement).
-2. **Sidebar entry** in `ClientSidebar` under Compliance: "NCR Management".
-3. **Compliance Center fix**: leave existing CAR list (it will populate once #1 is in place); also add a small CTA card linking to the new NCR module when the org has open NCNs.
+- No changes — `NCRManagement.tsx` already reads `non_conformance_notices` and submits `corrective_actions`. Will automatically see field-raised NCNs once an admin issues them.
 
-### E. Verification path
-1. Admin issues an NCN from `Enforcement → Issue NCN`.
-2. Client signs in, navigates to NCR Management, sees the NCN, submits a corrective action with evidence.
-3. Admin returns to `Enforcement → Corrective Actions` tab — the entry now appears with Accept/Reject controls.
-4. Supervisor submits an incident — succeeds without FK error and shows in `Admin → Reports → Incidents`.
-5. Supervisor submits Monthly Performance via Performance module — appears in `Admin → Reports → Monthly Performance` tab.
+---
 
-## Files affected
-- `supabase/migrations/<new>.sql` — RLS policies for NCN and corrective action client access.
-- `src/pages/supervisor/SupervisorIncidentForm.tsx` — use `ensure_supervisor_site` RPC.
-- `src/pages/supervisor/SupervisorIncidents.tsx` — show company name + refresh.
-- `src/admin/pages/AdminReports.tsx` — add Monthly Performance tab + KPI strip.
-- `src/pages/client/NCRManagement.tsx` — new page (list + submit CA dialog).
-- `src/pages/client/ComplianceCenter.tsx` — link to NCR module.
-- `src/components/layout/ClientSidebar.tsx` — add "NCR Management" entry.
-- `src/App.tsx` — register `/client/ncrs` route.
+## Technical notes
 
-## Notes / decisions
-- All inserts use `crypto.randomUUID()` client-side per project rule.
-- No changes to admin roles. Admin still owns final accept/reject in Enforcement.
-- Currency, Clerk auth, dual-control rules untouched.
+- Severity enum stays as-is on `non_conformance_notices`.
+- NCN number generator: keep existing format `NCR-YYYY-XXXXX`. Add `NCR-SUP-YYYY-XXXXX` for supervisor-raised and `NCR-INS-YYYY-XXXXX` for inspector-raised (matches memory rule on entity formats).
+- Client UUID generation via `crypto.randomUUID()` on all inserts (per memory rule).
+- All new RLS uses strict equality joins; no `OR true`.
+- No schema changes to `corrective_actions` itself — already has all needed columns.
+
+---
+
+## Out of scope
+
+- Dropping `supervisor_ncrs` / `inspector_ncrs` tables (left for a later cleanup pass once we're sure nothing breaks).
+- Bulk-migrating existing rows (both legacy tables are empty — nothing to migrate).
+
+---
+
+## Files to change
+
+- `supabase/migrations/<new>.sql` — schema + RLS
+- `src/pages/supervisor/SupervisorNCRs.tsx`
+- `src/pages/supervisor/SupervisorNCRDetail.tsx`
+- `src/pages/supervisor/SupervisorReportDetail.tsx` — add "Raise NCR" button
+- `src/pages/inspector/InspectorNCRs.tsx`
+- `src/pages/inspector/InspectorNCRDetail.tsx`
+- `src/pages/inspector/InspectorReportDetail.tsx` — add "Raise NCR" button
+- `src/admin/pages/Enforcement.tsx` — add Source column + Review action for field-raised
