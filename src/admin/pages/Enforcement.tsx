@@ -620,15 +620,13 @@ export default function Enforcement() {
                               {format(new Date(ca.submitted_at), 'dd MMM yyyy')}
                             </TableCell>
                             <TableCell>
-                              {(ca.status === 'pending' || ca.status === 'under_review') && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => setSelectedCA(ca)}
-                                >
-                                  Review
-                                </Button>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedCA(ca)}
+                              >
+                                {(ca.status === 'pending' || ca.status === 'under_review') ? 'Review' : 'View'}
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );
