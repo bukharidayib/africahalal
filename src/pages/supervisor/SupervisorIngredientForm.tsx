@@ -82,14 +82,18 @@ export default function SupervisorIngredientForm() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
-      const siteObj = sites.find((s: any) => s.id === selectedSite);
-      const orgId = siteObj?.organization_id || siteObj?.organizations?.id;
+      const siteObj = sites.find((s: any) => s.organization_id === selectedSite);
+      const orgId = siteObj?.organization_id || siteObj?.organizations?.id || selectedSite;
+
+      if (!orgId) {
+        throw new Error("Could not resolve organization for the selected company.");
+      }
 
       const { data: collection, error: colError } = await (supabase
         .from("supervisor_ingredient_collections" as any)
         .insert({
           supervisor_id: session.user.id,
-          site_id: selectedSite,
+          site_id: orgId,
           organization_id: orgId,
           product_name: productName,
           brand: brand || null,
