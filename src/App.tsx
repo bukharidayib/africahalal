@@ -84,6 +84,9 @@ import Businesses from "./admin/pages/Businesses";
 import BusinessDetail from "./admin/pages/BusinessDetail";
 import IngredientTracker from "./admin/pages/IngredientTracker";
 import AdminSupervisorReportDetail from "./admin/pages/AdminSupervisorReportDetail";
+import AdminReports from "./admin/pages/AdminReports";
+import AdminInspectorReportDetail from "./admin/pages/AdminInspectorReportDetail";
+import AdminIncidentDetail from "./admin/pages/AdminIncidentDetail";
 import { AdminProtectedRoute } from "./admin/components/AdminProtectedRoute";
 import { PermissionGate } from "./admin/components/PermissionGate";
 
@@ -101,7 +104,7 @@ import SupervisorNCRs from "./pages/supervisor/SupervisorNCRs";
 import SupervisorNCRDetail from "./pages/supervisor/SupervisorNCRDetail";
 import SupervisorIncidents from "./pages/supervisor/SupervisorIncidents";
 import SupervisorIncidentForm from "./pages/supervisor/SupervisorIncidentForm";
-import SupervisorObservations from "./pages/supervisor/SupervisorObservations";
+
 import SupervisorIngredients from "./pages/supervisor/SupervisorIngredients";
 import SupervisorIngredientForm from "./pages/supervisor/SupervisorIngredientForm";
 import SupervisorTickets from "./pages/supervisor/SupervisorTickets";
@@ -132,7 +135,7 @@ import InspectorIncidents from "./pages/inspector/InspectorIncidents";
 import InspectorIncidentForm from "./pages/inspector/InspectorIncidentForm";
 import InspectorNCRs from "./pages/inspector/InspectorNCRs";
 import InspectorNCRDetail from "./pages/inspector/InspectorNCRDetail";
-import InspectorObservations from "./pages/inspector/InspectorObservations";
+
 import InspectorManagerSupervisors from "./pages/inspector/InspectorManagerSupervisors";
 import InspectorManagerInspections from "./pages/inspector/InspectorManagerInspections";
 import InspectorRegister from "./pages/inspector/InspectorRegister";
@@ -242,6 +245,9 @@ const App = () => (
                 <Route path="businesses/:id" element={<PermissionGate require="canViewApplications"><BusinessDetail /></PermissionGate>} />
                 <Route path="ingredients" element={<PermissionGate require="canViewIngredients"><IngredientTracker /></PermissionGate>} />
                 <Route path="supervisor-reports/:id" element={<PermissionGate require="canViewSupervisors"><AdminSupervisorReportDetail /></PermissionGate>} />
+                <Route path="reports" element={<PermissionGate require="canViewReports"><AdminReports /></PermissionGate>} />
+                <Route path="reports/inspector/:id" element={<PermissionGate require="canViewReports"><AdminInspectorReportDetail /></PermissionGate>} />
+                <Route path="incidents/:source/:id" element={<PermissionGate require="canViewReports"><AdminIncidentDetail /></PermissionGate>} />
               </Route>
             </Route>
 
@@ -264,12 +270,12 @@ const App = () => (
             
             <Route path="/inspector/reports" element={<InspectorProtectedRoute><InspectorReports /></InspectorProtectedRoute>} />
             <Route path="/inspector/reports/new" element={<InspectorProtectedRoute><InspectorReportForm /></InspectorProtectedRoute>} />
+            <Route path="/inspector/reports/:id/edit" element={<InspectorProtectedRoute><InspectorReportForm /></InspectorProtectedRoute>} />
             <Route path="/inspector/reports/:id" element={<InspectorProtectedRoute><InspectorReportDetail /></InspectorProtectedRoute>} />
             <Route path="/inspector/incidents" element={<InspectorProtectedRoute><InspectorIncidents /></InspectorProtectedRoute>} />
             <Route path="/inspector/incidents/new" element={<InspectorProtectedRoute><InspectorIncidentForm /></InspectorProtectedRoute>} />
             <Route path="/inspector/ncrs" element={<InspectorProtectedRoute><InspectorNCRs /></InspectorProtectedRoute>} />
             <Route path="/inspector/ncrs/:id" element={<InspectorProtectedRoute><InspectorNCRDetail /></InspectorProtectedRoute>} />
-            <Route path="/inspector/observations" element={<InspectorProtectedRoute><InspectorObservations /></InspectorProtectedRoute>} />
 
             <Route path="/inspector/manager/supervisors" element={<InspectorProtectedRoute><InspectorManagerSupervisors /></InspectorProtectedRoute>} />
             <Route path="/inspector/manager/inspections" element={<InspectorProtectedRoute><InspectorManagerInspections /></InspectorProtectedRoute>} />
@@ -291,7 +297,6 @@ const App = () => (
             <Route path="/supervisor/ncrs/:id" element={<SupervisorProtectedRoute><SupervisorNCRDetail /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/incidents" element={<SupervisorProtectedRoute><SupervisorIncidents /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/incidents/new" element={<SupervisorProtectedRoute><SupervisorIncidentForm /></SupervisorProtectedRoute>} />
-            <Route path="/supervisor/observations" element={<SupervisorProtectedRoute><SupervisorObservations /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/ingredients" element={<SupervisorProtectedRoute><SupervisorIngredients /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/ingredients/new" element={<SupervisorProtectedRoute><SupervisorIngredientForm /></SupervisorProtectedRoute>} />
             <Route path="/supervisor/support/tickets" element={<SupervisorProtectedRoute><SupervisorTickets /></SupervisorProtectedRoute>} />

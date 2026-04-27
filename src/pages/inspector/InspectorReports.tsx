@@ -100,7 +100,7 @@ export default function InspectorReports() {
               </TableHeader>
               <TableBody>
                 {reports.map((r: any) => (
-                  <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => window.location.href = `/inspector/reports/${r.id}`}>
+                  <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => window.location.href = r.status === "draft" ? `/inspector/reports/${r.id}/edit` : `/inspector/reports/${r.id}`}>
                     <TableCell>{format(new Date(r.report_date), "dd MMM yyyy")}</TableCell>
                     <TableCell>{REPORT_TYPE_LABELS[r.report_type] || r.report_type}</TableCell>
                     <TableCell>

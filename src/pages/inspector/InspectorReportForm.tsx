@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Loader2, Plus, Trash2, Upload, Save, Send } from "lucide-react";
 import { format } from "date-fns";
 import { OrgCombobox } from "@/admin/components/OrgCombobox";
@@ -70,7 +70,10 @@ export default function InspectorReportForm() {
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const today = format(new Date(), "yyyy-MM-dd");
+  const { id: editId } = useParams();
+  const isEditMode = Boolean(editId);
+  const [reportDate, setReportDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const today = reportDate;
 
   // Weekly report state
   const [weeklySections, setWeeklySections] = useState<Record<string, string>>(
@@ -86,6 +89,7 @@ export default function InspectorReportForm() {
   }, [sites, selectedSite]);
 
   useEffect(() => {
+    if (isEditMode) return; // skip default seed when editing
     const newItems: ChecklistItem[] = [];
     CATEGORIES.forEach(cat => {
       (DEFAULT_ITEMS[cat.key] || []).forEach((desc, idx) => {
@@ -101,7 +105,55 @@ export default function InspectorReportForm() {
       });
     });
     setItems(newItems);
-  }, []);
+  }, [isEditMode]);
+
+  // Load existing draft when editing
+  useEffect(() => {
+    if (!isEditMode || !editId) return;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const { data: rep } = await (supabase.from("inspector_reports" as any).select("*").eq("id", editId).maybeSingle() as any);
+        if (!rep) { toast({ variant: "destructive", title: "Not found" }); navigate("/inspector/reports"); return; }
+        if ((rep as any).status !== "draft" || (rep as any).inspector_id !== session.user.id) {
+          toast({ variant: "destructive", title: "Cannot edit", description: "Only your own drafts can be edited." });
+          navigate(`/inspector/reports/${editId}`);
+          return;
+        }
+        const r = rep as any;
+        setReportType(r.report_type);
+        setReportDate(r.report_date);
+        setNotes(r.notes || "");
+        // resolve site -> organization id
+        const { data: site } = await (supabase.from("supervisor_sites" as any).select("organization_id").eq("id", r.organization_id).maybeSingle() as any);
+        if ((site as any)?.organization_id) setSelectedSite((site as any).organization_id);
+
+        if (r.report_type === "weekly_summary") {
+          const sections = r.report_content?.sections || {};
+          setWeeklySections({ ...Object.fromEntries(WEEKLY_SECTIONS.map(s => [s.key, ""])), ...sections });
+          setWeeklyEvidence(r.report_content?.evidence_urls || []);
+        }
+        if (r.report_type === "daily_checklist") {
+          const { data: cItems } = await (supabase.from("Inspector_checklist_items" as any).select("*").eq("report_id", editId).order("sort_order") as any);
+          const loaded: ChecklistItem[] = ((cItems as any[]) || []).map((it: any, idx: number) => ({
+            id: `loaded-${idx}-${it.id}`,
+            category: it.category,
+            item_description: it.item_description,
+            response: it.response || "",
+            observation_notes: it.observation_notes || "",
+            observation_time: it.observation_time ? format(new Date(it.observation_time), "yyyy-MM-dd'T'HH:mm") : format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+            evidence_urls: it.evidence_urls || [],
+          }));
+          if (loaded.length) setItems(loaded);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [isEditMode, editId, navigate, toast]);
+
 
   const updateItem = (id: string, field: keyof ChecklistItem, value: any) => {
     setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
@@ -206,23 +258,39 @@ export default function InspectorReportForm() {
         reportContent = { type: "weekly", sections: weeklySections, evidence_urls: weeklyEvidence };
       }
 
-      const { data: report, error: reportError } = await (supabase.from("inspector_reports" as any).insert({
-        inspector_id: session.user.id,
-        organization_id: siteId,
-        report_type: reportType,
-        report_date: today,
-        status: "draft",
-        notes,
-        report_content: reportContent,
-      } as any).select().single() as any);
-
-      if (reportError) throw reportError;
+      let reportId: string;
+      if (isEditMode && editId) {
+        const { error: updErr } = await (supabase.from("inspector_reports" as any).update({
+          organization_id: siteId,
+          report_type: reportType,
+          notes,
+          report_content: reportContent,
+        } as any).eq("id", editId) as any);
+        if (updErr) throw updErr;
+        reportId = editId;
+        // Replace checklist items
+        if (reportType === "daily_checklist") {
+          await (supabase.from("Inspector_checklist_items" as any).delete().eq("report_id", reportId) as any);
+        }
+      } else {
+        const { data: report, error: reportError } = await (supabase.from("inspector_reports" as any).insert({
+          inspector_id: session.user.id,
+          organization_id: siteId,
+          report_type: reportType,
+          report_date: today,
+          status: "draft",
+          notes,
+          report_content: reportContent,
+        } as any).select().single() as any);
+        if (reportError) throw reportError;
+        reportId = (report as any).id;
+      }
 
       // Insert checklist items only for daily reports
       if (reportType === "daily_checklist") {
         const filledItems = items.filter(i => i.item_description.trim());
         const itemsToInsert = filledItems.map((item, idx) => ({
-          report_id: (report as any).id,
+          report_id: reportId,
           category: item.category,
           item_description: item.item_description,
           response: item.response || null,
@@ -240,7 +308,7 @@ export default function InspectorReportForm() {
 
       if (submit) {
         if (reportType === "daily_checklist") {
-          const { data: result, error: submitError } = await supabase.rpc("submit_Inspector_report" as any, { _report_id: (report as any).id } as any);
+          const { data: result, error: submitError } = await supabase.rpc("submit_Inspector_report" as any, { _report_id: reportId } as any);
           if (submitError) throw submitError;
           const res = result as any;
           toast({
@@ -248,11 +316,10 @@ export default function InspectorReportForm() {
             description: `Compliance score: ${res.compliance_score}% (Risk: ${res.risk_level?.toUpperCase()})`,
           });
         } else {
-          // For weekly reports, just mark as submitted directly
           const { error: updateError } = await (supabase.from("inspector_reports" as any).update({
             status: "submitted",
             submitted_at: new Date().toISOString(),
-          } as any).eq("id", (report as any).id) as any);
+          } as any).eq("id", reportId) as any);
           if (updateError) throw updateError;
           toast({ title: "Report Submitted", description: "Weekly report submitted successfully." });
         }
@@ -277,8 +344,8 @@ export default function InspectorReportForm() {
     <InspectorLayout>
       <div className="space-y-6 max-w-4xl">
         <div>
-          <h1 className="text-2xl font-bold font-serif">New Report</h1>
-          <p className="text-muted-foreground mt-1">Create a new compliance report for your assigned site</p>
+          <h1 className="text-2xl font-bold font-serif">{isEditMode ? "Edit Draft Report" : "New Report"}</h1>
+          <p className="text-muted-foreground mt-1">{isEditMode ? "Update your draft and submit when ready" : "Create a new compliance report for your assigned site"}</p>
         </div>
 
         <Card>
