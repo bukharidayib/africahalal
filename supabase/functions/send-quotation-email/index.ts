@@ -110,25 +110,42 @@ Deno.serve(async (req) => {
     }
 
     const { bytes, quotation } = await buildQuotationPdf(quotation_id);
-    const recipientInfo = await resolveRecipient(quotation.organizations, quotation.organization_id);
 
-    if (!recipientInfo.email) {
-      const msg = `Cannot send quotation: missing ${recipientInfo.missing}`;
-      await logAudit({
-        event_type: 'quotation_send_failed',
-        actor_user_id, actor_email,
-        quotation_id,
-        organization_id: quotation.organization_id,
-        status: 'error',
-        error_message: msg,
-        metadata: { missing_field: recipientInfo.missing },
-      });
-      return new Response(
-        JSON.stringify({ error: msg, missing_field: recipientInfo.missing }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+    // Prefer explicit recipient_emails on the quotation; fall back to org/profile resolution.
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const explicitRecipients: string[] = Array.isArray((quotation as any).recipient_emails)
+      ? ((quotation as any).recipient_emails as string[])
+          .map((e) => String(e || '').trim().toLowerCase())
+          .filter((e) => e && EMAIL_RE.test(e))
+      : [];
+
+    let recipients: string[] = [];
+    let recipientSource = 'quotations.recipient_emails';
+    if (explicitRecipients.length > 0) {
+      recipients = Array.from(new Set(explicitRecipients));
+    } else {
+      const recipientInfo = await resolveRecipient(quotation.organizations, quotation.organization_id);
+      if (!recipientInfo.email) {
+        const msg = `Cannot send quotation: missing ${recipientInfo.missing}`;
+        await logAudit({
+          event_type: 'quotation_send_failed',
+          actor_user_id, actor_email,
+          quotation_id,
+          organization_id: quotation.organization_id,
+          status: 'error',
+          error_message: msg,
+          metadata: { missing_field: recipientInfo.missing },
+        });
+        return new Response(
+          JSON.stringify({ error: msg, missing_field: recipientInfo.missing }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      recipients = [recipientInfo.email];
+      recipientSource = recipientInfo.source || 'fallback';
     }
-    const recipient = recipientInfo.email;
+    const recipient = recipients[0];
+    const recipientInfo = { source: recipientSource };
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
@@ -225,7 +242,7 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
       body: JSON.stringify({
         from: 'African Halal Institute <accounts@africanhalaal.com>',
-        to: [recipient],
+        to: recipients,
         subject: `Quotation ${quotation.quotation_number} from African Halal Institute`,
         html,
         attachments: [{ filename: `${quotation.quotation_number}.pdf`, content: b64 }],
@@ -242,7 +259,7 @@ Deno.serve(async (req) => {
         recipient_email: recipient,
         status: 'error',
         error_message: msg,
-        metadata: { resend_status: resp.status, recipient_source: recipientInfo.source },
+        metadata: { resend_status: resp.status, recipient_source: recipientInfo.source, recipients },
       });
       throw new Error(msg);
     }
@@ -261,11 +278,12 @@ Deno.serve(async (req) => {
         total: quotation.total,
         currency: quotation.currency,
         recipient_source: recipientInfo.source,
+        recipients,
         resend_id: respBody?.id || null,
       },
     });
 
-    return new Response(JSON.stringify({ success: true, recipient, recipient_source: recipientInfo.source }), {
+    return new Response(JSON.stringify({ success: true, recipients, recipient_source: recipientInfo.source }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e: any) {

@@ -1,72 +1,42 @@
-# Fix Inspector Manager modules + NCR visibility for field staff
+# Quotations: Recipients + Edit + Delete
 
-## What's actually wrong (investigation results)
+Enhance the Accountant → Quotations module in the Admin portal with three improvements:
 
-### 1. Inspector Manager → Supervisors
-The query is correct: it walks `inspectors.is_manager` → `inspector_organizations` (manager's businesses) → `organization_supervisors` → `profiles`. Database has data: manager `Ahmed Fraah` has 2 businesses, one of which has supervisor `49140af5...`. So this page **should already render the supervisor**. If you still see "No supervisors", the most likely cause is that the manager's `inspectors.user_id` doesn't match the currently signed-in user, or the supervisor's profile row is missing. We'll add a small diagnostic + fall back to showing supervisors of the manager's organizations regardless of whether `profiles` has a row, by joining through `auth.users` email via a backfill profile.
+## 1. Multi-email recipients on New Quotation
 
-### 2. Inspector Manager → All Inspections (THE REAL BUG)
-`InspectorManagerInspections.tsx` builds this filter:
-```
-.or("inspector_id.in.(...),certification_applications.organization_id.in.(...)")
-```
-PostgREST does **not** support nested-relation columns inside a top-level `.or()`. The clause silently matches nothing → page shows "No inspections found". 
+- Add a "Send to (emails)" field to the New Quotation dialog using the existing `EmailTagsInput` component (`src/admin/components/EmailTagsInput.tsx`) — already supports multi-email tag entry with validation.
+- Pre-fill the field with the selected organization's `contact_email` (when known) so the accountant can simply add additional recipients.
+- Store the array in the existing `quotations.recipient_emails` column (already in schema — no migration needed).
+- Update `send-quotation-email` Edge Function to:
+  - Read `recipient_emails` from the quotation; if non-empty, send to that array.
+  - Fall back to current `resolveRecipient` (org contact / profile) only when the array is empty.
+  - Pass `to: recipient_emails` to Resend (Resend supports up to 50 recipients per send).
+  - Log each recipient in the audit entry.
 
-**Fix**: do two simple `.in()` queries (one by `inspector_id`, one by `application_id` resolved from `organization_id`) and merge the results client-side. Also include the manager's own inspections and inspections supervised by org-linked supervisors so the manager sees the full picture for their assigned businesses.
+## 2. Edit Quotation dialog
 
-### 3. NCR module empty in Supervisor & Inspector portals
-Database has 6 NCRs — all `source='admin'`, `raised_by=NULL`, `inspection_id=NULL`. The RLS policies we added in the last migration only allow field staff to see NCRs they raised themselves OR NCRs tied to their own inspection. **Admin-issued NCRs are completely invisible to field staff**, even when the NCR is for an organization they supervise / inspect.
+- Add a pencil "Edit" button per row in the Quotations table, enabled only for `draft` and `sent` statuses (locked once `accepted`, `rejected`, `expired`, or `converted`).
+- Reuse the same form layout as New Quotation (organization, title, line items, tax, valid until, notes, recipient emails).
+- On save, `UPDATE` the quotation row (recompute subtotal/tax/total). Quote number stays unchanged.
+- Show a confirmation toast and refresh the list.
 
-This is the missing link. Admins issue NCRs against an `application_id` (which belongs to an `organization_id`). Supervisors are linked to organizations via `organization_supervisors`; inspectors via `inspector_organizations`. We just need RLS that says: *"a supervisor/inspector can SEE an NCR whose application's organization is one of theirs"* — and the same for `corrective_actions` so they can review the client's response.
+## 3. Delete Quotation dialog
 
-No new admin module is needed — Admin Enforcement already issues NCRs. We're just opening the read path so field staff can monitor compliance for their assigned businesses.
+- Add a trash "Delete" button per row, enabled only for `draft` and `rejected` statuses (block deletion of sent/accepted/converted quotes for audit integrity — show disabled state with tooltip).
+- Use shadcn `AlertDialog` for confirmation showing the quotation number and total.
+- On confirm, `DELETE` from `quotations`, refresh the list, success toast.
 
----
+## Technical details
 
-## Plan
+- All work is in `src/admin/components/accountant/QuotationsTab.tsx` and `supabase/functions/send-quotation-email/index.ts`.
+- No DB migration required — `recipient_emails text[]` already exists on `quotations`.
+- RLS already allows accountants to update/delete quotations they manage; will verify by reading existing policies on `quotations` before implementing. If the delete policy is missing, add one via migration restricted to draft/rejected status and accountant role.
+- Form state shape extended with `recipient_emails: string[]`.
+- Edit reuses the same dialog component by toggling `mode: 'create' | 'edit'` and seeding `form` from the row.
+- Edge function backward compatible — existing single-recipient flow still works when `recipient_emails` is empty.
 
-### A. Database migration — RLS only (no schema changes)
+## Files
 
-Add SELECT policies on `non_conformance_notices`:
-- **Supervisors view org NCRs**: NCR's `application_id` belongs to an organization in `organization_supervisors` where `supervisor_id = auth.uid()`.
-- **Inspectors view org NCRs**: NCR's `application_id` belongs to an organization in `inspector_organizations` where the inspector record's `user_id = auth.uid()`. Manager inspectors also see NCRs for organizations of inspectors they manage (via `inspector_manager_inspectors`).
-
-Add matching SELECT policies on `corrective_actions` so the same scope can read client responses.
-
-(Existing "raised_by = auth.uid()" / "linked to my inspection" policies stay — these new ones are additive.)
-
-### B. Frontend — Inspector Manager pages
-
-`src/pages/inspector/InspectorManagerInspections.tsx`
-- Replace the broken `.or(...)` with two parallel queries:
-  1. `inspections` where `inspector_id IN (managedInspectorIds + me.id)`
-  2. `inspections` where `application_id IN (apps for orgIds)` — resolve apps first via `certification_applications.select('id').in('organization_id', orgIds)`
-- Merge + dedupe by `id`, sort by `created_at desc`.
-- Show empty state only if both result sets are empty.
-
-`src/pages/inspector/InspectorManagerSupervisors.tsx`
-- Keep current logic (it's correct). Add a small "scope" line: *"Supervisors assigned to your N businesses"*, and show the org name(s) each supervisor is linked to so the manager sees coverage at a glance.
-
-### C. Frontend — NCR pages (no logic change, just verify)
-
-`SupervisorNCRs.tsx` and `InspectorNCRs.tsx` already query `non_conformance_notices` with no client-side filter — they rely on RLS. Once policies in (A) land, admin-issued NCRs for assigned organizations will appear automatically. The existing `Source` badge already differentiates admin vs field-raised.
-
-`SupervisorNCRDetail.tsx` / `InspectorNCRDetail.tsx` will then show the NCR + any `corrective_actions` submitted by the client, so field staff can monitor remediation without admin intervention.
-
-### D. Optional polish (admin side)
-In `src/admin/pages/Enforcement.tsx`, add a small "Visible to" hint on each NCR row showing the count of supervisors/inspectors who will see it (computed from org assignments). Helps admins understand who's in the loop.
-
----
-
-## Files changed
-- New SQL migration: RLS additions for `non_conformance_notices` + `corrective_actions`
-- `src/pages/inspector/InspectorManagerInspections.tsx` — fix query
-- `src/pages/inspector/InspectorManagerSupervisors.tsx` — add scope/coverage info
-- `src/admin/pages/Enforcement.tsx` — (optional) "Visible to" hint
-
-## What stays the same
-- No new admin module needed — existing Enforcement page is the source of truth
-- No schema changes (last migration already added `source`/`raised_by`/`report_id`)
-- Field-raised NCR flow (RaiseNCRDialog) is unchanged
-
-Approve to proceed.
+- `src/admin/components/accountant/QuotationsTab.tsx` — add EmailTagsInput field, edit dialog, delete AlertDialog, action buttons.
+- `supabase/functions/send-quotation-email/index.ts` — accept multi-recipient array.
+- (Conditional) one small migration if delete RLS is missing.
