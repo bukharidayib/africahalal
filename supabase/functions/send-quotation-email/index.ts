@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
       body: JSON.stringify({
         from: 'African Halal Institute <accounts@africanhalaal.com>',
-        to: [recipient],
+        to: recipients,
         subject: `Quotation ${quotation.quotation_number} from African Halal Institute`,
         html,
         attachments: [{ filename: `${quotation.quotation_number}.pdf`, content: b64 }],
