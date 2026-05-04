@@ -14,10 +14,15 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Plus, RefreshCw, FileText, Send, Trash2, FileCheck } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, FileText, Send, Trash2, FileCheck, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
+import { EmailTagsInput } from '@/admin/components/EmailTagsInput';
 
 interface Item { label: string; qty: number; unit_price: number; total: number; }
 
@@ -35,6 +40,7 @@ interface Quotation {
   valid_until: string | null;
   status: string;
   notes: string | null;
+  recipient_emails: string[] | null;
   sent_at: string | null;
   converted_invoice_id: string | null;
   organizations?: { name: string; contact_email: string | null } | null;
@@ -47,16 +53,23 @@ const blankForm = {
   tax_pct: '0',
   valid_until: '',
   notes: '',
+  recipient_emails: [] as string[],
 };
+
+const EDITABLE_STATUSES = ['draft', 'sent'];
+const DELETABLE_STATUSES = ['draft', 'rejected', 'expired'];
 
 export default function QuotationsTab() {
   const [quotes, setQuotes] = useState<Quotation[]>([]);
-  const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
+  const [orgs, setOrgs] = useState<{ id: string; name: string; contact_email: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Quotation | null>(null);
   const [form, setForm] = useState({ ...blankForm });
   const [saving, setSaving] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Quotation | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
 
   const fetchData = async () => {
@@ -64,16 +77,27 @@ export default function QuotationsTab() {
     try {
       const [q, o] = await Promise.all([
         supabase.from('quotations').select('*, organizations(name, contact_email)').order('created_at', { ascending: false }),
-        supabase.from('organizations').select('id, name').order('name'),
+        supabase.from('organizations').select('id, name, contact_email').order('name'),
       ]);
       if (q.error) throw q.error;
       setQuotes((q.data || []) as any);
-      setOrgs(o.data || []);
+      setOrgs((o.data || []) as any);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally { setLoading(false); }
   };
   useEffect(() => { fetchData(); }, []);
+
+  // Auto-prefill recipient emails from selected org's contact_email when creating
+  useEffect(() => {
+    if (editing) return;
+    if (!form.organization_id) return;
+    const o = orgs.find(x => x.id === form.organization_id);
+    if (o?.contact_email && form.recipient_emails.length === 0) {
+      setForm(p => ({ ...p, recipient_emails: [o.contact_email!.trim().toLowerCase()] }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.organization_id, orgs]);
 
   const updateItem = (i: number, key: keyof Item, val: any) => {
     setForm(p => {
@@ -91,6 +115,26 @@ export default function QuotationsTab() {
   const taxAmt = subtotal * (Number(form.tax_pct) || 0) / 100;
   const total = subtotal + taxAmt;
 
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ ...blankForm });
+    setShowForm(true);
+  };
+
+  const openEdit = (q: Quotation) => {
+    setEditing(q);
+    setForm({
+      organization_id: q.organization_id,
+      title: q.title,
+      items: (q.items && q.items.length ? q.items : [{ label: '', qty: 1, unit_price: 0, total: 0 }]) as Item[],
+      tax_pct: String(q.tax_rate ?? 0),
+      valid_until: q.valid_until || '',
+      notes: q.notes || '',
+      recipient_emails: q.recipient_emails || [],
+    });
+    setShowForm(true);
+  };
+
   const handleSave = async () => {
     if (!form.organization_id || !form.title || form.items.some(i => !i.label || !i.qty)) {
       toast({ variant: 'destructive', title: 'Missing fields', description: 'Organization, title and complete line items required.' });
@@ -98,9 +142,7 @@ export default function QuotationsTab() {
     }
     setSaving(true);
     try {
-      const { data: qNum } = await supabase.rpc('generate_quotation_number');
-      const { error } = await supabase.from('quotations').insert({
-        quotation_number: qNum as string,
+      const payload = {
         organization_id: form.organization_id,
         title: form.title,
         items: form.items as any,
@@ -110,16 +152,44 @@ export default function QuotationsTab() {
         total,
         valid_until: form.valid_until || null,
         notes: form.notes || null,
-        status: 'draft',
-      });
-      if (error) throw error;
-      toast({ title: 'Quotation created', description: `Quotation ${qNum} saved as draft.` });
+        recipient_emails: form.recipient_emails.length ? form.recipient_emails : null,
+      };
+
+      if (editing) {
+        const { error } = await supabase.from('quotations').update(payload).eq('id', editing.id);
+        if (error) throw error;
+        toast({ title: 'Quotation updated', description: `Quotation ${editing.quotation_number} saved.` });
+      } else {
+        const { data: qNum } = await supabase.rpc('generate_quotation_number');
+        const { error } = await supabase.from('quotations').insert({
+          ...payload,
+          quotation_number: qNum as string,
+          status: 'draft',
+        });
+        if (error) throw error;
+        toast({ title: 'Quotation created', description: `Quotation ${qNum} saved as draft.` });
+      }
       setShowForm(false);
+      setEditing(null);
       setForm({ ...blankForm });
       fetchData();
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from('quotations').delete().eq('id', deleteTarget.id);
+      if (error) throw error;
+      toast({ title: 'Deleted', description: `Quotation ${deleteTarget.quotation_number} removed.` });
+      setDeleteTarget(null);
+      fetchData();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally { setDeleting(false); }
   };
 
   const handleSend = async (q: Quotation) => {
@@ -202,12 +272,14 @@ export default function QuotationsTab() {
           <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
-          <Dialog open={showForm} onOpenChange={setShowForm}>
+          <Dialog open={showForm} onOpenChange={(o) => { setShowForm(o); if (!o) { setEditing(null); setForm({ ...blankForm }); } }}>
             <DialogTrigger asChild>
-              <Button onClick={() => setForm({ ...blankForm })}><Plus className="h-4 w-4 mr-2" /> New Quotation</Button>
+              <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" /> New Quotation</Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
-              <DialogHeader><DialogTitle>New Quotation</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>{editing ? `Edit Quotation ${editing.quotation_number}` : 'New Quotation'}</DialogTitle>
+              </DialogHeader>
               <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -225,6 +297,14 @@ export default function QuotationsTab() {
                 <div>
                   <Label>Title *</Label>
                   <Input value={form.title} onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Halal certification + annual audit" />
+                </div>
+                <div>
+                  <Label>Send to (recipient emails)</Label>
+                  <EmailTagsInput
+                    value={form.recipient_emails}
+                    onChange={(emails) => setForm(p => ({ ...p, recipient_emails: emails }))}
+                    placeholder="Add recipient email and press Enter"
+                  />
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -262,10 +342,10 @@ export default function QuotationsTab() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => { setShowForm(false); setEditing(null); }}>Cancel</Button>
                 <Button onClick={handleSave} disabled={saving}>
                   {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Save Draft
+                  {editing ? 'Save Changes' : 'Save Draft'}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -294,40 +374,89 @@ export default function QuotationsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {quotes.map((q) => (
-                <TableRow key={q.id}>
-                  <TableCell className="font-mono text-sm">{q.quotation_number}</TableCell>
-                  <TableCell>{q.organizations?.name || '—'}</TableCell>
-                  <TableCell className="max-w-[200px] truncate">{q.title}</TableCell>
-                  <TableCell className="font-semibold">ZMW {Number(q.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
-                  <TableCell className="text-sm">{q.valid_until ? format(new Date(q.valid_until), 'dd MMM yyyy') : '—'}</TableCell>
-                  <TableCell>{statusBadge(q.status)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      {q.status !== 'converted' && q.status !== 'rejected' && (
-                        <Button size="sm" variant="outline" onClick={() => handleSend(q)} disabled={actingId === q.id}>
-                          {actingId === q.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+              {quotes.map((q) => {
+                const canEdit = EDITABLE_STATUSES.includes(q.status);
+                const canDelete = DELETABLE_STATUSES.includes(q.status);
+                return (
+                  <TableRow key={q.id}>
+                    <TableCell className="font-mono text-sm">{q.quotation_number}</TableCell>
+                    <TableCell>{q.organizations?.name || '—'}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">{q.title}</TableCell>
+                    <TableCell className="font-semibold">ZMW {Number(q.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell className="text-sm">{q.valid_until ? format(new Date(q.valid_until), 'dd MMM yyyy') : '—'}</TableCell>
+                    <TableCell>{statusBadge(q.status)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        {q.status !== 'converted' && q.status !== 'rejected' && (
+                          <Button size="sm" variant="outline" onClick={() => handleSend(q)} disabled={actingId === q.id} title="Send to recipients">
+                            {actingId === q.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                          </Button>
+                        )}
+                        {q.status === 'sent' && (
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => handleSetStatus(q, 'accepted')} disabled={actingId === q.id}>Accepted</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleSetStatus(q, 'rejected')} disabled={actingId === q.id}>Rejected</Button>
+                          </>
+                        )}
+                        {(q.status === 'accepted' || q.status === 'sent') && (
+                          <Button size="sm" onClick={() => handleConvert(q)} disabled={actingId === q.id}>
+                            <FileCheck className="h-3 w-3 mr-1" /> To Invoice
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openEdit(q)}
+                          disabled={!canEdit}
+                          title={canEdit ? 'Edit quotation' : `Cannot edit ${q.status} quotation`}
+                        >
+                          <Pencil className="h-3 w-3" />
                         </Button>
-                      )}
-                      {q.status === 'sent' && (
-                        <>
-                          <Button size="sm" variant="outline" onClick={() => handleSetStatus(q, 'accepted')} disabled={actingId === q.id}>Accepted</Button>
-                          <Button size="sm" variant="outline" onClick={() => handleSetStatus(q, 'rejected')} disabled={actingId === q.id}>Rejected</Button>
-                        </>
-                      )}
-                      {(q.status === 'accepted' || q.status === 'sent') && (
-                        <Button size="sm" onClick={() => handleConvert(q)} disabled={actingId === q.id}>
-                          <FileCheck className="h-3 w-3 mr-1" /> To Invoice
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setDeleteTarget(q)}
+                          disabled={!canDelete}
+                          title={canDelete ? 'Delete quotation' : `Cannot delete ${q.status} quotation`}
+                          className={canDelete ? 'hover:bg-destructive hover:text-destructive-foreground' : ''}
+                        >
+                          <Trash2 className="h-3 w-3" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
       </CardContent>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete quotation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes quotation{' '}
+              <span className="font-mono font-semibold">{deleteTarget?.quotation_number}</span>{' '}
+              ({deleteTarget?.organizations?.name || '—'}, ZMW{' '}
+              {Number(deleteTarget?.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}).
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
