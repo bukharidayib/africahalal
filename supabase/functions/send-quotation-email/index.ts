@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
         recipient_email: recipient,
         status: 'error',
         error_message: msg,
-        metadata: { resend_status: resp.status, recipient_source: recipientInfo.source },
+        metadata: { resend_status: resp.status, recipient_source: recipientInfo.source, recipients },
       });
       throw new Error(msg);
     }
@@ -278,11 +278,12 @@ Deno.serve(async (req) => {
         total: quotation.total,
         currency: quotation.currency,
         recipient_source: recipientInfo.source,
+        recipients,
         resend_id: respBody?.id || null,
       },
     });
 
-    return new Response(JSON.stringify({ success: true, recipient, recipient_source: recipientInfo.source }), {
+    return new Response(JSON.stringify({ success: true, recipients, recipient_source: recipientInfo.source }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e: any) {
