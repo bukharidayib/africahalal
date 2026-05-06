@@ -29,7 +29,10 @@ interface Item { label: string; qty: number; unit_price: number; total: number; 
 interface Quotation {
   id: string;
   quotation_number: string;
-  organization_id: string;
+  organization_id: string | null;
+  customer_name: string | null;
+  customer_email: string | null;
+  customer_address: string | null;
   title: string;
   items: Item[];
   subtotal: number;
@@ -47,7 +50,9 @@ interface Quotation {
 }
 
 const blankForm = {
-  organization_id: '',
+  customer_name: '',
+  customer_email: '',
+  customer_address: '',
   title: '',
   items: [{ label: '', qty: 1, unit_price: 0, total: 0 }] as Item[],
   tax_pct: '0',
