@@ -408,7 +408,7 @@ export default function QuotationsTab() {
                 return (
                   <TableRow key={q.id}>
                     <TableCell className="font-mono text-sm">{q.quotation_number}</TableCell>
-                    <TableCell>{q.organizations?.name || '—'}</TableCell>
+                    <TableCell>{q.customer_name || q.organizations?.name || '—'}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{q.title}</TableCell>
                     <TableCell className="font-semibold">ZMW {Number(q.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-sm">{q.valid_until ? format(new Date(q.valid_until), 'dd MMM yyyy') : '—'}</TableCell>
