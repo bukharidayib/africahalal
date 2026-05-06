@@ -66,7 +66,7 @@ const DELETABLE_STATUSES = ['draft', 'rejected', 'expired'];
 
 export default function QuotationsTab() {
   const [quotes, setQuotes] = useState<Quotation[]>([]);
-  const [orgs, setOrgs] = useState<{ id: string; name: string; contact_email: string | null }[]>([]);
+  // orgs are no longer used; quotations are now address-based
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Quotation | null>(null);
