@@ -287,15 +287,35 @@ export default function QuotationsTab() {
               <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Organization *</Label>
-                    <Select value={form.organization_id} onValueChange={(v) => setForm(p => ({ ...p, organization_id: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select organization" /></SelectTrigger>
-                      <SelectContent>{orgs.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent>
-                    </Select>
+                    <Label>Customer Name *</Label>
+                    <Input
+                      value={form.customer_name}
+                      onChange={(e) => setForm(p => ({ ...p, customer_name: e.target.value }))}
+                      placeholder="e.g. STAR BEEF COMPANY LIMITED"
+                    />
                   </div>
                   <div>
                     <Label>Valid until</Label>
                     <Input type="date" value={form.valid_until} onChange={(e) => setForm(p => ({ ...p, valid_until: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Customer Email</Label>
+                    <Input
+                      type="email"
+                      value={form.customer_email}
+                      onChange={(e) => setForm(p => ({ ...p, customer_email: e.target.value }))}
+                      placeholder="customer@example.com"
+                    />
+                  </div>
+                  <div>
+                    <Label>Customer Address</Label>
+                    <Input
+                      value={form.customer_address}
+                      onChange={(e) => setForm(p => ({ ...p, customer_address: e.target.value }))}
+                      placeholder="Street, City, Country"
+                    />
                   </div>
                 </div>
                 <div>
