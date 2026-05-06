@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     if (explicitRecipients.length > 0) {
       recipients = Array.from(new Set(explicitRecipients));
     } else {
-      const recipientInfo = await resolveRecipient(quotation.organizations, quotation.organization_id);
+      const recipientInfo = await resolveRecipient(quotation);
       if (!recipientInfo.email) {
         const msg = `Cannot send quotation: missing ${recipientInfo.missing}`;
         await logAudit({
