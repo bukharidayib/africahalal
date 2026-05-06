@@ -46,56 +46,15 @@ async function resolveRecipient(quotation: any) {
   };
 }
 
-async function buildQuotationPdf(quotationId: string) {
+async function loadQuotationWithPdf(quotationId: string) {
   const { data: q, error } = await supabase
     .from('quotations')
     .select('*, organizations(id, name, contact_email)')
     .eq('id', quotationId)
     .single();
   if (error || !q) throw new Error(error?.message || 'Quotation not found');
-
-  const pdf = await PDFDocument.create();
-  const page = pdf.addPage([595, 842]);
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const navy = rgb(0.06, 0.18, 0.34);
-  const gold = rgb(0.78, 0.62, 0.23);
-  const grey = rgb(0.4, 0.4, 0.4);
-  const black = rgb(0, 0, 0);
-
-  page.drawRectangle({ x: 0, y: 780, width: 595, height: 62, color: navy });
-  page.drawText('AFRICAN HALAL INSTITUTE', { x: 40, y: 812, size: 16, font: bold, color: rgb(1, 1, 1) });
-  page.drawText('QUOTATION', { x: 440, y: 808, size: 20, font: bold, color: gold });
-
-  page.drawText(`Quotation #: ${q.quotation_number}`, { x: 40, y: 745, size: 11, font: bold });
-  if (q.valid_until) page.drawText(`Valid Until: ${new Date(q.valid_until).toLocaleDateString('en-GB')}`, { x: 40, y: 728, size: 10, font, color: grey });
-
-  const org = q.organizations || {};
-  page.drawText('PREPARED FOR', { x: 350, y: 745, size: 9, font: bold, color: gold });
-  page.drawText(org.name || '—', { x: 350, y: 728, size: 11, font: bold });
-
-  page.drawText(q.title, { x: 40, y: 680, size: 13, font: bold, color: navy });
-
-  let y = 650;
-  page.drawRectangle({ x: 40, y: y - 4, width: 515, height: 22, color: navy });
-  page.drawText('ITEM', { x: 50, y: y + 4, size: 10, font: bold, color: rgb(1, 1, 1) });
-  page.drawText('QTY', { x: 360, y: y + 4, size: 10, font: bold, color: rgb(1, 1, 1) });
-  page.drawText('UNIT', { x: 410, y: y + 4, size: 10, font: bold, color: rgb(1, 1, 1) });
-  page.drawText('TOTAL', { x: 500, y: y + 4, size: 10, font: bold, color: rgb(1, 1, 1) });
-  y -= 22;
-  for (const it of (q.items as any[]) || []) {
-    if (y < 200) break;
-    page.drawText(String(it.label || '').slice(0, 50), { x: 50, y, size: 10, font });
-    page.drawText(String(it.qty ?? 1), { x: 365, y, size: 10, font });
-    page.drawText(Number(it.unit_price || 0).toFixed(2), { x: 410, y, size: 10, font });
-    page.drawText(Number(it.total || 0).toFixed(2), { x: 500, y, size: 10, font });
-    y -= 18;
-  }
-  y -= 10;
-  page.drawText('TOTAL', { x: 360, y, size: 13, font: bold, color: navy });
-  page.drawText(`${q.currency} ${Number(q.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, { x: 460, y, size: 14, font: bold, color: gold });
-
-  return { bytes: await pdf.save(), quotation: q };
+  const bytes = await buildQuotationPdf(quotationId);
+  return { bytes, quotation: q };
 }
 
 Deno.serve(async (req) => {
