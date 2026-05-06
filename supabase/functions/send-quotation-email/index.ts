@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { buildQuotationPdf } from '../generate-quotation-pdf/index.ts';
+import { buildQuotationPdf } from '../_shared/quotation_pdf.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
