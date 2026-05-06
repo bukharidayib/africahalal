@@ -19,23 +19,30 @@ async function logAudit(entry: Record<string, unknown>) {
   }
 }
 
-async function resolveRecipient(org: any, organizationId: string) {
-  if (org?.contact_email && String(org.contact_email).trim()) {
-    return { email: String(org.contact_email).trim(), source: 'organizations.contact_email', missing: null as string | null };
+async function resolveRecipient(quotation: any) {
+  const customerEmail = quotation?.customer_email && String(quotation.customer_email).trim();
+  if (customerEmail) {
+    return { email: customerEmail, source: 'quotations.customer_email', missing: null as string | null };
   }
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('email')
-    .eq('organization_id', organizationId)
-    .limit(1)
-    .maybeSingle();
-  if (profile?.email && String(profile.email).trim()) {
-    return { email: String(profile.email).trim(), source: 'profiles.email (organization owner)', missing: null };
+  const org = quotation?.organizations;
+  if (org?.contact_email && String(org.contact_email).trim()) {
+    return { email: String(org.contact_email).trim(), source: 'organizations.contact_email', missing: null };
+  }
+  if (quotation?.organization_id) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('organization_id', quotation.organization_id)
+      .limit(1)
+      .maybeSingle();
+    if (profile?.email && String(profile.email).trim()) {
+      return { email: String(profile.email).trim(), source: 'profiles.email (organization owner)', missing: null };
+    }
   }
   return {
     email: null,
     source: null,
-    missing: 'organizations.contact_email (and no linked profile email found for this organization)',
+    missing: 'customer_email or recipient_emails (no fallback available)',
   };
 }
 
