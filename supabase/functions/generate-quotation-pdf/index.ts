@@ -1,6 +1,7 @@
-// Generate professional quotation PDF
+// Generate AHI Halal branded quotation PDF
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { PDFDocument, rgb, StandardFonts } from 'https://esm.sh/pdf-lib@1.17.1';
+import { LOGO_BASE64 } from './_logo.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,7 @@ const supabase = createClient(
 );
 
 const fmt = (n: number) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtInt = (n: number) => Number(n || 0).toLocaleString('en-US');
 
 function wrap(text: string, max: number): string[] {
   const words = String(text || '').split(/\s+/);
@@ -26,10 +28,17 @@ function wrap(text: string, max: number): string[] {
   return lines;
 }
 
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
 async function buildQuotationPdf(quotationId: string): Promise<Uint8Array> {
   const { data: q, error } = await supabase
     .from('quotations')
-    .select('*, organizations(name, address, city, country, contact_email, registration_number)')
+    .select('*, organizations(name, address, city, country, contact_email)')
     .eq('id', quotationId)
     .single();
   if (error || !q) throw new Error(error?.message || 'Quotation not found');
@@ -39,155 +48,176 @@ async function buildQuotationPdf(quotationId: string): Promise<Uint8Array> {
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-  const green = rgb(0.10, 0.36, 0.20);
-  const indigo = rgb(0.36, 0.36, 0.95);
+  // Brand palette (AHI dark green)
+  const brand = rgb(0.06, 0.30, 0.16);
+  const brandLight = rgb(0.96, 0.93, 0.78); // cream for header text
   const ink = rgb(0.13, 0.16, 0.22);
   const muted = rgb(0.45, 0.50, 0.56);
-  const line = rgb(0.88, 0.89, 0.92);
+  const line = rgb(0.85, 0.86, 0.89);
   const white = rgb(1, 1, 1);
 
   const W = 595;
+  const H = 842;
   const M = 50;
-  let y = 792;
 
-  // Header
-  page.drawText('African Halal Institute', { x: M, y, size: 20, font: bold, color: green });
-  page.drawText('QUOTATION', { x: W - M - bold.widthOfTextAtSize('QUOTATION', 22), y, size: 22, font: bold, color: ink });
+  // Left vertical accent bar
+  page.drawRectangle({ x: 14, y: 30, width: 3, height: H - 60, color: brand });
 
-  y -= 18;
-  const addr = ['Plot 123, Cairo Road', 'Lusaka, Zambia', 'accounts@africanhalaal.com'];
-  let ay = y;
-  for (const ln of addr) { page.drawText(ln, { x: M, y: ay, size: 10, font, color: muted }); ay -= 13; }
+  // Logo top-right
+  try {
+    const logoImg = await pdf.embedPng(b64ToBytes(LOGO_BASE64));
+    const logoW = 95;
+    const ratio = logoImg.height / logoImg.width;
+    page.drawImage(logoImg, { x: W - M - logoW, y: H - M - logoW * ratio, width: logoW, height: logoW * ratio });
+  } catch {}
 
-  const meta = [
-    `#${q.quotation_number}`,
-    `Date: ${new Date(q.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`,
-    q.valid_until ? `Valid Until: ${new Date(q.valid_until).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}` : '',
-  ].filter(Boolean) as string[];
-  let my = y;
-  for (let i = 0; i < meta.length; i++) {
-    const t = meta[i];
-    const sz = i === 0 ? 11 : 10;
-    page.drawText(t, { x: W - M - font.widthOfTextAtSize(t, sz), y: my, size: sz, font, color: muted });
-    my -= 14;
+  // Title: "Quotation#<num>"
+  let y = H - 90;
+  page.drawText(`Quotation#${q.quotation_number}`, { x: M, y, size: 28, font: bold, color: ink });
+
+  // Customer / Date block
+  y -= 70;
+  const customerName = q.customer_name || q.organizations?.name || '—';
+  const customerEmail = q.customer_email || q.organizations?.contact_email || '';
+  const customerAddress = q.customer_address || [q.organizations?.address, [q.organizations?.city, q.organizations?.country].filter(Boolean).join(', ')].filter(Boolean).join('\n');
+
+  page.drawText('Customer', { x: M, y, size: 12, font: bold, color: ink });
+  let cy = y - 16;
+  page.drawText(String(customerName).toUpperCase(), { x: M, y: cy, size: 11, font, color: ink });
+  cy -= 14;
+  if (customerEmail) { page.drawText(customerEmail, { x: M, y: cy, size: 9, font, color: muted }); cy -= 12; }
+  if (customerAddress) {
+    for (const ln of String(customerAddress).split('\n').slice(0, 3)) {
+      page.drawText(ln, { x: M, y: cy, size: 9, font, color: muted }); cy -= 12;
+    }
   }
 
-  // Divider
-  y = ay - 8;
-  page.drawRectangle({ x: M, y, width: W - 2 * M, height: 1.5, color: indigo });
-
-  // Prepared For
-  y -= 30;
-  page.drawText('Prepared For:', { x: M, y, size: 12, font: bold, color: green });
-  y -= 18;
-  const org = q.organizations || {};
-  page.drawText(org.name || '—', { x: M, y, size: 12, font: bold, color: ink });
-  y -= 15;
-  const billLines = [org.address, [org.city, org.country].filter(Boolean).join(', '), org.contact_email].filter(Boolean) as string[];
-  for (const ln of billLines) {
-    page.drawText(String(ln), { x: M, y, size: 10, font, color: muted });
-    y -= 13;
-  }
-
-  // Title of quotation
-  y -= 8;
-  if (q.title) {
-    page.drawText(String(q.title), { x: M, y, size: 13, font: bold, color: ink });
-    y -= 8;
-  }
+  // Date / Valid Until (right side)
+  const dateStr = new Date(q.created_at).toLocaleDateString('en-GB');
+  const validStr = q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-GB') : '—';
+  const drawRightPair = (label: string, value: string, ry: number) => {
+    const text = `${label} ${value}`;
+    page.drawText(text, { x: W - M - font.widthOfTextAtSize(text, 11), y: ry, size: 11, font, color: ink });
+  };
+  drawRightPair('Date:', dateStr, y);
+  drawRightPair('ValidUntil:', validStr, y - 16);
 
   // Items table
-  y -= 18;
+  y = cy - 20;
   const tableX = M;
   const tableW = W - 2 * M;
   const colDescX = tableX + 14;
-  const colQtyX = tableX + 300;
-  const colPriceX = tableX + 360;
-  const colTotalX = tableX + tableW - 14;
+  const colQtyX = tableX + 270;
+  const colPriceX = tableX + 350;
+  const colTotalRX = tableX + tableW - 14;
 
-  page.drawRectangle({ x: tableX, y: y - 6, width: tableW, height: 32, color: green });
-  const hY = y + 6;
-  page.drawText('Description', { x: colDescX, y: hY, size: 11, font: bold, color: white });
-  page.drawText('Quantity', { x: colQtyX, y: hY, size: 11, font: bold, color: white });
-  page.drawText('Unit Price', { x: colPriceX, y: hY, size: 11, font: bold, color: white });
-  const totalLbl = 'Total';
-  page.drawText(totalLbl, { x: colTotalX - bold.widthOfTextAtSize(totalLbl, 11), y: hY, size: 11, font: bold, color: white });
+  // Header
+  page.drawRectangle({ x: tableX, y: y - 8, width: tableW, height: 30, color: brand });
+  const hY = y + 4;
+  page.drawText('Description', { x: colDescX, y: hY, size: 12, font: bold, color: brandLight });
+  page.drawText('Quantity', { x: colQtyX, y: hY, size: 12, font: bold, color: brandLight });
+  page.drawText('Price', { x: colPriceX, y: hY, size: 12, font: bold, color: brandLight });
+  const totHdr = 'Total';
+  page.drawText(totHdr, { x: colTotalRX - bold.widthOfTextAtSize(totHdr, 12), y: hY, size: 12, font: bold, color: brandLight });
 
   y -= 30;
 
   const items = (q.items as any[]) || [];
   for (const it of items) {
-    if (y < 230) break;
+    if (y < 200) break;
     const label = String(it.label || '');
-    const desc = String(it.description || '');
-    const qty = it.qty ?? 1;
+    const qty = Number(it.qty ?? 0);
     const unit = Number(it.unit_price ?? 0);
-    const total = Number(it.total ?? unit * Number(qty || 1));
+    const total = Number(it.total ?? unit * qty);
+    const isHeading = !qty && !unit; // description-only row
 
-    const descLines = desc ? wrap(desc, 55) : [];
-    const rowH = 22 + descLines.length * 12;
+    const labelLines = wrap(label, 48);
+    const rowH = Math.max(20, labelLines.length * 14 + 6);
 
-    page.drawText(label, { x: colDescX, y, size: 11, font: bold, color: ink });
-    let dy = y - 13;
-    for (const ln of descLines) {
-      page.drawText(ln, { x: colDescX, y: dy, size: 9, font, color: muted });
-      dy -= 12;
+    let ly = y;
+    for (const ln of labelLines) {
+      page.drawText(ln, { x: colDescX, y: ly, size: 11, font: isHeading ? bold : font, color: ink });
+      ly -= 13;
     }
 
-    page.drawText(String(qty), { x: colQtyX, y, size: 10, font, color: ink });
-    const up = `${q.currency} ${fmt(unit)}`;
-    page.drawText(up, { x: colPriceX, y, size: 10, font, color: ink });
-    const tt = `${q.currency} ${fmt(total)}`;
-    page.drawText(tt, { x: colTotalX - bold.widthOfTextAtSize(tt, 10), y, size: 10, font: bold, color: ink });
+    if (!isHeading) {
+      page.drawText(fmtInt(qty), { x: colQtyX, y, size: 11, font: bold, color: ink });
+      const up = `K${fmtInt(unit)}`;
+      page.drawText(up, { x: colPriceX, y, size: 11, font: bold, color: ink });
+      const tt = `K${fmtInt(total)}`;
+      page.drawText(tt, { x: colTotalRX - bold.widthOfTextAtSize(tt, 11), y, size: 11, font: bold, color: ink });
+    }
 
     y -= rowH;
-    page.drawLine({ start: { x: tableX, y: y + 4 }, end: { x: tableX + tableW, y: y + 4 }, thickness: 0.5, color: line });
-    y -= 6;
+    page.drawLine({ start: { x: tableX, y: y + 2 }, end: { x: tableX + tableW, y: y + 2 }, thickness: 0.5, color: line });
+    y -= 4;
   }
 
-  // Totals
-  y -= 14;
-  const labelRightX = W - M - 160;
-  const valueRightX = W - M;
-
-  const drawRow = (lbl: string, val: string, opts: { bold?: boolean; size?: number; color?: any } = {}) => {
-    const sz = opts.size || 11;
-    const f = opts.bold ? bold : font;
-    const c = opts.color || ink;
-    page.drawText(lbl, { x: labelRightX - font.widthOfTextAtSize(lbl, sz), y, size: sz, font, color: muted });
-    page.drawText(val, { x: valueRightX - f.widthOfTextAtSize(val, sz), y, size: sz, font: f, color: c });
-  };
-
-  drawRow('Subtotal:', `${q.currency} ${fmt(q.subtotal)}`, { bold: true });
-  y -= 18;
-  drawRow(`Tax (${q.tax_rate}%):`, `${q.currency} ${fmt(q.tax_amount)}`, { bold: true });
-  y -= 18;
-  page.drawLine({ start: { x: labelRightX - 80, y: y + 6 }, end: { x: valueRightX, y: y + 6 }, thickness: 0.5, color: line });
-  y -= 6;
-  const totalLabel = 'Total Due:';
-  const totalValue = `${q.currency} ${fmt(q.total)}`;
-  page.drawText(totalLabel, { x: labelRightX - font.widthOfTextAtSize(totalLabel, 14), y, size: 14, font, color: indigo });
-  page.drawText(totalValue, { x: valueRightX - bold.widthOfTextAtSize(totalValue, 16), y, size: 16, font: bold, color: indigo });
-
-  // Notes
-  if (q.notes) {
-    page.drawLine({ start: { x: M, y: 160 }, end: { x: W - M, y: 160 }, thickness: 0.5, color: line });
-    page.drawText('Notes:', { x: M, y: 142, size: 10, font: bold, color: ink });
-    let ny = 128;
-    for (const ln of wrap(String(q.notes), 95).slice(0, 4)) {
-      page.drawText(ln, { x: M, y: ny, size: 10, font, color: muted });
-      ny -= 13;
-    }
-  }
+  // TOTAL row (right-aligned, underlined)
+  y -= 10;
+  if (y < 140) y = 140;
+  const totLabel = 'TOTAL: ';
+  const totVal = `K${fmt(q.total)}`;
+  const totFull = totLabel + totVal;
+  const totW = bold.widthOfTextAtSize(totFull, 12);
+  const totX = W - M - totW;
+  page.drawText(totLabel, { x: totX, y, size: 12, font: bold, color: ink });
+  page.drawText(totVal, { x: totX + bold.widthOfTextAtSize(totLabel, 12), y, size: 12, font: bold, color: ink });
+  page.drawLine({ start: { x: totX + bold.widthOfTextAtSize(totLabel, 12), y: y - 2 }, end: { x: W - M, y: y - 2 }, thickness: 0.6, color: ink });
 
   // Footer
-  page.drawText('This quotation is non-binding until accepted and converted to an invoice.', {
-    x: M, y: 50, size: 9, font: bold, color: ink,
-  });
-  page.drawText('African Halal Institute | accounts@africanhalaal.com | Lusaka, Zambia', {
-    x: M, y: 36, size: 8, font, color: muted,
-  });
-  page.drawText(`Quotation ${q.quotation_number} | Status: ${String(q.status).toUpperCase()}`, {
+  const footerY = 60;
+  page.drawText('African Halaal Institute', { x: W / 2 - bold.widthOfTextAtSize('African Halaal Institute', 11) / 2, y: footerY, size: 11, font: bold, color: brand });
+  page.drawText('www.africanhalaal.com', { x: W / 2 - font.widthOfTextAtSize('www.africanhalaal.com', 9) / 2, y: footerY - 14, size: 9, font, color: muted });
+
+  // ===== Page 2: Terms + Totals + Signature =====
+  const page2 = pdf.addPage([595, 842]);
+  page2.drawRectangle({ x: 14, y: 30, width: 3, height: H - 60, color: brand });
+
+  let py = H - 80;
+  page2.drawText('Terms & Conditions', { x: M, y: py, size: 14, font: bold, color: brand });
+  py -= 22;
+  const terms = [
+    'Above information is not an invoice and only an estimate of goods/services.',
+    'Payment will be due prior to provision or delivery of goods/services.',
+  ];
+  if (q.notes) terms.push(...wrap(String(q.notes), 90));
+  for (const t of terms) {
+    page2.drawText('•', { x: M, y: py, size: 11, font, color: ink });
+    page2.drawText(t, { x: M + 14, y: py, size: 10, font, color: ink });
+    py -= 16;
+  }
+
+  // Totals block
+  py -= 30;
+  const labelRX = W - M - 160;
+  const valueRX = W - M;
+  const drawTotalsRow = (lbl: string, val: string, big = false) => {
+    const sz = big ? 14 : 11;
+    const f = big ? bold : font;
+    page2.drawText(lbl, { x: labelRX - font.widthOfTextAtSize(lbl, sz), y: py, size: sz, font, color: muted });
+    page2.drawText(val, { x: valueRX - f.widthOfTextAtSize(val, sz), y: py, size: sz, font: f, color: big ? brand : ink });
+    py -= big ? 22 : 18;
+  };
+  drawTotalsRow('Subtotal:', `K${fmt(q.subtotal)}`);
+  drawTotalsRow('Total Tax:', q.tax_amount ? `K${fmt(q.tax_amount)}` : '—');
+  drawTotalsRow('Other:', '—');
+  page2.drawLine({ start: { x: labelRX - 80, y: py + 6 }, end: { x: valueRX, y: py + 6 }, thickness: 0.5, color: line });
+  drawTotalsRow('Total:', `K${fmt(q.total)}`, true);
+
+  // Signature
+  py -= 30;
+  page2.drawText('Please confirm your acceptance of this quote:', { x: M, y: py, size: 11, font: bold, color: ink });
+  py -= 50;
+  page2.drawLine({ start: { x: M, y: py }, end: { x: M + 220, y: py }, thickness: 0.6, color: ink });
+  page2.drawText('Signature over printed name', { x: M, y: py - 14, size: 9, font, color: muted });
+  page2.drawLine({ start: { x: W - M - 220, y: py }, end: { x: W - M, y: py }, thickness: 0.6, color: ink });
+  page2.drawText('Date signed', { x: W - M - 220, y: py - 14, size: 9, font, color: muted });
+
+  // Footer page 2
+  page2.drawText('African Halaal Institute', { x: W / 2 - bold.widthOfTextAtSize('African Halaal Institute', 11) / 2, y: footerY, size: 11, font: bold, color: brand });
+  page2.drawText('www.africanhalaal.com', { x: W / 2 - font.widthOfTextAtSize('www.africanhalaal.com', 9) / 2, y: footerY - 14, size: 9, font, color: muted });
+  page2.drawText(`Quotation ${q.quotation_number} | Status: ${String(q.status).toUpperCase()}`, {
     x: M, y: 24, size: 8, font, color: muted,
   });
 
