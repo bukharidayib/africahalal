@@ -1,7 +1,7 @@
 // Generate AHI Halal branded quotation PDF
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { PDFDocument, rgb, StandardFonts } from 'https://esm.sh/pdf-lib@1.17.1';
-import { LOGO_BASE64 } from './_logo.ts';
+import { LOGO_BASE64 } from '../_shared/quotation_logo.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
