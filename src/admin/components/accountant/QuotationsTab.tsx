@@ -17,9 +17,6 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { Loader2, Plus, RefreshCw, FileText, Send, Trash2, FileCheck, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { EmailTagsInput } from '@/admin/components/EmailTagsInput';
