@@ -467,7 +467,7 @@ export default function QuotationsTab() {
             <AlertDialogDescription>
               This permanently removes quotation{' '}
               <span className="font-mono font-semibold">{deleteTarget?.quotation_number}</span>{' '}
-              ({deleteTarget?.organizations?.name || '—'}, ZMW{' '}
+              ({deleteTarget?.customer_name || deleteTarget?.organizations?.name || '—'}, ZMW{' '}
               {Number(deleteTarget?.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}).
               This action cannot be undone.
             </AlertDialogDescription>
