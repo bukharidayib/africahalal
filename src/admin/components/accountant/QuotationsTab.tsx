@@ -17,9 +17,6 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { Loader2, Plus, RefreshCw, FileText, Send, Trash2, FileCheck, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { EmailTagsInput } from '@/admin/components/EmailTagsInput';
@@ -29,7 +26,10 @@ interface Item { label: string; qty: number; unit_price: number; total: number; 
 interface Quotation {
   id: string;
   quotation_number: string;
-  organization_id: string;
+  organization_id: string | null;
+  customer_name: string | null;
+  customer_email: string | null;
+  customer_address: string | null;
   title: string;
   items: Item[];
   subtotal: number;
@@ -47,7 +47,9 @@ interface Quotation {
 }
 
 const blankForm = {
-  organization_id: '',
+  customer_name: '',
+  customer_email: '',
+  customer_address: '',
   title: '',
   items: [{ label: '', qty: 1, unit_price: 0, total: 0 }] as Item[],
   tax_pct: '0',
@@ -61,7 +63,7 @@ const DELETABLE_STATUSES = ['draft', 'rejected', 'expired'];
 
 export default function QuotationsTab() {
   const [quotes, setQuotes] = useState<Quotation[]>([]);
-  const [orgs, setOrgs] = useState<{ id: string; name: string; contact_email: string | null }[]>([]);
+  // orgs are no longer used; quotations are now address-based
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Quotation | null>(null);
@@ -75,29 +77,24 @@ export default function QuotationsTab() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [q, o] = await Promise.all([
-        supabase.from('quotations').select('*, organizations(name, contact_email)').order('created_at', { ascending: false }),
-        supabase.from('organizations').select('id, name, contact_email').order('name'),
-      ]);
+      const q = await supabase.from('quotations').select('*, organizations(name, contact_email)').order('created_at', { ascending: false });
       if (q.error) throw q.error;
       setQuotes((q.data || []) as any);
-      setOrgs((o.data || []) as any);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally { setLoading(false); }
   };
   useEffect(() => { fetchData(); }, []);
 
-  // Auto-prefill recipient emails from selected org's contact_email when creating
+  // Auto-add customer_email into recipient_emails when typed (and not already present)
   useEffect(() => {
-    if (editing) return;
-    if (!form.organization_id) return;
-    const o = orgs.find(x => x.id === form.organization_id);
-    if (o?.contact_email && form.recipient_emails.length === 0) {
-      setForm(p => ({ ...p, recipient_emails: [o.contact_email!.trim().toLowerCase()] }));
-    }
+    const e = form.customer_email.trim().toLowerCase();
+    if (!e) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return;
+    if (form.recipient_emails.includes(e)) return;
+    setForm(p => ({ ...p, recipient_emails: [...p.recipient_emails, e] }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.organization_id, orgs]);
+  }, [form.customer_email]);
 
   const updateItem = (i: number, key: keyof Item, val: any) => {
     setForm(p => {
@@ -124,7 +121,9 @@ export default function QuotationsTab() {
   const openEdit = (q: Quotation) => {
     setEditing(q);
     setForm({
-      organization_id: q.organization_id,
+      customer_name: q.customer_name || q.organizations?.name || '',
+      customer_email: q.customer_email || q.organizations?.contact_email || '',
+      customer_address: q.customer_address || '',
       title: q.title,
       items: (q.items && q.items.length ? q.items : [{ label: '', qty: 1, unit_price: 0, total: 0 }]) as Item[],
       tax_pct: String(q.tax_rate ?? 0),
@@ -136,14 +135,16 @@ export default function QuotationsTab() {
   };
 
   const handleSave = async () => {
-    if (!form.organization_id || !form.title || form.items.some(i => !i.label || !i.qty)) {
-      toast({ variant: 'destructive', title: 'Missing fields', description: 'Organization, title and complete line items required.' });
+    if (!form.customer_name.trim() || !form.title || form.items.some(i => !i.label)) {
+      toast({ variant: 'destructive', title: 'Missing fields', description: 'Customer name, title and item descriptions are required.' });
       return;
     }
     setSaving(true);
     try {
-      const payload = {
-        organization_id: form.organization_id,
+      const payload: any = {
+        customer_name: form.customer_name.trim(),
+        customer_email: form.customer_email.trim() || null,
+        customer_address: form.customer_address.trim() || null,
         title: form.title,
         items: form.items as any,
         subtotal,
@@ -214,6 +215,10 @@ export default function QuotationsTab() {
   };
 
   const handleConvert = async (q: Quotation) => {
+    if (!q.organization_id) {
+      toast({ variant: 'destructive', title: 'Cannot convert', description: 'This quotation is not linked to a registered organization. Invoices require a registered business.' });
+      return;
+    }
     setActingId(q.id);
     try {
       const { data: invNum } = await supabase.rpc('generate_invoice_number');
@@ -283,15 +288,35 @@ export default function QuotationsTab() {
               <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Organization *</Label>
-                    <Select value={form.organization_id} onValueChange={(v) => setForm(p => ({ ...p, organization_id: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select organization" /></SelectTrigger>
-                      <SelectContent>{orgs.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent>
-                    </Select>
+                    <Label>Customer Name *</Label>
+                    <Input
+                      value={form.customer_name}
+                      onChange={(e) => setForm(p => ({ ...p, customer_name: e.target.value }))}
+                      placeholder="e.g. STAR BEEF COMPANY LIMITED"
+                    />
                   </div>
                   <div>
                     <Label>Valid until</Label>
                     <Input type="date" value={form.valid_until} onChange={(e) => setForm(p => ({ ...p, valid_until: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Customer Email</Label>
+                    <Input
+                      type="email"
+                      value={form.customer_email}
+                      onChange={(e) => setForm(p => ({ ...p, customer_email: e.target.value }))}
+                      placeholder="customer@example.com"
+                    />
+                  </div>
+                  <div>
+                    <Label>Customer Address</Label>
+                    <Input
+                      value={form.customer_address}
+                      onChange={(e) => setForm(p => ({ ...p, customer_address: e.target.value }))}
+                      placeholder="Street, City, Country"
+                    />
                   </div>
                 </div>
                 <div>
@@ -380,7 +405,7 @@ export default function QuotationsTab() {
                 return (
                   <TableRow key={q.id}>
                     <TableCell className="font-mono text-sm">{q.quotation_number}</TableCell>
-                    <TableCell>{q.organizations?.name || '—'}</TableCell>
+                    <TableCell>{q.customer_name || q.organizations?.name || '—'}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{q.title}</TableCell>
                     <TableCell className="font-semibold">ZMW {Number(q.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-sm">{q.valid_until ? format(new Date(q.valid_until), 'dd MMM yyyy') : '—'}</TableCell>
@@ -439,7 +464,7 @@ export default function QuotationsTab() {
             <AlertDialogDescription>
               This permanently removes quotation{' '}
               <span className="font-mono font-semibold">{deleteTarget?.quotation_number}</span>{' '}
-              ({deleteTarget?.organizations?.name || '—'}, ZMW{' '}
+              ({deleteTarget?.customer_name || deleteTarget?.organizations?.name || '—'}, ZMW{' '}
               {Number(deleteTarget?.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}).
               This action cannot be undone.
             </AlertDialogDescription>

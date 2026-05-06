@@ -2141,10 +2141,13 @@ export type Database = {
           created_at: string
           created_by: string | null
           currency: string
+          customer_address: string | null
+          customer_email: string | null
+          customer_name: string | null
           id: string
           items: Json
           notes: string | null
-          organization_id: string
+          organization_id: string | null
           quotation_number: string
           rejected_at: string | null
           sent_at: string | null
@@ -2165,10 +2168,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
           id?: string
           items?: Json
           notes?: string | null
-          organization_id: string
+          organization_id?: string | null
           quotation_number: string
           rejected_at?: string | null
           sent_at?: string | null
@@ -2189,10 +2195,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
           id?: string
           items?: Json
           notes?: string | null
-          organization_id?: string
+          organization_id?: string | null
           quotation_number?: string
           rejected_at?: string | null
           sent_at?: string | null
