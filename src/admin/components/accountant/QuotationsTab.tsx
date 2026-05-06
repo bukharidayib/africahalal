@@ -80,29 +80,24 @@ export default function QuotationsTab() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [q, o] = await Promise.all([
-        supabase.from('quotations').select('*, organizations(name, contact_email)').order('created_at', { ascending: false }),
-        supabase.from('organizations').select('id, name, contact_email').order('name'),
-      ]);
+      const q = await supabase.from('quotations').select('*, organizations(name, contact_email)').order('created_at', { ascending: false });
       if (q.error) throw q.error;
       setQuotes((q.data || []) as any);
-      setOrgs((o.data || []) as any);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally { setLoading(false); }
   };
   useEffect(() => { fetchData(); }, []);
 
-  // Auto-prefill recipient emails from selected org's contact_email when creating
+  // Auto-add customer_email into recipient_emails when typed (and not already present)
   useEffect(() => {
-    if (editing) return;
-    if (!form.organization_id) return;
-    const o = orgs.find(x => x.id === form.organization_id);
-    if (o?.contact_email && form.recipient_emails.length === 0) {
-      setForm(p => ({ ...p, recipient_emails: [o.contact_email!.trim().toLowerCase()] }));
-    }
+    const e = form.customer_email.trim().toLowerCase();
+    if (!e) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return;
+    if (form.recipient_emails.includes(e)) return;
+    setForm(p => ({ ...p, recipient_emails: [...p.recipient_emails, e] }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.organization_id, orgs]);
+  }, [form.customer_email]);
 
   const updateItem = (i: number, key: keyof Item, val: any) => {
     setForm(p => {
@@ -129,7 +124,9 @@ export default function QuotationsTab() {
   const openEdit = (q: Quotation) => {
     setEditing(q);
     setForm({
-      organization_id: q.organization_id,
+      customer_name: q.customer_name || q.organizations?.name || '',
+      customer_email: q.customer_email || q.organizations?.contact_email || '',
+      customer_address: q.customer_address || '',
       title: q.title,
       items: (q.items && q.items.length ? q.items : [{ label: '', qty: 1, unit_price: 0, total: 0 }]) as Item[],
       tax_pct: String(q.tax_rate ?? 0),
@@ -141,14 +138,16 @@ export default function QuotationsTab() {
   };
 
   const handleSave = async () => {
-    if (!form.organization_id || !form.title || form.items.some(i => !i.label || !i.qty)) {
-      toast({ variant: 'destructive', title: 'Missing fields', description: 'Organization, title and complete line items required.' });
+    if (!form.customer_name.trim() || !form.title || form.items.some(i => !i.label)) {
+      toast({ variant: 'destructive', title: 'Missing fields', description: 'Customer name, title and item descriptions are required.' });
       return;
     }
     setSaving(true);
     try {
-      const payload = {
-        organization_id: form.organization_id,
+      const payload: any = {
+        customer_name: form.customer_name.trim(),
+        customer_email: form.customer_email.trim() || null,
+        customer_address: form.customer_address.trim() || null,
         title: form.title,
         items: form.items as any,
         subtotal,
