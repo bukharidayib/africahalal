@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       actor_email = data?.user?.email || null;
     }
 
-    const { bytes, quotation } = await buildQuotationPdf(quotation_id);
+    const { bytes, quotation } = await loadQuotationWithPdf(quotation_id);
 
     // Prefer explicit recipient_emails on the quotation; fall back to org/profile resolution.
     const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
