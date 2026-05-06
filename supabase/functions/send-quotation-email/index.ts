@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
     if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
 
     const b64 = btoa(String.fromCharCode(...bytes));
-    const orgName = quotation.organizations?.name || 'Client';
+    const orgName = quotation.customer_name || quotation.organizations?.name || 'Client';
     const total = `${quotation.currency} ${Number(quotation.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
     const validUntil = quotation.valid_until ? new Date(quotation.valid_until).toLocaleDateString('en-GB') : '—';
