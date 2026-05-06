@@ -218,6 +218,10 @@ export default function QuotationsTab() {
   };
 
   const handleConvert = async (q: Quotation) => {
+    if (!q.organization_id) {
+      toast({ variant: 'destructive', title: 'Cannot convert', description: 'This quotation is not linked to a registered organization. Invoices require a registered business.' });
+      return;
+    }
     setActingId(q.id);
     try {
       const { data: invNum } = await supabase.rpc('generate_invoice_number');
