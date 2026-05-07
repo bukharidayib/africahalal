@@ -199,7 +199,7 @@ export async function buildQuotationPdf(quotationId: string): Promise<Uint8Array
 
   page2.drawText('African Halaal Institute', { x: W / 2 - bold.widthOfTextAtSize('African Halaal Institute', 11) / 2, y: footerY, size: 11, font: bold, color: brand });
   page2.drawText('www.africanhalaal.com', { x: W / 2 - font.widthOfTextAtSize('www.africanhalaal.com', 9) / 2, y: footerY - 14, size: 9, font, color: muted });
-  page2.drawText(`Quotation ${q.quotation_number} | Status: ${String(q.status).toUpperCase()}`, {
+  page2.drawText(`Quotation# ${shortNum} | Status: ${String(q.status).toUpperCase()}`, {
     x: M, y: 24, size: 8, font, color: muted,
   });
 
