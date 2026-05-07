@@ -88,12 +88,13 @@ export async function buildQuotationPdf(quotationId: string): Promise<Uint8Array
 
   const dateStr = new Date(q.created_at).toLocaleDateString('en-GB');
   const validStr = q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-GB') : '—';
+  const dateY = H - M - 150;
   const drawRightPair = (label: string, value: string, ry: number) => {
     const text = `${label} ${value}`;
     page.drawText(text, { x: W - M - font.widthOfTextAtSize(text, 11), y: ry, size: 11, font, color: ink });
   };
-  drawRightPair('Date:', dateStr, y);
-  drawRightPair('ValidUntil:', validStr, y - 16);
+  drawRightPair('Date:', dateStr, dateY);
+  drawRightPair('Valid Until:', validStr, dateY - 16);
 
   y = cy - 20;
   const tableX = M;
