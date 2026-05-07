@@ -62,8 +62,13 @@ export async function buildQuotationPdf(quotationId: string): Promise<Uint8Array
     page.drawImage(logoImg, { x: W - M - logoW, y: H - M - logoW * ratio, width: logoW, height: logoW * ratio });
   } catch {}
 
+  const shortNum = (() => {
+    const last = String(q.quotation_number || '').split('-').pop() || '';
+    const n = parseInt(last, 10);
+    return Number.isFinite(n) ? String(n).padStart(4, '0') : last;
+  })();
   let y = H - 90;
-  page.drawText(`Quotation#${q.quotation_number}`, { x: M, y, size: 28, font: bold, color: ink });
+  page.drawText(`Quotation# ${shortNum}`, { x: M, y, size: 28, font: bold, color: ink });
 
   y -= 70;
   const customerName = q.customer_name || q.organizations?.name || '—';
