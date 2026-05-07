@@ -57,7 +57,7 @@ export async function buildQuotationPdf(quotationId: string): Promise<Uint8Array
 
   try {
     const logoImg = await pdf.embedPng(b64ToBytes(LOGO_BASE64));
-    const logoW = 95;
+    const logoW = 140;
     const ratio = logoImg.height / logoImg.width;
     page.drawImage(logoImg, { x: W - M - logoW, y: H - M - logoW * ratio, width: logoW, height: logoW * ratio });
   } catch {}
