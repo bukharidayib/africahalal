@@ -57,13 +57,18 @@ export async function buildQuotationPdf(quotationId: string): Promise<Uint8Array
 
   try {
     const logoImg = await pdf.embedPng(b64ToBytes(LOGO_BASE64));
-    const logoW = 95;
+    const logoW = 140;
     const ratio = logoImg.height / logoImg.width;
     page.drawImage(logoImg, { x: W - M - logoW, y: H - M - logoW * ratio, width: logoW, height: logoW * ratio });
   } catch {}
 
+  const shortNum = (() => {
+    const last = String(q.quotation_number || '').split('-').pop() || '';
+    const n = parseInt(last, 10);
+    return Number.isFinite(n) ? String(n).padStart(4, '0') : last;
+  })();
   let y = H - 90;
-  page.drawText(`Quotation#${q.quotation_number}`, { x: M, y, size: 28, font: bold, color: ink });
+  page.drawText(`Quotation# ${shortNum}`, { x: M, y, size: 28, font: bold, color: ink });
 
   y -= 70;
   const customerName = q.customer_name || q.organizations?.name || '—';
@@ -194,7 +199,7 @@ export async function buildQuotationPdf(quotationId: string): Promise<Uint8Array
 
   page2.drawText('African Halaal Institute', { x: W / 2 - bold.widthOfTextAtSize('African Halaal Institute', 11) / 2, y: footerY, size: 11, font: bold, color: brand });
   page2.drawText('www.africanhalaal.com', { x: W / 2 - font.widthOfTextAtSize('www.africanhalaal.com', 9) / 2, y: footerY - 14, size: 9, font, color: muted });
-  page2.drawText(`Quotation ${q.quotation_number} | Status: ${String(q.status).toUpperCase()}`, {
+  page2.drawText(`Quotation# ${shortNum} | Status: ${String(q.status).toUpperCase()}`, {
     x: M, y: 24, size: 8, font, color: muted,
   });
 
