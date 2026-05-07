@@ -2149,6 +2149,7 @@ export type Database = {
           notes: string | null
           organization_id: string | null
           quotation_number: string
+          recipient_emails: string[] | null
           rejected_at: string | null
           sent_at: string | null
           status: string
@@ -2176,6 +2177,7 @@ export type Database = {
           notes?: string | null
           organization_id?: string | null
           quotation_number: string
+          recipient_emails?: string[] | null
           rejected_at?: string | null
           sent_at?: string | null
           status?: string
@@ -2203,6 +2205,7 @@ export type Database = {
           notes?: string | null
           organization_id?: string | null
           quotation_number?: string
+          recipient_emails?: string[] | null
           rejected_at?: string | null
           sent_at?: string | null
           status?: string
