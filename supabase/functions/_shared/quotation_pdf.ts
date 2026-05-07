@@ -55,11 +55,14 @@ export async function buildQuotationPdf(quotationId: string): Promise<Uint8Array
 
   page.drawRectangle({ x: 14, y: 30, width: 3, height: H - 60, color: brand });
 
+  const LOGO_GAP = 16;
+  const logoW = 140;
+  let logoH = 0;
   try {
     const logoImg = await pdf.embedPng(b64ToBytes(LOGO_BASE64));
-    const logoW = 140;
     const ratio = logoImg.height / logoImg.width;
-    page.drawImage(logoImg, { x: W - M - logoW, y: H - M - logoW * ratio, width: logoW, height: logoW * ratio });
+    logoH = logoW * ratio;
+    page.drawImage(logoImg, { x: W - M - logoW, y: H - M - logoH, width: logoW, height: logoH });
   } catch {}
 
   const shortNum = (() => {
@@ -67,10 +70,13 @@ export async function buildQuotationPdf(quotationId: string): Promise<Uint8Array
     const n = parseInt(last, 10);
     return Number.isFinite(n) ? String(n).padStart(4, '0') : last;
   })();
-  let y = H - 90;
-  page.drawText(`Quotation# ${shortNum}`, { x: M, y, size: 28, font: bold, color: ink });
 
-  y -= 70;
+  const titleSize = 28;
+  const headerBottom = H - M - Math.max(logoH, 40) - LOGO_GAP;
+  let y = headerBottom - titleSize;
+  page.drawText(`Quotation# ${shortNum}`, { x: M, y, size: titleSize, font: bold, color: ink });
+
+  y -= 50;
   const customerName = q.customer_name || q.organizations?.name || '—';
   const customerEmail = q.customer_email || q.organizations?.contact_email || '';
   const customerAddress = q.customer_address || [q.organizations?.address, [q.organizations?.city, q.organizations?.country].filter(Boolean).join(', ')].filter(Boolean).join('\n');
@@ -88,13 +94,18 @@ export async function buildQuotationPdf(quotationId: string): Promise<Uint8Array
 
   const dateStr = new Date(q.created_at).toLocaleDateString('en-GB');
   const validStr = q.valid_until ? new Date(q.valid_until).toLocaleDateString('en-GB') : '—';
-  const dateY = H - M - 150;
+  const dateSize = 10;
+  const dateLineH = 16;
+  const dateY = H - M - logoH - LOGO_GAP - dateSize;
   const drawRightPair = (label: string, value: string, ry: number) => {
-    const text = `${label} ${value}`;
-    page.drawText(text, { x: W - M - font.widthOfTextAtSize(text, 11), y: ry, size: 11, font, color: ink });
+    const labelW = bold.widthOfTextAtSize(label, dateSize);
+    const valueW = font.widthOfTextAtSize(value, dateSize);
+    const startX = W - M - labelW - 6 - valueW;
+    page.drawText(label, { x: startX, y: ry, size: dateSize, font: bold, color: muted });
+    page.drawText(value, { x: startX + labelW + 6, y: ry, size: dateSize, font, color: ink });
   };
   drawRightPair('Date:', dateStr, dateY);
-  drawRightPair('Valid Until:', validStr, dateY - 16);
+  drawRightPair('Valid Until:', validStr, dateY - dateLineH);
 
   y = cy - 20;
   const tableX = M;
