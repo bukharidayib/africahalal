@@ -15,11 +15,11 @@ import {
   Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Layout } from "@/components/layout/Layout";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { SectionHeader } from "@/components/sections/SectionHeader";
-
+import { BUSINESS_CATEGORY_FEES } from "@/lib/applicationFees";
 
 import halalCertImg from "@/assets/services/halal-certification.jpg";
 import auditingImg from "@/assets/services/auditing-inspection.jpg";
@@ -171,6 +171,41 @@ export default function Services() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Application Fees */}
+      <section id="fees" className="section-padding bg-background">
+        <div className="container max-w-3xl">
+          <SectionHeader
+            subtitle="Pricing"
+            title="Application Fees"
+            description="One-time, non-refundable application fees by business category. All amounts in Zambian Kwacha (ZMW)."
+          />
+          <Card className="border shadow-md overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-primary text-primary-foreground">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-semibold">Business Category</th>
+                    <th className="px-6 py-3 text-right font-semibold">Application Fee (ZMW)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {BUSINESS_CATEGORY_FEES.map((c) => (
+                    <tr key={c.key} className="border-t hover:bg-muted/40 transition-colors">
+                      <td className="px-6 py-3 font-medium text-foreground">{c.label}</td>
+                      <td className="px-6 py-3 text-right font-bold text-foreground">K{c.fee.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <CardContent className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
+              <p>• All application fees are <strong>non-refundable</strong> and must be paid prior to the start of the certification process.</p>
+              <p>• Covers initial application review and administrative processing only. Inspection, audit, and annual certification fees are billed separately.</p>
+            </CardContent>
+          </Card>
         </div>
       </section>
 

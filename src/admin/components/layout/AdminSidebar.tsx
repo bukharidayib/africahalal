@@ -112,6 +112,12 @@ const navItems: NavItem[] = [
     permission: 'canViewEnforcement',
   },
   {
+    title: 'Accountant',
+    href: '/admin/billing',
+    icon: Calculator,
+    permission: 'canViewFinance',
+  },
+  {
     title: 'Support Center',
     href: '/admin/support',
     icon: MessageSquare,

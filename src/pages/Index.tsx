@@ -199,7 +199,7 @@ export default function Index() {
             url: "https://africanhalaal.com",
             logo: "https://africanhalaal.com/favicon.png",
             description: "Zambia's leading ISO-accredited Halal certification authority. We certify food, meat processing, hospitality, cosmetics and exports.",
-            telephone: "+260979098880",
+            telephone: "+260972044414",
             email: "info@africanhalaal.com",
             address: { "@type": "PostalAddress", streetAddress: "Matero", addressLocality: "Lusaka", addressCountry: "ZM" },
             areaServed: { "@type": "Country", name: "Zambia" },

@@ -134,10 +134,10 @@ export default function QuotationsTab() {
     setShowForm(true);
   };
 
-  const handleSave = async (opts?: { downloadPdf?: boolean }): Promise<string | null> => {
+  const handleSave = async () => {
     if (!form.customer_name.trim() || !form.title || form.items.some(i => !i.label)) {
       toast({ variant: 'destructive', title: 'Missing fields', description: 'Customer name, title and item descriptions are required.' });
-      return null;
+      return;
     }
     setSaving(true);
     try {
@@ -156,58 +156,26 @@ export default function QuotationsTab() {
         recipient_emails: form.recipient_emails.length ? form.recipient_emails : null,
       };
 
-      let savedId: string | null = null;
-      let savedNumber = '';
       if (editing) {
         const { error } = await supabase.from('quotations').update(payload).eq('id', editing.id);
         if (error) throw error;
-        savedId = editing.id;
-        savedNumber = editing.quotation_number;
         toast({ title: 'Quotation updated', description: `Quotation ${editing.quotation_number} saved.` });
       } else {
         const { data: qNum } = await supabase.rpc('generate_quotation_number');
-        const { data: inserted, error } = await supabase.from('quotations').insert({
+        const { error } = await supabase.from('quotations').insert({
           ...payload,
           quotation_number: qNum as string,
           status: 'draft',
-        }).select('id').single();
+        });
         if (error) throw error;
-        savedId = inserted!.id;
-        savedNumber = qNum as string;
         toast({ title: 'Quotation created', description: `Quotation ${qNum} saved as draft.` });
       }
-
-      if (opts?.downloadPdf && savedId) {
-        try {
-          const { data, error } = await supabase.functions.invoke('generate-quotation-pdf', { body: { quotation_id: savedId } });
-          if (error) throw error;
-          const b64 = (data as any)?.pdf_base64;
-          if (!b64) throw new Error('No PDF returned');
-          const bin = atob(b64);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          const blob = new Blob([bytes], { type: 'application/pdf' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `Quotation-${savedNumber}.pdf`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
-        } catch (e: any) {
-          toast({ variant: 'destructive', title: 'PDF download failed', description: e.message });
-        }
-      }
-
       setShowForm(false);
       setEditing(null);
       setForm({ ...blankForm });
       fetchData();
-      return savedId;
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
-      return null;
     } finally { setSaving(false); }
   };
 
@@ -334,7 +302,7 @@ export default function QuotationsTab() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Customer Email (optional)</Label>
+                    <Label>Customer Email</Label>
                     <Input
                       type="email"
                       value={form.customer_email}
@@ -398,13 +366,9 @@ export default function QuotationsTab() {
                   <Textarea rows={2} value={form.notes} onChange={(e) => setForm(p => ({ ...p, notes: e.target.value }))} />
                 </div>
               </div>
-              <DialogFooter className="gap-2">
+              <DialogFooter>
                 <Button variant="outline" onClick={() => { setShowForm(false); setEditing(null); }}>Cancel</Button>
-                <Button variant="secondary" onClick={() => handleSave({ downloadPdf: true })} disabled={saving}>
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
-                  {editing ? 'Save & Download PDF' : 'Save Draft & Download PDF'}
-                </Button>
-                <Button onClick={() => handleSave()} disabled={saving}>
+                <Button onClick={handleSave} disabled={saving}>
                   {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {editing ? 'Save Changes' : 'Save Draft'}
                 </Button>
