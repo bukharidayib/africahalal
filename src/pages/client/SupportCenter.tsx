@@ -202,8 +202,8 @@ export default function SupportCenter() {
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Phone Support</p>
-                                    <a href="tel:+260211123456" className="font-medium text-foreground hover:text-primary transition-colors">
-                                        +260 211 123 456
+                                    <a href="tel:+260979098880" className="font-medium text-foreground hover:text-primary transition-colors">
+                                        +260 97 9098880
                                     </a>
                                 </div>
                             </div>
