@@ -3108,6 +3108,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_delete_business_deep: {
+        Args: { _business_id: string }
+        Returns: Json
+      }
       assign_admin_role: {
         Args: {
           _email: string
