@@ -356,17 +356,6 @@ export default function Businesses() {
     </AdminLayout>
   );
 }
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </AdminLayout>
-  );
-}
 
 function SubBadge({ status, days }: { status?: SubStatus; days?: number | null }) {
   if (!status || status === 'none') return <Badge variant="outline">No cert</Badge>;
