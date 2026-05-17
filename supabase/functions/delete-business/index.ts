@@ -40,90 +40,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    const del = async (table: string, col: string, ids: string[]) => {
-      if (!ids.length) return;
-      const { error } = await admin.from(table).delete().in(col, ids);
-      if (error) console.warn(`delete ${table}.${col} failed:`, error.message);
-    };
-    const ids = (rows: any[] | null | undefined, key = 'id') =>
-      (rows || []).map((r: any) => r[key]).filter(Boolean);
-
-    // 1. Applications for this business
-    const { data: apps } = await admin
-      .from('certification_applications').select('id').eq('business_id', business_id);
-    const appIds = ids(apps);
-
-    if (appIds.length) {
-      // 2. Collect descendant ids per application
-      const [{ data: inspections }, { data: certs }, { data: ncns }, { data: invs }, { data: subs }, { data: quos }] = await Promise.all([
-        admin.from('inspections').select('id').in('application_id', appIds),
-        admin.from('certificates').select('id').in('application_id', appIds),
-        admin.from('non_conformance_notices').select('id').in('application_id', appIds),
-        admin.from('invoices').select('id').in('application_id', appIds),
-        admin.from('subscriptions').select('id').in('application_id', appIds),
-        admin.from('quotations').select('id').in('application_id', appIds),
-      ]);
-      const inspIds = ids(inspections);
-      const certIds = ids(certs);
-      const ncnIds = ids(ncns);
-      const invIds = ids(invs);
-      const subIds = ids(subs);
-      const quoIds = ids(quos);
-
-      // 3. Grandchildren of invoices
-      await del('payment_transactions', 'invoice_id', invIds);
-      await del('invoice_activity_log', 'invoice_id', invIds);
-      await del('invoice_items', 'invoice_id', invIds);
-
-      // 4. Grandchildren of NCNs
-      await del('corrective_actions', 'ncn_id', ncnIds);
-
-      // 5. Grandchildren of inspections
-      await del('inspection_reports', 'inspection_id', inspIds);
-      await del('inspection_checklist_items', 'inspection_id', inspIds);
-      await del('inspection_evidence', 'inspection_id', inspIds);
-      await del('inspection_notifications', 'inspection_id', inspIds);
-      // NCNs may also reference an inspection
-      if (inspIds.length) {
-        await admin.from('non_conformance_notices').delete().in('inspection_id', inspIds);
-      }
-
-      // 6. Grandchildren of certificates
-      await del('certificate_history', 'certificate_id', certIds);
-      // invoices reference certificates — null out before deleting certs
-      if (certIds.length) {
-        await admin.from('invoices').update({ certificate_id: null }).in('certificate_id', certIds);
-      }
-
-      // 7. Direct children of application
-      await del('application_status_history', 'application_id', appIds);
-      await del('application_documents', 'application_id', appIds);
-      await del('application_messages', 'application_id', appIds);
-      await del('application_products', 'application_id', appIds);
-      await del('certification_decisions', 'application_id', appIds);
-      await del('approval_requests', 'application_id', appIds);
-      await del('non_conformance_notices', 'application_id', appIds);
-      await del('inspections', 'application_id', appIds);
-      await del('invoices', 'application_id', appIds);
-      await del('certificates', 'application_id', appIds);
-      await del('subscriptions', 'application_id', appIds);
-      await del('quotations', 'application_id', appIds);
-
-      // 8. Applications
-      const { error: appDelErr } = await admin
-        .from('certification_applications').delete().in('id', appIds);
-      if (appDelErr) throw appDelErr;
+    // Single transactional deep delete in the DB
+    const { data, error } = await admin.rpc('admin_delete_business_deep', {
+      _business_id: business_id,
+    });
+    if (error) {
+      console.error('admin_delete_business_deep failed:', error);
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // 9. Quotations directly linked to the business (no application)
-    await admin.from('quotations').delete().eq('business_id', business_id);
-
-    // 10. Business
-    const { error: bizErr } = await admin
-      .from('client_businesses').delete().eq('id', business_id);
-    if (bizErr) throw bizErr;
-
-    return new Response(JSON.stringify({ success: true, deleted_applications: appIds.length }), {
+    return new Response(JSON.stringify(data ?? { success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e: any) {
