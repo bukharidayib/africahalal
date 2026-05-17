@@ -51,6 +51,27 @@ export default function Businesses() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | SubStatus>('all');
   const [overdueSubs, setOverdueSubs] = useState(0);
+  const [toDelete, setToDelete] = useState<BusinessRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-business', {
+        body: { business_id: toDelete.id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: 'Business deleted', description: `${toDelete.entity_name} and all related records were removed.` });
+      setToDelete(null);
+      await load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete failed', description: e.message });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => { void load(); }, []);
 
