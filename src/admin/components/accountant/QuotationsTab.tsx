@@ -398,7 +398,11 @@ export default function QuotationsTab() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => { setShowForm(false); setEditing(null); }}>Cancel</Button>
-                <Button onClick={handleSave} disabled={saving}>
+                <Button variant="secondary" onClick={() => handleSave({ downloadPdf: true })} disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
+                  {editing ? 'Save & Download PDF' : 'Save Draft & Download PDF'}
+                </Button>
+                <Button onClick={() => handleSave()} disabled={saving}>
                   {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {editing ? 'Save Changes' : 'Save Draft'}
                 </Button>
