@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Video, User, Clock, ArrowRight, MessageSquare } from 'lucide-react';
+import { Video, User, Clock, ArrowRight, MessageSquare, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 
 interface ChatSession {
   id: string;
@@ -29,6 +31,7 @@ export default function AdminSupportChats() {
   const [activeChats, setActiveChats] = useState<ChatSession[]>([]);
   const [endedChats, setEndedChats] = useState<ChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<ChatSession | null>(null);
 
   useEffect(() => {
     fetchChats();
@@ -134,7 +137,20 @@ export default function AdminSupportChats() {
     }
   }
 
-  const ChatCard = ({ chat, isActive }: { chat: ChatSession; isActive: boolean }) => (
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      const { error } = await supabase.from('chat_sessions').delete().eq('id', deleteTarget.id);
+      if (error) throw error;
+      toast.success('Chat session deleted');
+      setDeleteTarget(null);
+      fetchChats();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete');
+    }
+  }
+
+  const ChatCard = ({ chat, isActive, onDelete }: { chat: ChatSession; isActive: boolean; onDelete: (chat: ChatSession) => void }) => (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
@@ -180,12 +196,17 @@ export default function AdminSupportChats() {
               </div>
             </div>
           </div>
-          <Button asChild size="sm">
-            <Link to={`/admin/support/chats/${chat.id}`}>
-              {isActive ? 'Join Chat' : 'View'}
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" title="Delete" onClick={() => onDelete(chat)}>
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+            <Button asChild size="sm">
+              <Link to={`/admin/support/chats/${chat.id}`}>
+                {isActive ? 'Join Chat' : 'View'}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -232,7 +253,7 @@ export default function AdminSupportChats() {
             ) : (
               <div className="grid gap-4">
                 {activeChats.map((chat) => (
-                  <ChatCard key={chat.id} chat={chat} isActive={true} />
+                  <ChatCard key={chat.id} chat={chat} isActive={true} onDelete={setDeleteTarget} />
                 ))}
               </div>
             )}
@@ -254,13 +275,28 @@ export default function AdminSupportChats() {
             ) : (
               <div className="grid gap-4">
                 {endedChats.map((chat) => (
-                  <ChatCard key={chat.id} chat={chat} isActive={false} />
+                  <ChatCard key={chat.id} chat={chat} isActive={false} onDelete={setDeleteTarget} />
                 ))}
               </div>
             )}
           </TabsContent>
         </Tabs>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this chat session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the chat session with {deleteTarget?.profile?.full_name || 'this user'} and all its messages. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }

@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, FileText, ClipboardList, AlertTriangle, TrendingUp, Eye, Search, Download } from "lucide-react";
+import { Loader2, FileText, ClipboardList, AlertTriangle, TrendingUp, Eye, Search, Download, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 const REPORT_TYPE_LABELS: Record<string, string> = {
   daily_checklist: "Daily Checklist",
@@ -53,17 +55,17 @@ export default function AdminReports() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState("all");
+  const [deleteTarget, setDeleteTarget] = useState<UnifiedRow | null>(null);
 
-  useEffect(() => {
-    async function load() {
-      setIsLoading(true);
-      try {
-        const [insRes, supRes, insIncRes, supIncRes] = await Promise.all([
-          (supabase.from("inspector_reports" as any).select("*").order("created_at", { ascending: false }).limit(500) as any),
-          (supabase.from("supervisor_reports" as any).select("*").order("created_at", { ascending: false }).limit(500) as any),
-          (supabase.from("inspector_incidents" as any).select("*").order("created_at", { ascending: false }).limit(500) as any),
-          (supabase.from("supervisor_incidents" as any).select("*").order("created_at", { ascending: false }).limit(500) as any),
-        ]);
+  async function loadAll() {
+    setIsLoading(true);
+    try {
+      const [insRes, supRes, insIncRes, supIncRes] = await Promise.all([
+        (supabase.from("inspector_reports" as any).select("*").order("created_at", { ascending: false }).limit(500) as any),
+        (supabase.from("supervisor_reports" as any).select("*").order("created_at", { ascending: false }).limit(500) as any),
+        (supabase.from("inspector_incidents" as any).select("*").order("created_at", { ascending: false }).limit(500) as any),
+        (supabase.from("supervisor_incidents" as any).select("*").order("created_at", { ascending: false }).limit(500) as any),
+      ]);
 
         const inspectorReports = (insRes.data as any[]) || [];
         const supervisorReports = (supRes.data as any[]) || [];
@@ -169,9 +171,28 @@ export default function AdminReports() {
       } finally {
         setIsLoading(false);
       }
+  }
+
+  useEffect(() => { loadAll(); }, []);
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const tableMap: Record<string, Record<string, string>> = {
+      inspector: { report: "inspector_reports", incident: "inspector_incidents" },
+      supervisor: { report: "supervisor_reports", incident: "supervisor_incidents" },
+    };
+    const table = tableMap[deleteTarget.source]?.[deleteTarget.kind];
+    if (!table) return;
+    try {
+      const { error } = await (supabase.from(table as any).delete().eq("id", deleteTarget.id) as any);
+      if (error) throw error;
+      toast.success("Record deleted");
+      setDeleteTarget(null);
+      loadAll();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete");
     }
-    load();
-  }, []);
+  }
 
   const stats = useMemo(() => {
     const reports = rows.filter((r) => r.kind === "report");
@@ -295,19 +316,34 @@ export default function AdminReports() {
               </TabsList>
             </div>
 
-            <TabsContent value="all"><ReportTable data={allFiltered} onExport={() => exportCsv(allFiltered, "all-reports")} /></TabsContent>
-            <TabsContent value="inspector"><ReportTable data={inspectorReportRows} onExport={() => exportCsv(inspectorReportRows, "inspector-reports")} /></TabsContent>
-            <TabsContent value="supervisor"><ReportTable data={supervisorReportRows} onExport={() => exportCsv(supervisorReportRows, "supervisor-reports")} /></TabsContent>
-            <TabsContent value="monthly"><ReportTable data={monthlyReportRows} onExport={() => exportCsv(monthlyReportRows, "monthly-performance")} /></TabsContent>
-            <TabsContent value="incidents"><ReportTable data={incidentRows} onExport={() => exportCsv(incidentRows, "incidents")} showSeverity /></TabsContent>
+            <TabsContent value="all"><ReportTable data={allFiltered} onExport={() => exportCsv(allFiltered, "all-reports")} onDelete={setDeleteTarget} /></TabsContent>
+            <TabsContent value="inspector"><ReportTable data={inspectorReportRows} onExport={() => exportCsv(inspectorReportRows, "inspector-reports")} onDelete={setDeleteTarget} /></TabsContent>
+            <TabsContent value="supervisor"><ReportTable data={supervisorReportRows} onExport={() => exportCsv(supervisorReportRows, "supervisor-reports")} onDelete={setDeleteTarget} /></TabsContent>
+            <TabsContent value="monthly"><ReportTable data={monthlyReportRows} onExport={() => exportCsv(monthlyReportRows, "monthly-performance")} onDelete={setDeleteTarget} /></TabsContent>
+            <TabsContent value="incidents"><ReportTable data={incidentRows} onExport={() => exportCsv(incidentRows, "incidents")} showSeverity onDelete={setDeleteTarget} /></TabsContent>
           </Tabs>
         )}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the {deleteTarget?.kind} from {deleteTarget?.authorName} ({deleteTarget?.orgName}). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }
 
-function ReportTable({ data, onExport, showSeverity }: { data: UnifiedRow[]; onExport: () => void; showSeverity?: boolean }) {
+function ReportTable({ data, onExport, showSeverity, onDelete }: { data: UnifiedRow[]; onExport: () => void; showSeverity?: boolean; onDelete?: (row: UnifiedRow) => void }) {
   if (data.length === 0) {
     return (
       <Card>
@@ -357,9 +393,16 @@ function ReportTable({ data, onExport, showSeverity }: { data: UnifiedRow[]; onE
                     </>
                   )}
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link to={r.detailHref}><Eye className="h-4 w-4 mr-1" /> View</Link>
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link to={r.detailHref}><Eye className="h-4 w-4 mr-1" /> View</Link>
+                      </Button>
+                      {onDelete && (
+                        <Button variant="ghost" size="icon" title="Delete" onClick={() => onDelete(r)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

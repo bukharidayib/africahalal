@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, FlaskConical, Brain, CheckCircle2, XCircle, AlertTriangle, HelpCircle, Search } from "lucide-react";
+import { Loader2, FlaskConical, Brain, CheckCircle2, XCircle, AlertTriangle, HelpCircle, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 const statusColors: Record<string, string> = {
@@ -33,6 +34,7 @@ export default function IngredientTracker() {
   const [ingredients, setIngredients] = useState<any[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const { toast } = useToast();
 
   const loadCollections = async () => {
@@ -55,6 +57,22 @@ export default function IngredientTracker() {
       .order("created_at") as any);
     setIngredients((data as any[]) || []);
     setIsDetailOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      const { error } = await (supabase
+        .from("supervisor_ingredient_collections" as any)
+        .delete()
+        .eq("id", deleteTarget.id) as any);
+      if (error) throw error;
+      toast({ title: "Collection deleted" });
+      setDeleteTarget(null);
+      loadCollections();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Failed to delete", description: err.message });
+    }
   };
 
   const analyzeWithAI = async (collection: any) => {
@@ -257,15 +275,25 @@ export default function IngredientTracker() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant={c.status === "pending" ? "default" : "outline"}
-                        onClick={(e) => { e.stopPropagation(); analyzeWithAI(c); }}
-                        disabled={isAnalyzing === c.id}
-                      >
-                        {isAnalyzing === c.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Brain className="mr-1 h-3 w-3" />}
-                        {c.status === "pending" ? "Analyze" : "Re-analyze"}
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant={c.status === "pending" ? "default" : "outline"}
+                          onClick={(e) => { e.stopPropagation(); analyzeWithAI(c); }}
+                          disabled={isAnalyzing === c.id}
+                        >
+                          {isAnalyzing === c.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Brain className="mr-1 h-3 w-3" />}
+                          {c.status === "pending" ? "Analyze" : "Re-analyze"}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Delete"
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -340,6 +368,21 @@ export default function IngredientTracker() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this collection?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the ingredient collection for "{deleteTarget?.product_name}"{deleteTarget?.brand ? ` (${deleteTarget.brand})` : ''} and all its ingredients. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }

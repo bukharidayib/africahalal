@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, Search, Filter, ArrowRight, User } from 'lucide-react';
+import { MessageSquare, Search, Filter, ArrowRight, User, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,10 +19,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import { format, formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 
 interface Ticket {
   id: string;
@@ -46,6 +48,7 @@ export default function AdminSupportTickets() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [deleteTarget, setDeleteTarget] = useState<Ticket | null>(null);
 
   useEffect(() => {
     fetchTickets();
@@ -99,6 +102,19 @@ export default function AdminSupportTickets() {
       console.error('Error fetching tickets:', error);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      const { error } = await supabase.from('support_tickets').delete().eq('id', deleteTarget.id);
+      if (error) throw error;
+      toast.success('Ticket deleted');
+      setDeleteTarget(null);
+      fetchTickets();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete');
     }
   }
 
@@ -273,11 +289,16 @@ export default function AdminSupportTickets() {
                         {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}
                       </TableCell>
                       <TableCell>
-                        <Button asChild variant="ghost" size="sm">
-                          <Link to={`/admin/support/tickets/${ticket.id}`}>
-                            <ArrowRight className="h-4 w-4" />
-                          </Link>
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" title="Delete" onClick={() => setDeleteTarget(ticket)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                          <Button asChild variant="ghost" size="sm">
+                            <Link to={`/admin/support/tickets/${ticket.id}`}>
+                              <ArrowRight className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -287,6 +308,21 @@ export default function AdminSupportTickets() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this ticket?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete ticket {deleteTarget?.ticket_number} — "{deleteTarget?.subject}" and all its messages. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }

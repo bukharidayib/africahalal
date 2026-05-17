@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  AlertTriangle, 
-  Search, 
+import {
+  AlertTriangle,
+  Search,
   ChevronRight,
   Building2,
   Calendar,
@@ -11,7 +11,8 @@ import {
   XCircle,
   AlertCircle,
   FileWarning,
-  Plus
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -41,6 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -135,6 +137,9 @@ export default function Enforcement() {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState('ncns');
   
+  const [deleteNCN, setDeleteNCN] = useState<NCN | null>(null);
+  const [deleteCA, setDeleteCA] = useState<CorrectiveAction | null>(null);
+
   // Review dialog state
   const [selectedCA, setSelectedCA] = useState<CorrectiveAction | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
@@ -200,6 +205,32 @@ export default function Enforcement() {
       console.error('Error fetching enforcement data:', error);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function confirmDeleteNCN() {
+    if (!deleteNCN) return;
+    try {
+      const { error } = await supabase.from('non_conformance_notices').delete().eq('id', deleteNCN.id);
+      if (error) throw error;
+      toast.success('NCN deleted');
+      setDeleteNCN(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete');
+    }
+  }
+
+  async function confirmDeleteCA() {
+    if (!deleteCA) return;
+    try {
+      const { error } = await supabase.from('corrective_actions').delete().eq('id', deleteCA.id);
+      if (error) throw error;
+      toast.success('Corrective action deleted');
+      setDeleteCA(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete');
     }
   }
 
@@ -544,9 +575,14 @@ export default function Enforcement() {
                               <p className={`text-xs ${dueInfo.className}`}>{dueInfo.text}</p>
                             </TableCell>
                             <TableCell>
-                              <Button variant="ghost" size="icon">
-                                <ChevronRight className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" title="Delete" onClick={() => setDeleteNCN(ncn)}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                                <Button variant="ghost" size="icon">
+                                  <ChevronRight className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -628,13 +664,18 @@ export default function Enforcement() {
                               {format(new Date(ca.submitted_at), 'dd MMM yyyy')}
                             </TableCell>
                             <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setSelectedCA(ca)}
-                              >
-                                {(ca.status === 'pending' || ca.status === 'under_review') ? 'Review' : 'View'}
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" title="Delete" onClick={() => setDeleteCA(ca)}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setSelectedCA(ca)}
+                                >
+                                  {(ca.status === 'pending' || ca.status === 'under_review') ? 'Review' : 'View'}
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -926,6 +967,36 @@ export default function Enforcement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteNCN} onOpenChange={(o) => !o && setDeleteNCN(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this NCN?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete NCN {deleteNCN?.ncn_number} and all its associated corrective actions. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteNCN} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteCA} onOpenChange={(o) => !o && setDeleteCA(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this corrective action?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the corrective action for NCN {deleteCA?.non_conformance_notices?.ncn_number}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteCA} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }

@@ -10,7 +10,8 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  Clock
+  Clock,
+  Trash2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,9 +32,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInDays } from 'date-fns';
+import { toast } from 'sonner';
 import { CertificateDownloader } from '@/components/certificate/CertificateDownloader';
 
 type CertificateStatus = 'active' | 'suspended' | 'revoked' | 'expired';
@@ -64,6 +67,7 @@ export default function Certificates() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [deleteTarget, setDeleteTarget] = useState<Certificate | null>(null);
 
   useEffect(() => {
     fetchCertificates();
@@ -94,6 +98,19 @@ export default function Certificates() {
       console.error('Error fetching certificates:', error);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      const { error } = await supabase.from('certificates').delete().eq('id', deleteTarget.id);
+      if (error) throw error;
+      toast.success('Certificate deleted');
+      setDeleteTarget(null);
+      fetchCertificates();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete');
     }
   }
 
@@ -273,6 +290,9 @@ export default function Certificates() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Delete" onClick={() => setDeleteTarget(cert)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
                             <CertificateDownloader
                               certificateId={cert.id}
                               certificateNumber={cert.certificate_number}
@@ -301,6 +321,22 @@ export default function Certificates() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this certificate?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete certificate {deleteTarget?.certificate_number} for{' '}
+              {deleteTarget?.organizations?.name || 'this organization'}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }

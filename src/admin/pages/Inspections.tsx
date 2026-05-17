@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  ClipboardList, 
-  Search, 
+import {
+  ClipboardList,
+  Search,
   ChevronRight,
   Building2,
   Calendar,
@@ -10,7 +10,8 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  Play
+  Play,
+  Trash2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -40,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { AdminLayout } from '../components/layout/AdminLayout';
@@ -102,6 +104,8 @@ export default function Inspections() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  const [deleteTarget, setDeleteTarget] = useState<Inspection | null>(null);
+
   // Schedule dialog state
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [availableApplications, setAvailableApplications] = useState<Application[]>([]);
@@ -148,6 +152,19 @@ export default function Inspections() {
       console.error('Error fetching inspections:', error);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      const { error } = await supabase.from('inspections').delete().eq('id', deleteTarget.id);
+      if (error) throw error;
+      toast.success('Inspection deleted');
+      setDeleteTarget(null);
+      fetchInspections();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete');
     }
   }
 
@@ -469,11 +486,16 @@ export default function Inspections() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button asChild variant="ghost" size="icon">
-                            <Link to={`/admin/inspections/${insp.id}`}>
-                              <ChevronRight className="h-4 w-4" />
-                            </Link>
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" title="Delete" onClick={() => setDeleteTarget(insp)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                            <Button asChild variant="ghost" size="icon">
+                              <Link to={`/admin/inspections/${insp.id}`}>
+                                <ChevronRight className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -591,6 +613,23 @@ export default function Inspections() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this inspection?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the inspection for{' '}
+              {deleteTarget?.certification_applications?.organizations?.name || 'this organization'} scheduled on{' '}
+              {deleteTarget ? format(new Date(deleteTarget.scheduled_date), 'dd MMM yyyy') : ''}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }
