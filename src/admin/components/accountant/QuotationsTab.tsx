@@ -302,7 +302,7 @@ export default function QuotationsTab() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Customer Email</Label>
+                    <Label>Customer Email (optional)</Label>
                     <Input
                       type="email"
                       value={form.customer_email}
