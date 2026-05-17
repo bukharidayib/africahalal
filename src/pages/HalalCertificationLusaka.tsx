@@ -93,7 +93,7 @@ export default function HalalCertificationLusaka() {
                 </div>
                 <div className="flex items-center gap-3">
                   <Phone className="h-5 w-5 text-primary" />
-                  <p className="text-sm">+260972044414</p>
+                  <p className="text-sm">+260979098880</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <Mail className="h-5 w-5 text-primary" />
