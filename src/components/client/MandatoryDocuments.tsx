@@ -40,7 +40,7 @@ const mandatoryDocuments: MandatoryDocument[] = [
         id: "halal_policy",
         name: "Halal Policy Statement",
         description: "Company's halal compliance policy document",
-        required: true,
+        required: false,
         acceptedFormats: [".pdf", ".doc", ".docx"]
     },
     {
