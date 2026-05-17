@@ -2141,11 +2141,15 @@ export type Database = {
           created_at: string
           created_by: string | null
           currency: string
+          customer_address: string | null
+          customer_email: string | null
+          customer_name: string | null
           id: string
           items: Json
           notes: string | null
-          organization_id: string
+          organization_id: string | null
           quotation_number: string
+          recipient_emails: string[] | null
           rejected_at: string | null
           sent_at: string | null
           status: string
@@ -2165,11 +2169,15 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
           id?: string
           items?: Json
           notes?: string | null
-          organization_id: string
+          organization_id?: string | null
           quotation_number: string
+          recipient_emails?: string[] | null
           rejected_at?: string | null
           sent_at?: string | null
           status?: string
@@ -2189,11 +2197,15 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
           id?: string
           items?: Json
           notes?: string | null
-          organization_id?: string
+          organization_id?: string | null
           quotation_number?: string
+          recipient_emails?: string[] | null
           rejected_at?: string | null
           sent_at?: string | null
           status?: string
@@ -3096,6 +3108,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_delete_business_deep: {
+        Args: { _business_id: string }
+        Returns: Json
+      }
       assign_admin_role: {
         Args: {
           _email: string

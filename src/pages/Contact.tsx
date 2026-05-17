@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const contactInfo = [
   { icon: Mail, label: "Email", value: "info@africanhalaal.com", link: "mailto:info@africanhalaal.com" },
-  { icon: Phone, label: "Phone", value: "+260 972 044 414", link: "tel:+260972044414" },
+  { icon: Phone, label: "Phone", value: "+260 97 9098880", link: "tel:+260979098880" },
   { icon: MapPin, label: "Address", value: "Lusaka, Zambia (Main Headquarters)" },
   { icon: Clock, label: "Hours", value: "Mon-Fri: 8:00 AM - 5:00 PM (CAT)" },
 ];
@@ -87,7 +87,7 @@ export default function Contact() {
     <Layout>
       <SEO
         title="Contact African Halal Institute — Halal Certification Enquiries Zambia"
-        description="Contact AHI in Lusaka, Zambia for Halal certification enquiries, applications, and support. Phone: +260 972 044 414. Email: info@africanhalaal.com."
+        description="Contact AHI in Lusaka, Zambia for Halal certification enquiries, applications, and support. Phone: +260 97 9098880. Email: info@africanhalaal.com."
         keywords="contact AHI, halal certification contact zambia, african halal institute phone"
         canonicalPath="/contact"
       />

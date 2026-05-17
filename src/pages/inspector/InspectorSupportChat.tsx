@@ -135,7 +135,7 @@ export default function InspectorSupportChat() {
               Prefer other contact methods?{" "}
               <a href="mailto:support@africanhalaal.com" className="text-primary hover:underline"><Mail className="h-3 w-3 inline mr-1" />Email us</a>
               {" or "}
-              <a href="tel:+260211123456" className="text-primary hover:underline"><Phone className="h-3 w-3 inline mr-1" />Call us</a>
+              <a href="tel:+260979098880" className="text-primary hover:underline"><Phone className="h-3 w-3 inline mr-1" />Call us</a>
             </p>
           </CardContent>
         </Card>

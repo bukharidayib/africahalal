@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Search, Eye, Loader2, AlertTriangle, CalendarClock } from 'lucide-react';
+import { Building2, Search, Eye, Loader2, AlertTriangle, CalendarClock, Trash2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -47,6 +51,27 @@ export default function Businesses() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | SubStatus>('all');
   const [overdueSubs, setOverdueSubs] = useState(0);
+  const [toDelete, setToDelete] = useState<BusinessRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-business', {
+        body: { business_id: toDelete.id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: 'Business deleted', description: `${toDelete.entity_name} and all related records were removed.` });
+      setToDelete(null);
+      await load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete failed', description: e.message });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => { void load(); }, []);
 
@@ -283,9 +308,19 @@ export default function Businesses() {
                         {r.outstanding ? `ZMW ${r.outstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button asChild variant="outline" size="sm">
-                          <Link to={`/admin/businesses/${r.id}`}><Eye className="h-4 w-4 mr-1" /> Open</Link>
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button asChild variant="outline" size="sm">
+                            <Link to={`/admin/businesses/${r.id}`}><Eye className="h-4 w-4 mr-1" /> Open</Link>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setToDelete(r)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -295,6 +330,29 @@ export default function Businesses() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && !deleting && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this business?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to permanently delete <strong>{toDelete?.entity_name}</strong>. This will also remove all
+              related applications, certificates, inspections, invoices, subscriptions, quotations, NCNs, messages,
+              documents and history. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void handleDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Deleting…</> : 'Delete permanently'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }
