@@ -400,7 +400,7 @@ export default function CertificationApplication() {
                 }
                 return true;
             case 4: {
-                const requiredDocIds = ["business_registration", "tax_clearance", "ingredient_spec", "halal_policy"];
+                const requiredDocIds = ["business_registration", "tax_clearance", "ingredient_spec"];
                 const uploadedDocIds = formData.uploadedFiles.map(f => f.documentId);
                 const missingDocs = requiredDocIds.filter(id => !uploadedDocIds.includes(id));
                 if (missingDocs.length > 0) {
