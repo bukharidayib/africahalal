@@ -132,7 +132,7 @@ export function useAdminAuth() {
         if (error) {
           console.warn('Session error:', error.message);
           if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token')) {
-            try { await supabase.auth.signOut(); } catch (e) {}
+            try { await supabase.auth.signOut(); } catch (signOutError) { console.warn('Failed to clear invalid admin session:', signOutError); }
           }
           if (isMounted) setState(unauthenticatedState);
           return;
@@ -215,11 +215,12 @@ export function useAdminAuth() {
 
         navigate('/admin/dashboard');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Login failed. Please check your credentials.';
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: err.message || 'Login failed. Please check your credentials.',
+        error: message,
       }));
     }
   };
