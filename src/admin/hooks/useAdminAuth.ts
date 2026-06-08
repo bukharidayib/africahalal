@@ -45,33 +45,24 @@ export function useAdminAuth() {
 
   const fetchUserRoleAndPermissions = useCallback(async (userId: string): Promise<{ role: AdminRole | null; permissions: Permission }> => {
     try {
-      // Fetch role
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role_id, admin_roles!inner(name, status)')
-        .eq('user_id', userId)
-        .limit(1)
-        .single();
+      const { data: isAdmin, error: accessError } = await supabase.rpc('is_admin_user', {
+        _user_id: userId,
+      });
 
-      if (error) {
-        console.error('Error fetching user role:', error);
+      if (accessError || !isAdmin) {
+        if (accessError) console.error('Error checking admin access:', accessError);
         return { role: null, permissions: getPermissions(null) };
       }
 
-      const roleData = (data as any)?.admin_roles;
-      const roleName = roleData?.name;
-      const roleStatus = roleData?.status;
+      const { data: roleName, error: roleError } = await supabase.rpc('get_user_role', {
+        _user_id: userId,
+      });
 
-      if (roleStatus === 'suspended') {
-        console.warn('User role is suspended:', roleName);
+      if (roleError || !roleName) {
+        if (roleError) console.error('Error fetching user role:', roleError);
         return { role: null, permissions: getPermissions(null) };
       }
 
-      if (!roleName) {
-        return { role: null, permissions: getPermissions(null) };
-      }
-
-      // Fetch dynamic permissions from DB
       const { data: permCodes, error: permError } = await supabase.rpc('get_user_permissions', {
         _user_id: userId,
       });
