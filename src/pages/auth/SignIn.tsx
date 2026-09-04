@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, Lock, Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,13 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const businessInvite = searchParams.get("business_invite") || "";
+
+  useEffect(() => {
+    const invitedEmail = searchParams.get("email");
+    if (invitedEmail) setEmail(invitedEmail);
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +76,21 @@ export default function SignIn() {
       }
 
       if (userData?.user) {
+        if (businessInvite) {
+          const { data, error: inviteError } = await supabase.functions.invoke('accept-business-user-invitation', {
+            body: { email, token: businessInvite },
+          });
+          if (inviteError || (data as any)?.error) {
+            toast({
+              variant: "destructive",
+              title: "Invitation Not Accepted",
+              description: (data as any)?.error || inviteError?.message || "Please ask an admin to resend the invitation.",
+            });
+            setIsLoading(false);
+            return;
+          }
+        }
+
         const lastSignIn = userData.user.last_sign_in_at;
         const createdAt = userData.user.created_at;
         // If first sign-in (last_sign_in_at is very close to now, meaning this is the first time)
@@ -180,9 +202,9 @@ export default function SignIn() {
 
 
                         <p className="text-center text-sm text-muted-foreground pt-4">
-                            Don't have a portal account?{""}
-                            <Link to="/auth/signup" className="ml-1 font-semibold text-primary hover:text-primary/80 underline-offset-4 hover:underline">
-                                Create Account
+                            Client accounts are created by AHI. Need help accessing your account?{" "}
+                            <Link to="/contact" className="font-semibold text-primary hover:text-primary/80 underline-offset-4 hover:underline">
+                                Contact us
                             </Link>
                         </p>
                     </div>

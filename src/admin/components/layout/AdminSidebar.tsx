@@ -82,6 +82,12 @@ const navItems: NavItem[] = [
     permission: 'canViewApplications',
   },
   {
+    title: 'Client Users',
+    href: '/admin/client-users',
+    icon: Users,
+    permission: 'canManageUsers',
+  },
+  {
     title: 'Certificates',
     href: '/admin/certificates',
     icon: Award,

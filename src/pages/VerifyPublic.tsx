@@ -13,10 +13,10 @@ import {
     BadgeCheck,
     Calendar,
     Building2,
-    ExternalLink,
     Info,
     ArrowRight,
-    Clock
+    Clock,
+    MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +44,7 @@ export default function VerifyPublic() {
 
             if (error) throw error;
 
-            const cert = data && data.length > 0 ? data[0] : null;
+            const cert = data && data.length > 0 ? data[0] as any : null;
 
             if (cert) {
                 setResult({
@@ -55,7 +55,11 @@ export default function VerifyPublic() {
                     issueDate: new Date(cert.issue_date).toLocaleDateString(),
                     expiryDate: new Date(cert.expiry_date).toLocaleDateString(),
                     status: cert.status,
-                    type: "Standard Halal Accreditation"
+                    type: "Standard Halal Accreditation",
+                    businessType: cert.business_type,
+                    parentBusinessName: cert.parent_business_name,
+                    pacraNumber: cert.pacra_number || cert.organization_registration_number,
+                    location: [cert.address, cert.city, cert.country].filter(Boolean).join(", "),
                 });
             } else {
                 setResult({ valid: false });
@@ -136,6 +140,9 @@ export default function VerifyPublic() {
                                                     <Building2 className="h-3 w-3" /> Certified Entity
                                                 </span>
                                                 <span className="font-bold text-foreground block line-clamp-1">{result.entity}</span>
+                                                {result.businessType === "branch" && result.parentBusinessName && (
+                                                    <span className="text-xs text-muted-foreground block line-clamp-1">Branch of {result.parentBusinessName}</span>
+                                                )}
                                             </div>
                                             <div className="p-4 rounded-xl bg-white/60 border shadow-sm space-y-1">
                                                 <span className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
@@ -155,6 +162,14 @@ export default function VerifyPublic() {
                                                 </span>
                                                 <span className="font-bold text-secondary block line-clamp-1">{result.expiryDate}</span>
                                             </div>
+                                            {result.location && (
+                                                <div className="p-4 rounded-xl bg-white/60 border shadow-sm space-y-1 md:col-span-2">
+                                                    <span className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
+                                                        <MapPin className="h-3 w-3" /> Certified Location
+                                                    </span>
+                                                    <span className="font-bold text-foreground block line-clamp-1">{result.location}</span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="w-full pt-8 space-y-4">

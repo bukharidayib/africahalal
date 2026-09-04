@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
@@ -21,8 +22,12 @@ import {
 interface Business {
     id: string;
     entity_name: string;
+    branch_name?: string | null;
     pacra_number: string;
+    business_type?: string;
+    parent_business_id?: string | null;
     created_at: string;
+    user_id: string;
 }
 
 export default function MyBusinesses() {
@@ -32,6 +37,7 @@ export default function MyBusinesses() {
     const [editBiz, setEditBiz] = useState<Business | null>(null);
     const [deleteBiz, setDeleteBiz] = useState<Business | null>(null);
     const [form, setForm] = useState({ entity_name: "", pacra_number: "" });
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const { toast } = useToast();
@@ -40,6 +46,8 @@ export default function MyBusinesses() {
 
     const fetchBusinesses = async () => {
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            setCurrentUserId(user?.id || null);
             const { data, error } = await supabase.from('client_businesses')
                 .select('*').order('created_at', { ascending: false });
             if (error) throw error;
@@ -75,15 +83,18 @@ export default function MyBusinesses() {
 
     const handleOpenEdit = (biz: Business) => {
         setEditBiz(biz);
-        setForm({ entity_name: biz.entity_name, pacra_number: biz.pacra_number });
+        setForm({ entity_name: biz.branch_name || biz.entity_name, pacra_number: biz.pacra_number });
     };
 
     const handleSaveEdit = async () => {
-        if (!editBiz || !form.entity_name || !form.pacra_number) return;
+        if (!editBiz || !form.entity_name || ((editBiz.business_type || 'business') !== 'branch' && !form.pacra_number)) return;
         setIsSaving(true);
         try {
+            const updatePayload: any = { entity_name: form.entity_name };
+            if ((editBiz.business_type || 'business') === 'branch') updatePayload.branch_name = form.entity_name;
+            else updatePayload.pacra_number = form.pacra_number;
             const { error } = await supabase.from('client_businesses')
-                .update({ entity_name: form.entity_name, pacra_number: form.pacra_number })
+                .update(updatePayload)
                 .eq('id', editBiz.id);
             if (error) throw error;
             toast({ title: "Updated", description: "Business details updated." });
@@ -143,19 +154,31 @@ export default function MyBusinesses() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {businesses.map((biz) => (
+                                    {businesses.map((biz) => {
+                                        const isBranch = (biz.business_type || 'business') === 'branch';
+                                        const isOwner = biz.user_id === currentUserId;
+                                        return (
                                         <TableRow key={biz.id}>
-                                            <TableCell className="font-medium">{biz.entity_name}</TableCell>
+                                            <TableCell className="font-medium">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {biz.branch_name || biz.entity_name}
+                                                    <Badge variant={isBranch ? "secondary" : "outline"}>{isBranch ? "Branch" : "Business"}</Badge>
+                                                    {!isOwner && <Badge variant="default">Managed</Badge>}
+                                                </div>
+                                            </TableCell>
                                             <TableCell className="font-mono text-sm">{biz.pacra_number}</TableCell>
                                             <TableCell className="text-sm text-muted-foreground">{new Date(biz.created_at).toLocaleDateString()}</TableCell>
                                             <TableCell>
                                                 <div className="flex items-center justify-end gap-1">
                                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEdit(biz)}><Pencil className="h-4 w-4" /></Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteBiz(biz)}><Trash2 className="h-4 w-4" /></Button>
+                                                    {isOwner && (
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteBiz(biz)}><Trash2 className="h-4 w-4" /></Button>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                    ))}
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         )}
@@ -197,7 +220,8 @@ export default function MyBusinesses() {
                             </div>
                             <div className="space-y-2">
                                 <Label>PACRA Registration Number *</Label>
-                                <Input value={form.pacra_number} onChange={(e) => setForm(p => ({ ...p, pacra_number: e.target.value }))} />
+                                <Input value={form.pacra_number} onChange={(e) => setForm(p => ({ ...p, pacra_number: e.target.value }))} disabled={(editBiz?.business_type || 'business') === 'branch'} />
+                                {(editBiz?.business_type || 'business') === 'branch' && <p className="text-xs text-muted-foreground">Branch PACRA is inherited from the parent business.</p>}
                             </div>
                         </div>
                         <DialogFooter>

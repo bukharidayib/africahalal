@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Search, Eye, Loader2, AlertTriangle, CalendarClock, Trash2 } from 'lucide-react';
+import { Building2, Search, Eye, Loader2, AlertTriangle, CalendarClock, Trash2, Plus, CheckCircle2, XCircle } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -12,6 +12,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,8 +29,12 @@ type SubStatus = 'active' | 'expiring' | 'expired' | 'none';
 interface BusinessRow {
   id: string;
   entity_name: string;
+  branch_name?: string | null;
+  business_type?: 'business' | 'branch' | string;
+  parent_business_id?: string | null;
   pacra_number: string;
-  user_id: string;
+  sector?: string | null;
+  user_id: string | null;
   organization_id: string | null;
   created_at: string;
   owner_email?: string | null;
@@ -34,6 +45,11 @@ interface BusinessRow {
   outstanding?: number;
   days_to_expiry?: number | null;
   sub_status?: SubStatus;
+  parent_name?: string | null;
+  inherited_pacra_number?: string | null;
+  branch_count?: number;
+  directory_visible?: boolean;
+  directory_status?: 'listed' | 'hidden' | 'pending_review' | string;
 }
 
 const FILTERS: { key: 'all' | SubStatus; label: string }[] = [
@@ -50,9 +66,26 @@ export default function Businesses() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | SubStatus>('all');
+  const [kindFilter, setKindFilter] = useState<'all' | 'business' | 'branch'>('all');
   const [overdueSubs, setOverdueSubs] = useState(0);
   const [toDelete, setToDelete] = useState<BusinessRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [pacraCheck, setPacraCheck] = useState<'idle' | 'checking' | 'available' | 'registered' | 'error'>('idle');
+  const [pacraCheckMessage, setPacraCheckMessage] = useState('');
+  const [createForm, setCreateForm] = useState({
+    entity_name: '',
+    pacra_number: '',
+    sector: '',
+    address: '',
+    city: '',
+    contact_name: '',
+    contact_email: '',
+    contact_phone: '',
+    status: 'active',
+    directory_visible: true,
+  });
 
   const handleDelete = async () => {
     if (!toDelete) return;
@@ -75,6 +108,115 @@ export default function Businesses() {
 
   useEffect(() => { void load(); }, []);
 
+  useEffect(() => {
+    const pacraNumber = createForm.pacra_number.trim().toUpperCase();
+    if (!pacraNumber) {
+      setPacraCheck('idle');
+      setPacraCheckMessage('');
+      return;
+    }
+
+    setPacraCheck('checking');
+    setPacraCheckMessage('Checking PACRA number…');
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .eq('registration_number', pacraNumber)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (error) {
+        setPacraCheck('error');
+        setPacraCheckMessage('Could not verify PACRA number. You can still submit and the server will verify it.');
+      } else if (data) {
+        setPacraCheck('registered');
+        setPacraCheckMessage(`Already registered: ${data.name}`);
+      } else {
+        setPacraCheck('available');
+        setPacraCheckMessage('PACRA number is available');
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [createForm.pacra_number]);
+
+  const resetCreateForm = () => setCreateForm({
+    entity_name: '',
+    pacra_number: '',
+    sector: '',
+    address: '',
+    city: '',
+    contact_name: '',
+    contact_email: '',
+    contact_phone: '',
+    status: 'active',
+    directory_visible: true,
+  });
+
+  const handleCreateBusiness = async () => {
+    if (!createForm.entity_name.trim() || !createForm.pacra_number.trim() || !createForm.contact_email.trim()) {
+      toast({ variant: 'destructive', title: 'Missing registration details', description: 'Business name, PACRA number and owner email are required.' });
+      return;
+    }
+    if (pacraCheck === 'registered') {
+      toast({ variant: 'destructive', title: 'PACRA number already registered', description: pacraCheckMessage });
+      return;
+    }
+    setCreating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('register-business', {
+        body: {
+          business_name: createForm.entity_name.trim(),
+          pacra_number: createForm.pacra_number.trim(),
+          sector: createForm.sector.trim() || 'General',
+          address: createForm.address.trim() || null,
+          city: createForm.city.trim() || null,
+          status: createForm.status,
+          contact_name: createForm.contact_name.trim() || null,
+          contact_email: createForm.contact_email.trim().toLowerCase(),
+          contact_phone: createForm.contact_phone.trim() || null,
+          directory_visible: createForm.directory_visible,
+        },
+      });
+      if (error) {
+        let serverMessage = error.message;
+        const functionError = error as any;
+        try {
+          const responseBody = functionError.context && typeof functionError.context.json === 'function'
+            ? await functionError.context.json()
+            : null;
+          if (responseBody?.error) serverMessage = responseBody.error;
+        } catch {
+          // The response may already have been consumed by supabase-js.
+        }
+        throw new Error(serverMessage);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      const invitationSent = Boolean((data as any)?.invitation_sent);
+      const invitationError = (data as any)?.invitation_error as string | null;
+      toast({
+        title: invitationSent ? 'Business registered' : 'Business registered; invitation pending',
+        description: invitationSent
+          ? 'The business owner invitation email has been sent.'
+          : `The business was saved, but the invitation email could not be sent${invitationError ? `: ${invitationError}` : '. Check the email service configuration.'}`,
+        variant: invitationSent ? 'default' : 'destructive',
+      });
+      resetCreateForm();
+      setCreateOpen(false);
+      await load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Registration failed', description: e.message });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const load = async () => {
     setLoading(true);
     try {
@@ -87,10 +229,20 @@ export default function Businesses() {
 
       const userIds = Array.from(new Set(list.map((b) => b.user_id).filter(Boolean)));
       const orgIds = Array.from(new Set(list.map((b) => b.organization_id).filter(Boolean) as string[]));
+      const businessMap = new Map(list.map((b) => [b.id, b]));
+      const branchCountByParent = new Map<string, number>();
+      list.forEach((b) => {
+        if (b.parent_business_id) {
+          branchCountByParent.set(b.parent_business_id, (branchCountByParent.get(b.parent_business_id) || 0) + 1);
+        }
+      });
 
-      const [{ data: profiles }, { data: certs }, { data: apps }, { data: invs }] = await Promise.all([
+      const [{ data: profiles }, { data: orgs }, { data: certs }, { data: apps }, { data: invs }] = await Promise.all([
         userIds.length
           ? supabase.from('profiles').select('id, email, full_name').in('id', userIds)
+          : Promise.resolve({ data: [] as any[] }),
+        orgIds.length
+          ? supabase.from('organizations').select('id, sector').in('id', orgIds)
           : Promise.resolve({ data: [] as any[] }),
         orgIds.length
           ? supabase.from('certificates').select('organization_id, certificate_number, status, expiry_date').in('organization_id', orgIds)
@@ -104,6 +256,7 @@ export default function Businesses() {
       ]);
 
       const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+      const sectorByOrg = new Map((orgs || []).map((o: any) => [o.id, o.sector]));
       const activeCertByOrg = new Map<string, number>();
       const latestExpiryByOrg = new Map<string, string>();
       const activeCertNumberByOrg = new Map<string, string>();
@@ -133,6 +286,7 @@ export default function Businesses() {
       const enriched: BusinessRow[] = list.map((b) => {
         const p: any = profileMap.get(b.user_id);
         const orgId = b.organization_id || '';
+        const parent = b.parent_business_id ? businessMap.get(b.parent_business_id) : null;
         const expiry = latestExpiryByOrg.get(orgId);
         const activeCount = orgId ? (activeCertByOrg.get(orgId) || 0) : 0;
         let subStatus: SubStatus = 'none';
@@ -145,8 +299,12 @@ export default function Businesses() {
         }
         return {
           ...b,
+          sector: orgId ? sectorByOrg.get(orgId) || null : null,
           owner_email: p?.email || null,
           owner_name: p?.full_name || null,
+          parent_name: parent?.entity_name || null,
+          inherited_pacra_number: parent?.pacra_number || b.pacra_number,
+          branch_count: branchCountByParent.get(b.id) || 0,
           active_certs: activeCount,
           active_cert_number: orgId ? (activeCertNumberByOrg.get(orgId) || null) : null,
           open_apps: appsByBiz.get(b.id) || 0,
@@ -185,17 +343,21 @@ export default function Businesses() {
 
   const filtered = useMemo(() => {
     let list = rows;
+    if (kindFilter !== 'all') list = list.filter((r) => (r.business_type || 'business') === kindFilter);
     if (filter !== 'all') list = list.filter((r) => r.sub_status === filter);
     if (search) {
       const s = search.toLowerCase();
       list = list.filter((r) =>
         r.entity_name?.toLowerCase().includes(s) ||
+        r.branch_name?.toLowerCase().includes(s) ||
+        r.parent_name?.toLowerCase().includes(s) ||
         r.pacra_number?.toLowerCase().includes(s) ||
+        r.inherited_pacra_number?.toLowerCase().includes(s) ||
         r.owner_email?.toLowerCase().includes(s),
       );
     }
     return list;
-  }, [rows, search, filter]);
+  }, [rows, search, filter, kindFilter]);
 
   return (
     <AdminLayout>
@@ -205,6 +367,12 @@ export default function Businesses() {
             <Building2 className="h-6 w-6" /> Businesses
           </h1>
           <p className="text-muted-foreground">Unified hub for every certified business — applications, certificates, subscriptions, invoices, documents and history.</p>
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Register Business
+          </Button>
         </div>
 
         {(counts.expiring > 0 || counts.expired > 0 || overdueSubs > 0) && (
@@ -244,6 +412,18 @@ export default function Businesses() {
               <Input placeholder="Search by name, PACRA #, or owner email…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
             </div>
             <div className="flex gap-2 flex-wrap">
+              {(['all', 'business', 'branch'] as const).map((kind) => (
+                <Button
+                  key={kind}
+                  variant={kindFilter === kind ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setKindFilter(kind)}
+                >
+                  {kind === 'all' ? 'All units' : kind === 'business' ? 'Parent businesses' : 'Branches'}
+                </Button>
+              ))}
+            </div>
+            <div className="flex gap-2 flex-wrap">
               {FILTERS.map((f) => (
                 <Button
                   key={f.key}
@@ -268,11 +448,13 @@ export default function Businesses() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Business</TableHead>
+                    <TableHead>Business Name</TableHead>
                     <TableHead>PACRA #</TableHead>
+                    <TableHead>Sector</TableHead>
                     <TableHead>Owner</TableHead>
                     <TableHead>Certificate</TableHead>
                     <TableHead>Subscription</TableHead>
+                    <TableHead>Directory</TableHead>
                     <TableHead>Open Apps</TableHead>
                     <TableHead>Outstanding</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -281,8 +463,18 @@ export default function Businesses() {
                 <TableBody>
                   {filtered.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.entity_name}</TableCell>
-                      <TableCell className="font-mono text-xs">{r.pacra_number}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col">
+                          <span>{r.business_type === 'branch' ? (r.branch_name || r.entity_name) : r.entity_name}</span>
+                          {r.business_type === 'branch' ? (
+                            <span className="text-xs text-muted-foreground">Branch of {r.parent_name || 'parent business'}</span>
+                          ) : r.branch_count ? (
+                            <span className="text-xs text-muted-foreground">{r.branch_count} branch(es)</span>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{r.inherited_pacra_number || r.pacra_number}</TableCell>
+                      <TableCell className="text-sm">{r.sector || '—'}</TableCell>
                       <TableCell className="text-sm">
                         <div className="flex flex-col">
                           <span>{r.owner_name || '—'}</span>
@@ -300,6 +492,11 @@ export default function Businesses() {
                       </TableCell>
                       <TableCell>
                         <SubBadge status={r.sub_status} days={r.days_to_expiry} />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={r.directory_visible && r.directory_status === 'listed' ? 'default' : 'outline'} className="capitalize">
+                          {r.directory_visible ? (r.directory_status || 'listed').replace(/_/g, ' ') : 'Hidden'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant={r.open_apps ? 'secondary' : 'outline'}>{r.open_apps}</Badge>
@@ -353,6 +550,99 @@ export default function Businesses() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetCreateForm(); }}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Register Business</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>PACRA # *</Label>
+                <div className="relative">
+                  <Input
+                    value={createForm.pacra_number}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, pacra_number: e.target.value }))}
+                    className="pr-10"
+                    aria-invalid={pacraCheck === 'registered'}
+                  />
+                  {pacraCheck === 'checking' && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+                  {pacraCheck === 'available' && <CheckCircle2 className="absolute right-3 top-2.5 h-4 w-4 text-emerald-600" />}
+                  {pacraCheck === 'registered' && <XCircle className="absolute right-3 top-2.5 h-4 w-4 text-destructive" />}
+                </div>
+                {pacraCheckMessage && (
+                  <p className={`mt-1 text-xs ${pacraCheck === 'registered' ? 'text-destructive' : pacraCheck === 'available' ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                    {pacraCheckMessage}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Business Name *</Label>
+                <Input value={createForm.entity_name} onChange={(e) => setCreateForm((p) => ({ ...p, entity_name: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Sector</Label>
+                <Input value={createForm.sector} onChange={(e) => setCreateForm((p) => ({ ...p, sector: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <Input value={createForm.address} onChange={(e) => setCreateForm((p) => ({ ...p, address: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>City</Label>
+                <Input value={createForm.city} onChange={(e) => setCreateForm((p) => ({ ...p, city: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={createForm.status} onValueChange={(value) => setCreateForm((p) => ({ ...p, status: value }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="suspended">Suspended</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Visible in public directory</Label>
+                <Select value={createForm.directory_visible ? 'yes' : 'no'} onValueChange={(value) => setCreateForm((p) => ({ ...p, directory_visible: value === 'yes' }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="yes">Yes</SelectItem>
+                    <SelectItem value="no">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Contact name</Label>
+                <Input value={createForm.contact_name} onChange={(e) => setCreateForm((p) => ({ ...p, contact_name: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input type="email" value={createForm.contact_email} onChange={(e) => setCreateForm((p) => ({ ...p, contact_email: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input value={createForm.contact_phone} onChange={(e) => setCreateForm((p) => ({ ...p, contact_phone: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</Button>
+            <Button onClick={handleCreateBusiness} disabled={creating || pacraCheck === 'registered' || pacraCheck === 'checking'}>
+              {creating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              Register Business
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

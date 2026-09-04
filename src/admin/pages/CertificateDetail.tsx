@@ -9,6 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -18,6 +23,7 @@ import { CertificateDownloader } from '@/components/certificate/CertificateDownl
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
+import { downloadBrandedQrPng } from '@/components/certificate/BrandedQRCode';
 
 type CertStatus = 'active' | 'suspended' | 'revoked' | 'expired';
 
@@ -37,6 +43,18 @@ export default function CertificateDetail() {
   const [action, setAction] = useState<'suspend' | 'revoke' | 'reinstate' | null>(null);
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [detailForm, setDetailForm] = useState({
+    certificate_number: '',
+    certificate_business_name: '',
+    scope: '',
+    certificate_location: '',
+    issue_date: '',
+    expiry_date: '',
+    status: 'active' as CertStatus,
+    directory_visible: true,
+    notes: '',
+  });
 
   useEffect(() => { if (id) load(); }, [id]);
 
@@ -45,13 +63,24 @@ export default function CertificateDetail() {
     try {
       const { data: c, error } = await supabase
         .from('certificates')
-        .select(`*, organizations (id, name, registration_number),
+        .select(`*, organizations (id, name, registration_number, address, city),
                  certification_applications (id, application_number, sector)`)
         .eq('id', id!)
         .maybeSingle();
       if (error) throw error;
       if (!c) { toast.error('Certificate not found'); navigate('/admin/certificates'); return; }
       setCert(c);
+      setDetailForm({
+        certificate_number: c.certificate_number,
+        certificate_business_name: c.certificate_business_name || c.organizations?.name || '',
+        scope: c.scope,
+        certificate_location: c.certificate_location || c.organizations?.address || c.organizations?.city || '',
+        issue_date: c.issue_date,
+        expiry_date: c.expiry_date,
+        status: c.status as CertStatus,
+        directory_visible: (c as any).directory_visible ?? true,
+        notes: '',
+      });
 
       const [{ data: hist }, issuer, approver] = await Promise.all([
         supabase.from('certificate_history' as any).select('*').eq('certificate_id', id!).order('created_at', { ascending: false }),
@@ -103,6 +132,58 @@ export default function CertificateDetail() {
       toast.error(e.message || 'Failed to update certificate');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function saveDetails() {
+    if (!cert) return;
+    if (!detailForm.certificate_number.trim() || !detailForm.scope.trim()) {
+      toast.error('Certificate number and scope are required');
+      return;
+    }
+    if (new Date(detailForm.expiry_date) <= new Date(detailForm.issue_date)) {
+      toast.error('Expiry must be after issue date');
+      return;
+    }
+    setSavingDetails(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from('certificates').update({
+        certificate_number: detailForm.certificate_number.trim(),
+        certificate_business_name: detailForm.certificate_business_name.trim() || null,
+        scope: detailForm.scope.trim(),
+        certificate_location: detailForm.certificate_location.trim() || null,
+        issue_date: detailForm.issue_date,
+        expiry_date: detailForm.expiry_date,
+        status: detailForm.status,
+        directory_visible: detailForm.directory_visible,
+      } as any).eq('id', cert.id);
+      if (error) throw error;
+
+      await supabase.from('certificate_history' as any).insert({
+        certificate_id: cert.id,
+        action: 'updated',
+        performed_by: user?.id,
+        reason: detailForm.notes.trim() || 'Certificate details updated',
+      });
+
+      toast.success('Certificate updated');
+      await load();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update certificate');
+    } finally {
+      setSavingDetails(false);
+    }
+  }
+
+  const directoryUrl = cert ? `${window.location.origin}/directory?certificate=${encodeURIComponent(cert.certificate_number)}` : '';
+
+  async function downloadQr() {
+    if (!cert) return;
+    try {
+      await downloadBrandedQrPng(directoryUrl, `QR-${cert.certificate_number}.png`);
+    } catch (error: any) {
+      toast.error(error.message || 'QR code could not be generated');
     }
   }
 
@@ -221,18 +302,84 @@ export default function CertificateDetail() {
 
           <div className="space-y-6">
             <Card>
+              <CardHeader><CardTitle className="text-base">Update Certificate</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Certificate number</Label>
+                  <Input value={detailForm.certificate_number} onChange={(e) => setDetailForm((p) => ({ ...p, certificate_number: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Business name on certificate</Label>
+                  <Input value={detailForm.certificate_business_name} onChange={(e) => setDetailForm((p) => ({ ...p, certificate_business_name: e.target.value }))} placeholder="Name to display on this certificate" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={detailForm.status} onValueChange={(value) => setDetailForm((p) => ({ ...p, status: value as CertStatus }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                      <SelectItem value="revoked">Revoked</SelectItem>
+                      <SelectItem value="expired">Expired</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label>Issue</Label>
+                    <Input type="date" value={detailForm.issue_date} onChange={(e) => setDetailForm((p) => ({ ...p, issue_date: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Expiry</Label>
+                    <Input type="date" value={detailForm.expiry_date} onChange={(e) => setDetailForm((p) => ({ ...p, expiry_date: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label>Scope</Label>
+                    <Textarea value={detailForm.scope} onChange={(e) => setDetailForm((p) => ({ ...p, scope: e.target.value }))} rows={3} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Location on certificate</Label>
+                    <Textarea value={detailForm.certificate_location} onChange={(e) => setDetailForm((p) => ({ ...p, certificate_location: e.target.value }))} rows={3} placeholder="e.g. East Park Mall" />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={detailForm.directory_visible}
+                    onChange={(e) => setDetailForm((p) => ({ ...p, directory_visible: e.target.checked }))}
+                  />
+                  Visible in public directory
+                </label>
+                <div className="space-y-2">
+                  <Label>Update notes</Label>
+                  <Textarea value={detailForm.notes} onChange={(e) => setDetailForm((p) => ({ ...p, notes: e.target.value }))} rows={2} />
+                </div>
+                <Button className="w-full" onClick={saveDetails} disabled={savingDetails}>
+                  {savingDetails ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Save Changes
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
               <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
               <CardContent className="space-y-2">
                 <CertificateDownloader
                   certificateId={cert.id}
                   certificateNumber={cert.certificate_number}
-                  institutionName={cert.organizations?.name || 'Unknown'}
+                  institutionName={cert.certificate_business_name || cert.organizations?.name || 'Unknown'}
                   scope={cert.scope}
+                  location={cert.certificate_location || cert.organizations?.address || cert.organizations?.city || 'Location not specified'}
                   issueDate={format(new Date(cert.issue_date), 'dd MMM yyyy')}
                   expiryDate={format(new Date(cert.expiry_date), 'dd MMM yyyy')}
                   variant="default"
                   className="w-full"
                 />
+                <Button variant="outline" className="w-full" onClick={downloadQr}>
+                  <QrCode className="mr-2 h-4 w-4" /> Download QR
+                </Button>
                 {cert.status === 'active' && (
                   <>
                     <Button variant="outline" className="w-full" onClick={() => setAction('suspend')}>
@@ -265,7 +412,7 @@ export default function CertificateDetail() {
               <CardHeader><CardTitle className="text-base">Verification URL</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground break-all">
-                  {window.location.origin}/verify-certificate?id={cert.id}
+                  {directoryUrl}
                 </p>
               </CardContent>
             </Card>

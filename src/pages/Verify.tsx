@@ -118,6 +118,15 @@ export default function Verify() {
           issue_date: data.issue_date,
           expiry_date: data.expiry_date,
           scope: data.scope,
+          business_type: data.business_type,
+          business_name: data.business_name,
+          parent_business_name: data.parent_business_name,
+          pacra_number: data.pacra_number,
+          address: data.address,
+          city: data.city,
+          country: data.country,
+          contact_email: data.contact_email,
+          contact_phone: data.contact_phone,
           organizations: {
             name: data.organization_name,
             registration_number: data.organization_registration_number
@@ -279,11 +288,28 @@ export default function Verify() {
                           <div>
                             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Certified Entity</p>
                             <p className="text-lg font-bold text-slate-800 leading-tight">
-                              {certificate.organizations?.name || "Private Entity"}
+                              {certificate.business_name || certificate.organizations?.name || "Private Entity"}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">Reg: {certificate.organizations?.registration_number || "N/A"}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              PACRA: {certificate.pacra_number || certificate.organizations?.registration_number || "N/A"}
+                            </p>
+                            {certificate.business_type === 'branch' && certificate.parent_business_name && (
+                              <p className="text-xs text-muted-foreground mt-1">Branch of {certificate.parent_business_name}</p>
+                            )}
                           </div>
                         </div>
+
+                        {(certificate.address || certificate.city || certificate.country) && (
+                          <div className="flex items-start gap-4">
+                            <MapPin className="h-6 w-6 text-primary mt-1" />
+                            <div>
+                              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Certified Location</p>
+                              <p className="text-sm font-medium text-slate-700 leading-relaxed">
+                                {[certificate.address, certificate.city, certificate.country].filter(Boolean).join(", ")}
+                              </p>
+                            </div>
+                          </div>
+                        )}
 
                         <div className="flex items-start gap-4">
                           <Shield className="h-6 w-6 text-primary mt-1" />

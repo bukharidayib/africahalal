@@ -10,12 +10,19 @@ import {
   XCircle,
   AlertCircle,
   Building2,
-  Calendar
+  Calendar,
+  Plus,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -34,6 +41,7 @@ import {
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 type ApplicationStatus = 
   | 'draft'
@@ -65,6 +73,16 @@ interface Application {
   };
 }
 
+interface BusinessOption {
+  id: string;
+  entity_name: string;
+  branch_name: string | null;
+  business_type: string | null;
+  pacra_number: string;
+  organization_id: string | null;
+  sector?: string | null;
+}
+
 const statusConfig: Record<ApplicationStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ComponentType<any> }> = {
   draft: { label: 'Draft', variant: 'outline', icon: FileText },
   submitted: { label: 'Submitted', variant: 'default', icon: Clock },
@@ -81,14 +99,100 @@ const statusConfig: Record<ApplicationStatus, { label: string; variant: 'default
 };
 
 export default function Applications() {
+  const { toast } = useToast();
   const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [businesses, setBusinesses] = useState<BusinessOption[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    business_id: '',
+    application_type: 'Full Certification',
+    sector: '',
+    scope: '',
+    status: 'submitted',
+    submitted_at: new Date().toISOString().slice(0, 10),
+  });
 
   useEffect(() => {
     fetchApplications();
   }, [statusFilter]);
+
+  useEffect(() => {
+    fetchBusinesses();
+  }, []);
+
+  async function fetchBusinesses() {
+    const { data } = await supabase
+      .from('client_businesses')
+      .select('id, entity_name, branch_name, business_type, pacra_number, organization_id')
+      .order('entity_name');
+    setBusinesses((data || []) as BusinessOption[]);
+  }
+
+  function resetCreateForm() {
+    setCreateForm({
+      business_id: '',
+      application_type: 'Full Certification',
+      sector: '',
+      scope: '',
+      status: 'submitted',
+      submitted_at: new Date().toISOString().slice(0, 10),
+    });
+  }
+
+  async function ensureBusinessOrganization(business: BusinessOption) {
+    if (business.organization_id) return business.organization_id;
+    const name = business.branch_name || business.entity_name;
+    const orgId = crypto.randomUUID();
+    const { error: orgErr } = await supabase.from('organizations').insert({
+      id: orgId,
+      name,
+      registration_number: business.pacra_number,
+      sector: createForm.sector || 'General',
+    });
+    if (orgErr) throw orgErr;
+    const { error: bizErr } = await supabase.from('client_businesses').update({ organization_id: orgId } as any).eq('id', business.id);
+    if (bizErr) throw bizErr;
+    return orgId;
+  }
+
+  async function handleCreateApplication() {
+    const business = businesses.find((b) => b.id === createForm.business_id);
+    if (!business || !createForm.scope.trim()) {
+      toast({ variant: 'destructive', title: 'Missing application details', description: 'Business and certification scope are required.' });
+      return;
+    }
+    setCreating(true);
+    try {
+      const organizationId = await ensureBusinessOrganization(business);
+      const { data: appNumberData } = await supabase.rpc('generate_application_number');
+      const appNumber = appNumberData || `APP-${Date.now()}`;
+      const submittedAt = createForm.status === 'draft' ? null : new Date(createForm.submitted_at || Date.now()).toISOString();
+      const { data, error } = await supabase.from('certification_applications').insert({
+        application_number: appNumber,
+        organization_id: organizationId,
+        business_id: business.id,
+        application_type: createForm.application_type,
+        sector: createForm.sector || 'General',
+        scope: createForm.scope.trim(),
+        status: createForm.status,
+        submitted_at: submittedAt,
+      } as any).select('id, application_number').single();
+      if (error) throw error;
+      toast({ title: 'Application created', description: `${data.application_number} was created for ${business.branch_name || business.entity_name}.` });
+      resetCreateForm();
+      setCreateOpen(false);
+      await fetchApplications();
+      await fetchBusinesses();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Create failed', description: e.message });
+    } finally {
+      setCreating(false);
+    }
+  }
 
   async function fetchApplications() {
     try {
@@ -139,6 +243,9 @@ export default function Applications() {
               Manage certification applications
             </p>
           </div>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Create Application
+          </Button>
         </div>
 
         {/* Filters */}
@@ -254,6 +361,74 @@ export default function Applications() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetCreateForm(); }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create Application</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Business *</Label>
+              <Select
+                value={createForm.business_id}
+                onValueChange={(value) => {
+                  const business = businesses.find((b) => b.id === value);
+                  setCreateForm((p) => ({ ...p, business_id: value, sector: p.sector || business?.sector || '' }));
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Select registered business" /></SelectTrigger>
+                <SelectContent>
+                  {businesses.map((business) => (
+                    <SelectItem key={business.id} value={business.id}>
+                      {business.business_type === 'branch' ? business.branch_name || business.entity_name : business.entity_name} - {business.pacra_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Application type</Label>
+                <Input value={createForm.application_type} onChange={(e) => setCreateForm((p) => ({ ...p, application_type: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Sector</Label>
+                <Input value={createForm.sector} onChange={(e) => setCreateForm((p) => ({ ...p, sector: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Certification scope *</Label>
+              <Textarea value={createForm.scope} onChange={(e) => setCreateForm((p) => ({ ...p, scope: e.target.value }))} rows={3} />
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={createForm.status} onValueChange={(value) => setCreateForm((p) => ({ ...p, status: value }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="submitted">Submitted</SelectItem>
+                    <SelectItem value="under_review">Under Review</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Submitted date</Label>
+                <Input type="date" value={createForm.submitted_at} onChange={(e) => setCreateForm((p) => ({ ...p, submitted_at: e.target.value }))} disabled={createForm.status === 'draft'} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</Button>
+            <Button onClick={handleCreateApplication} disabled={creating}>
+              {creating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              Create Application
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

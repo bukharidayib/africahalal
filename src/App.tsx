@@ -83,6 +83,7 @@ import RoleEditor from "./admin/pages/RoleEditor";
 import AdminBilling from "./admin/pages/AdminBilling";
 import Businesses from "./admin/pages/Businesses";
 import BusinessDetail from "./admin/pages/BusinessDetail";
+import ClientUsers from "./admin/pages/ClientUsers";
 import IngredientTracker from "./admin/pages/IngredientTracker";
 import AdminSupervisorReportDetail from "./admin/pages/AdminSupervisorReportDetail";
 import AdminReports from "./admin/pages/AdminReports";
@@ -245,6 +246,7 @@ const App = () => (
                 <Route path="billing" element={<PermissionGate require="canViewFinance"><AdminBilling /></PermissionGate>} />
                 <Route path="businesses" element={<PermissionGate require="canViewApplications"><Businesses /></PermissionGate>} />
                 <Route path="businesses/:id" element={<PermissionGate require="canViewApplications"><BusinessDetail /></PermissionGate>} />
+                <Route path="client-users" element={<PermissionGate requireAny={["canManageUsers","canViewApplications"]}><ClientUsers /></PermissionGate>} />
                 <Route path="ingredients" element={<PermissionGate require="canViewIngredients"><IngredientTracker /></PermissionGate>} />
                 <Route path="supervisor-reports/:id" element={<PermissionGate require="canViewSupervisors"><AdminSupervisorReportDetail /></PermissionGate>} />
                 <Route path="reports" element={<PermissionGate require="canViewReports"><AdminReports /></PermissionGate>} />

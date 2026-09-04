@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { Mail, Lock, Loader2, ArrowLeft, User, FileText, Phone, Eye, EyeOff, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +61,7 @@ export default function SignUp() {
     const { toast } = useToast();
     const [searchParams] = useSearchParams();
     const isInvited = searchParams.get("invited") === "true";
+    const businessInvite = searchParams.get("business_invite") || "";
 
     useEffect(() => {
         const invitedEmail = searchParams.get("email");
@@ -70,6 +71,10 @@ export default function SignUp() {
     const strength = useMemo(() => getPasswordStrength(password), [password]);
     const strengthInfo = strengthConfig[Math.max(0, strength - 1)] || strengthConfig[0];
     const passwordsMatch = confirmPassword === "" || password === confirmPassword;
+
+    if (!businessInvite) {
+        return <Navigate to="/contact" replace />;
+    }
 
     const handleGeneratePassword = () => {
         const p = generateStrongPassword();
@@ -123,6 +128,12 @@ export default function SignUp() {
                     await supabase.from('admin_invitations')
                         .update({ status: 'accepted', accepted_at: new Date().toISOString() })
                         .eq('email', email).eq('status', 'pending');
+                }
+
+                if (businessInvite) {
+                    await supabase.functions.invoke('accept-business-user-invitation', {
+                        body: { email, token: businessInvite }
+                    });
                 }
 
                 // Sign out immediately — user must confirm email first
@@ -258,7 +269,12 @@ export default function SignUp() {
 
                         <p className="text-center text-sm text-muted-foreground pt-4">
                             Already have an account?
-                            <Link to="/auth/signin" className="ml-1 font-semibold text-primary hover:text-primary/80 underline-offset-4 hover:underline">Sign in here</Link>
+                            <Link
+                                to={`/auth/signin${businessInvite ? `?email=${encodeURIComponent(email)}&business_invite=${encodeURIComponent(businessInvite)}` : ""}`}
+                                className="ml-1 font-semibold text-primary hover:text-primary/80 underline-offset-4 hover:underline"
+                            >
+                                Sign in here
+                            </Link>
                         </p>
                     </div>
                 </div>

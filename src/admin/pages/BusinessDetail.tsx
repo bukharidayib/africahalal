@@ -1,18 +1,28 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Building2, FileText, Award, Receipt, MessageSquare, History,
   FolderOpen, DollarSign, Loader2, Eye, Mail, Phone, MapPin, Hash,
   CalendarDays, Pencil, Plus, Download, Send, CheckCircle2, ChevronDown,
   ChevronRight, RefreshCw, Pause, Play, XCircle, ClipboardList, AlertTriangle,
+  GitBranch, Trash2, Upload, Users, ShieldX, RotateCcw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -29,6 +39,19 @@ import { CertificateTimeline } from '../components/billing/CertificateTimeline';
 import { BusinessAlerts } from '../components/billing/BusinessAlerts';
 
 const fmtCycle = (c?: string) => (c || '').replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
+const parentDocumentTypes = [
+  { value: 'pacra', label: 'PACRA Certificate' },
+  { value: 'tax_clearance', label: 'Tax Clearance' },
+  { value: 'business_license', label: 'Business License' },
+  { value: 'other', label: 'Other' },
+];
+const branchDocumentTypes = [
+  { value: 'city_council', label: 'City Council Permit' },
+  { value: 'health_permit', label: 'Health Permit' },
+  { value: 'premises_license', label: 'Premises License' },
+  { value: 'branch_authorization', label: 'Branch Authorization' },
+  { value: 'other', label: 'Other' },
+];
 
 export default function BusinessDetail() {
   const { id } = useParams();
@@ -36,11 +59,18 @@ export default function BusinessDetail() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [biz, setBiz] = useState<any>(null);
+  const [parentBiz, setParentBiz] = useState<any>(null);
   const [org, setOrg] = useState<any>(null);
   const [owner, setOwner] = useState<any>(null);
+  const [profileForm, setProfileForm] = useState<any>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const [apps, setApps] = useState<any[]>([]);
   const [certs, setCerts] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [businessDocs, setBusinessDocs] = useState<any[]>([]);
+  const [businessMembers, setBusinessMembers] = useState<any[]>([]);
+  const [businessInvites, setBusinessInvites] = useState<any[]>([]);
   const [subs, setSubs] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
@@ -61,8 +91,19 @@ export default function BusinessDetail() {
   const [invoiceDialog, setInvoiceDialog] = useState<{ open: boolean; invoiceId?: string | null }>({ open: false });
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
   const [expandedCert, setExpandedCert] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ filePath: string; fileName: string } | null>(null);
+  const [preview, setPreview] = useState<{ filePath: string; fileName: string; bucket?: string } | null>(null);
   const [subDialog, setSubDialog] = useState<{ open: boolean; sub?: any | null }>({ open: false });
+  const [branchDialog, setBranchDialog] = useState<{ open: boolean; branch?: any | null }>({ open: false });
+  const [branchForm, setBranchForm] = useState<any>({});
+  const [savingBranch, setSavingBranch] = useState(false);
+  const [docDialog, setDocDialog] = useState(false);
+  const [docForm, setDocForm] = useState({ document_type: '', expires_at: '', status: 'active' });
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [accessActionId, setAccessActionId] = useState<string | null>(null);
+  const docInputRef = useRef<HTMLInputElement | null>(null);
   const [notify, setNotify] = useState<
     | { kind: 'cert'; certificateId: string; certNumber: string }
     | { kind: 'sub'; subscriptionId: string; planName: string }
@@ -78,16 +119,44 @@ export default function BusinessDetail() {
       if (error) throw error;
       if (!b) { toast({ variant: 'destructive', title: 'Not found' }); navigate('/admin/businesses'); return; }
       setBiz(b);
+      setProfileForm({
+        entity_name: b.entity_name || '',
+        branch_name: b.branch_name || '',
+        pacra_number: b.pacra_number || '',
+        address: b.address || '',
+        city: b.city || '',
+        country: b.country || '',
+        contact_name: b.contact_name || '',
+        contact_email: b.contact_email || '',
+        contact_phone: b.contact_phone || '',
+        status: b.status || 'active',
+        directory_status: (b as any).directory_status || 'listed',
+        directory_visible: (b as any).directory_visible ?? true,
+        notes: b.notes || '',
+        sector: '',
+      });
 
-      const [{ data: orgData }, { data: ownerData }] = await Promise.all([
+      const [{ data: orgData }, { data: ownerData }, { data: parentData }] = await Promise.all([
         b.organization_id ? supabase.from('organizations').select('*').eq('id', b.organization_id).maybeSingle() : Promise.resolve({ data: null } as any),
         b.user_id ? supabase.from('profiles').select('*').eq('id', b.user_id).maybeSingle() : Promise.resolve({ data: null } as any),
+        b.parent_business_id ? supabase.from('client_businesses').select('*').eq('id', b.parent_business_id).maybeSingle() : Promise.resolve({ data: null } as any),
       ]);
       setOrg(orgData);
       setOwner(ownerData);
+      setParentBiz(parentData);
+      setProfileForm((prev: any) => prev ? ({
+        ...prev,
+        sector: orgData?.sector || '',
+        address: prev.address || orgData?.address || '',
+        city: prev.city || orgData?.city || '',
+        country: prev.country || orgData?.country || '',
+        contact_name: prev.contact_name || orgData?.contact_name || '',
+        contact_email: prev.contact_email || orgData?.contact_email || '',
+        contact_phone: prev.contact_phone || orgData?.contact_phone || '',
+      }) : prev);
 
       const orgId = b.organization_id;
-      const [appsRes, certsRes, subsRes, invRes, payRes, chatRes, auditRes] = await Promise.all([
+      const [appsRes, certsRes, subsRes, invRes, payRes, chatRes, auditRes, branchRes, businessDocsRes] = await Promise.all([
         supabase.from('certification_applications')
           .select('id, application_number, status, scope, sector, created_at, submitted_at')
           .eq('business_id', b.id)
@@ -114,6 +183,10 @@ export default function BusinessDetail() {
           .or(`resource_id.eq.${b.id},resource_id.eq.${orgId}`)
           .order('created_at', { ascending: false })
           .limit(100) : Promise.resolve({ data: [] } as any),
+        (b.business_type || 'business') === 'business'
+          ? supabase.from('client_businesses').select('*').eq('parent_business_id', b.id).order('created_at', { ascending: false })
+          : Promise.resolve({ data: [] } as any),
+        supabase.from('business_documents').select('*').eq('business_id', b.id).order('uploaded_at', { ascending: false }),
       ]);
 
       setApps(appsRes.data || []);
@@ -123,6 +196,22 @@ export default function BusinessDetail() {
       setPayments(payRes.data || []);
       setChats(chatRes.data || []);
       setAudits(auditRes.data || []);
+      setBranches(branchRes.data || []);
+      setBusinessDocs(businessDocsRes.data || []);
+
+      const [membersRes, invitesRes] = await Promise.all([
+        supabase.from('business_user_memberships').select('*').eq('business_id', b.id).order('created_at', { ascending: false }),
+        supabase.from('business_user_invitations').select('*').eq('business_id', b.id).order('created_at', { ascending: false }),
+      ]);
+      const memberRows = membersRes.data || [];
+      const profileIds = memberRows.map((m: any) => m.user_id).filter(Boolean);
+      let profileMap = new Map<string, any>();
+      if (profileIds.length) {
+        const { data: memberProfiles } = await supabase.from('profiles').select('id, full_name, email, phone, nrc, created_at').in('id', profileIds);
+        profileMap = new Map((memberProfiles || []).map((p: any) => [p.id, p]));
+      }
+      setBusinessMembers(memberRows.map((m: any) => ({ ...m, profile: profileMap.get(m.user_id) })));
+      setBusinessInvites(invitesRes.data || []);
 
       const appIds = (appsRes.data || []).map((a: any) => a.id);
       if (appIds.length) {
@@ -249,6 +338,294 @@ export default function BusinessDetail() {
     }
   };
 
+  const isBranch = (biz?.business_type || 'business') === 'branch';
+  const displayName = isBranch ? (biz?.branch_name || biz?.entity_name) : biz?.entity_name;
+  const inheritedPacra = isBranch ? (parentBiz?.pacra_number || biz?.pacra_number) : biz?.pacra_number;
+
+  const saveProfile = async () => {
+    if (!biz || !profileForm) return;
+    setSavingProfile(true);
+    try {
+      const name = isBranch ? (profileForm.branch_name || profileForm.entity_name) : profileForm.entity_name;
+      if (!name?.trim()) throw new Error(isBranch ? 'Branch name is required.' : 'Business name is required.');
+
+      const businessUpdate: any = {
+        entity_name: name,
+        address: profileForm.address || null,
+        city: profileForm.city || null,
+        country: profileForm.country || null,
+        contact_name: profileForm.contact_name || null,
+        contact_email: profileForm.contact_email || null,
+        contact_phone: profileForm.contact_phone || null,
+        status: profileForm.status || 'active',
+        directory_status: profileForm.directory_status || 'listed',
+        directory_visible: profileForm.directory_visible ?? true,
+        notes: profileForm.notes || null,
+      };
+      if (isBranch) businessUpdate.branch_name = name;
+      else businessUpdate.pacra_number = profileForm.pacra_number;
+
+      const { error: bizErr } = await supabase.from('client_businesses').update(businessUpdate).eq('id', biz.id);
+      if (bizErr) throw bizErr;
+
+      if (biz.organization_id) {
+        const { error: orgErr } = await supabase.from('organizations').update({
+          name,
+          registration_number: inheritedPacra,
+          sector: profileForm.sector || org?.sector || 'General',
+          address: profileForm.address || null,
+          city: profileForm.city || null,
+          country: profileForm.country || null,
+          contact_name: profileForm.contact_name || null,
+          contact_email: profileForm.contact_email || null,
+          contact_phone: profileForm.contact_phone || null,
+        }).eq('id', biz.organization_id);
+        if (orgErr) throw orgErr;
+      }
+
+      toast({ title: isBranch ? 'Branch updated' : 'Business updated' });
+      void load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Update failed', description: e.message });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const openBranchDialog = (branch?: any) => {
+    setBranchForm({
+      branch_name: branch?.branch_name || branch?.entity_name || '',
+      address: branch?.address || '',
+      city: branch?.city || '',
+      country: branch?.country || '',
+      contact_name: branch?.contact_name || '',
+      contact_email: branch?.contact_email || '',
+      contact_phone: branch?.contact_phone || '',
+      status: branch?.status || 'active',
+      notes: branch?.notes || '',
+    });
+    setBranchDialog({ open: true, branch: branch || null });
+  };
+
+  const saveBranch = async () => {
+    if (!biz) return;
+    if (!branchForm.branch_name?.trim()) {
+      toast({ variant: 'destructive', title: 'Branch name is required' });
+      return;
+    }
+    setSavingBranch(true);
+    try {
+      const parentPacra = biz.pacra_number;
+      const branchName = branchForm.branch_name.trim();
+      if (branchDialog.branch) {
+        const { error: branchErr } = await supabase.from('client_businesses').update({
+          entity_name: branchName,
+          branch_name: branchName,
+          address: branchForm.address || null,
+          city: branchForm.city || null,
+          country: branchForm.country || null,
+          contact_name: branchForm.contact_name || null,
+          contact_email: branchForm.contact_email || null,
+          contact_phone: branchForm.contact_phone || null,
+          status: branchForm.status || 'active',
+          notes: branchForm.notes || null,
+        }).eq('id', branchDialog.branch.id);
+        if (branchErr) throw branchErr;
+        if (branchDialog.branch.organization_id) {
+          const { error: orgErr } = await supabase.from('organizations').update({
+            name: branchName,
+            registration_number: parentPacra,
+            sector: org?.sector || 'General',
+            address: branchForm.address || null,
+            city: branchForm.city || null,
+            country: branchForm.country || null,
+            contact_name: branchForm.contact_name || null,
+            contact_email: branchForm.contact_email || null,
+            contact_phone: branchForm.contact_phone || null,
+          }).eq('id', branchDialog.branch.organization_id);
+          if (orgErr) throw orgErr;
+        }
+      } else {
+        const orgId = crypto.randomUUID();
+        const { error: orgErr } = await supabase.from('organizations').insert({
+          id: orgId,
+          name: branchName,
+          registration_number: parentPacra,
+          sector: org?.sector || 'General',
+          address: branchForm.address || null,
+          city: branchForm.city || null,
+          country: branchForm.country || null,
+          contact_name: branchForm.contact_name || null,
+          contact_email: branchForm.contact_email || null,
+          contact_phone: branchForm.contact_phone || null,
+        });
+        if (orgErr) throw orgErr;
+        const { error: branchErr } = await supabase.from('client_businesses').insert({
+          user_id: biz.user_id,
+          entity_name: branchName,
+          branch_name: branchName,
+          pacra_number: parentPacra,
+          business_type: 'branch',
+          parent_business_id: biz.id,
+          organization_id: orgId,
+          address: branchForm.address || null,
+          city: branchForm.city || null,
+          country: branchForm.country || null,
+          contact_name: branchForm.contact_name || null,
+          contact_email: branchForm.contact_email || null,
+          contact_phone: branchForm.contact_phone || null,
+          status: branchForm.status || 'active',
+          notes: branchForm.notes || null,
+        });
+        if (branchErr) throw branchErr;
+      }
+      toast({ title: branchDialog.branch ? 'Branch updated' : 'Branch created' });
+      setBranchDialog({ open: false });
+      void load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Branch save failed', description: e.message });
+    } finally {
+      setSavingBranch(false);
+    }
+  };
+
+  const deleteBranch = async (branch: any) => {
+    setDeletingBranchId(branch.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-business', {
+        body: { business_id: branch.id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({ title: 'Branch deleted', description: `${branch.branch_name || branch.entity_name} was removed.` });
+      void load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete failed', description: e.message });
+    } finally {
+      setDeletingBranchId(null);
+    }
+  };
+
+  const uploadBusinessDocument = async () => {
+    const file = docInputRef.current?.files?.[0];
+    if (!biz || !file || !docForm.document_type) {
+      toast({ variant: 'destructive', title: 'Choose a document type and file' });
+      return;
+    }
+    if (isBranch && docForm.document_type === 'pacra') {
+      toast({ variant: 'destructive', title: 'Branches cannot upload PACRA documents' });
+      return;
+    }
+    setUploadingDoc(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${biz.id}/${docForm.document_type}/${Date.now()}_${safeName}`;
+      const { error: uploadErr } = await supabase.storage.from('business-documents').upload(filePath, file);
+      if (uploadErr) throw uploadErr;
+      const { error: insertErr } = await supabase.from('business_documents').insert({
+        business_id: biz.id,
+        document_type: docForm.document_type,
+        file_name: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        mime_type: file.type || null,
+        uploaded_by: user?.id,
+        expires_at: docForm.expires_at || null,
+        status: docForm.status || 'active',
+      });
+      if (insertErr) throw insertErr;
+      toast({ title: 'Document uploaded' });
+      setDocDialog(false);
+      setDocForm({ document_type: '', expires_at: '', status: 'active' });
+      if (docInputRef.current) docInputRef.current.value = '';
+      void load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Upload failed', description: e.message });
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const downloadBusinessDocument = async (d: any) => {
+    try {
+      const { data, error } = await supabase.storage.from('business-documents').createSignedUrl(d.file_path, 600);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank');
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Download failed', description: e.message });
+    }
+  };
+
+  const updateBusinessDocumentStatus = async (d: any, status: string) => {
+    const { error } = await supabase.from('business_documents').update({ status }).eq('id', d.id);
+    if (error) toast({ variant: 'destructive', title: 'Update failed', description: error.message });
+    else void load();
+  };
+
+  const sendBusinessInvite = async (email = inviteEmail) => {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!biz || !trimmedEmail) {
+      toast({ variant: 'destructive', title: 'Email is required' });
+      return;
+    }
+    setInviteLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-business-user-invitation', {
+        body: { business_id: biz.id, email: trimmedEmail },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({
+        title: 'Invitation sent',
+        description: isBranch ? 'Manager access will apply to this branch only.' : 'Manager access will include this business and all branches.',
+      });
+      setInviteEmail('');
+      void load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Invite failed', description: e.message });
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const revokeMembership = async (membership: any) => {
+    setAccessActionId(membership.id);
+    try {
+      const { error } = await supabase.from('business_user_memberships').update({ status: 'revoked' }).eq('id', membership.id);
+      if (error) throw error;
+      toast({ title: 'Manager access revoked' });
+      void load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Revoke failed', description: e.message });
+    } finally {
+      setAccessActionId(null);
+    }
+  };
+
+  const cancelBusinessInvite = async (invitation: any) => {
+    setAccessActionId(invitation.id);
+    try {
+      const { error } = await supabase.from('business_user_invitations').update({ status: 'cancelled' }).eq('id', invitation.id);
+      if (error) throw error;
+      toast({ title: 'Invitation cancelled' });
+      void load();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Cancel failed', description: e.message });
+    } finally {
+      setAccessActionId(null);
+    }
+  };
+
+  const resendBusinessInvite = async (invitation: any) => {
+    setAccessActionId(invitation.id);
+    try {
+      await sendBusinessInvite(invitation.email);
+    } finally {
+      setAccessActionId(null);
+    }
+  };
+
   const downloadDocument = async (d: any) => {
     try {
       const { data, error } = await supabase.storage
@@ -277,9 +654,14 @@ export default function BusinessDetail() {
           </Button>
           <div className="flex-1">
             <h1 className="text-2xl font-bold font-serif flex items-center gap-2">
-              <Building2 className="h-6 w-6 text-primary" /> {biz.entity_name}
+              {isBranch ? <GitBranch className="h-6 w-6 text-primary" /> : <Building2 className="h-6 w-6 text-primary" />}
+              {displayName}
+              <Badge variant={isBranch ? 'secondary' : 'outline'}>{isBranch ? 'Branch' : 'Business'}</Badge>
             </h1>
-            <p className="text-muted-foreground text-sm">PACRA: <span className="font-mono">{biz.pacra_number}</span></p>
+            <p className="text-muted-foreground text-sm">
+              PACRA: <span className="font-mono">{inheritedPacra}</span>
+              {isBranch && parentBiz ? <> · Branch of <Link className="text-primary hover:underline" to={`/admin/businesses/${parentBiz.id}`}>{parentBiz.entity_name}</Link></> : null}
+            </p>
           </div>
           <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-2" /> Refresh</Button>
         </div>
@@ -297,6 +679,8 @@ export default function BusinessDetail() {
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="overview" className="gap-2"><Building2 className="h-4 w-4" /> Overview</TabsTrigger>
+            {!isBranch && <TabsTrigger value="branches" className="gap-2"><GitBranch className="h-4 w-4" /> Branches</TabsTrigger>}
+            <TabsTrigger value="access" className="gap-2"><Users className="h-4 w-4" /> Access</TabsTrigger>
             <TabsTrigger value="subscription" className="gap-2"><CalendarDays className="h-4 w-4" /> Subscription</TabsTrigger>
             <TabsTrigger value="applications" className="gap-2"><FileText className="h-4 w-4" /> Applications</TabsTrigger>
             <TabsTrigger value="certificates" className="gap-2"><Award className="h-4 w-4" /> Certificates</TabsTrigger>
@@ -310,18 +694,101 @@ export default function BusinessDetail() {
           <TabsContent value="overview">
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
-                <CardHeader><CardTitle>Business Profile</CardTitle></CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <Field icon={Building2} label="Entity Name" value={biz.entity_name} />
-                  <Field icon={Hash} label="PACRA Number" value={biz.pacra_number} />
-                  {org && (
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>{isBranch ? 'Branch Profile' : 'Business Profile'}</CardTitle>
+                  <Button size="sm" onClick={saveProfile} disabled={savingProfile || !profileForm}>
+                    {savingProfile ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Pencil className="h-4 w-4 mr-2" />}
+                    Save
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm">
+                  {profileForm && (
                     <>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>{isBranch ? 'Branch name' : 'Business name'}</Label>
+                          <Input
+                            value={isBranch ? profileForm.branch_name : profileForm.entity_name}
+                            onChange={(e) => setProfileForm((p: any) => ({ ...p, [isBranch ? 'branch_name' : 'entity_name']: e.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>PACRA number</Label>
+                          <Input
+                            value={isBranch ? inheritedPacra : profileForm.pacra_number}
+                            disabled={isBranch}
+                            onChange={(e) => setProfileForm((p: any) => ({ ...p, pacra_number: e.target.value }))}
+                          />
+                          {isBranch && <p className="text-xs text-muted-foreground">Inherited from parent business.</p>}
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Status</Label>
+                          <Select value={profileForm.status} onValueChange={(value) => setProfileForm((p: any) => ({ ...p, status: value }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                              <SelectItem value="suspended">Suspended</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Sector</Label>
+                          <Input value={profileForm.sector} onChange={(e) => setProfileForm((p: any) => ({ ...p, sector: e.target.value }))} />
+                        </div>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Directory status</Label>
+                          <Select value={profileForm.directory_status || 'listed'} onValueChange={(value) => setProfileForm((p: any) => ({ ...p, directory_status: value }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="listed">Listed</SelectItem>
+                              <SelectItem value="pending_review">Pending Review</SelectItem>
+                              <SelectItem value="hidden">Hidden</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <label className="flex items-end gap-2 text-sm pb-2">
+                          <input
+                            type="checkbox"
+                            checked={profileForm.directory_visible ?? true}
+                            onChange={(e) => setProfileForm((p: any) => ({ ...p, directory_visible: e.target.checked }))}
+                          />
+                          Visible in public directory
+                        </label>
+                      </div>
                       <Separator />
-                      <Field icon={Building2} label="Organization" value={org.name} />
-                      {org.sector && <Field label="Sector" value={org.sector} />}
-                      {org.address && <Field icon={MapPin} label="Address" value={`${org.address}${org.city ? `, ${org.city}` : ''}${org.country ? `, ${org.country}` : ''}`} />}
-                      {org.contact_email && <Field icon={Mail} label="Email" value={org.contact_email} />}
-                      {org.contact_phone && <Field icon={Phone} label="Phone" value={org.contact_phone} />}
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <div className="space-y-2 md:col-span-3">
+                          <Label>Address</Label>
+                          <Input value={profileForm.address} onChange={(e) => setProfileForm((p: any) => ({ ...p, address: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>City</Label>
+                          <Input value={profileForm.city} onChange={(e) => setProfileForm((p: any) => ({ ...p, city: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Country</Label>
+                          <Input value={profileForm.country} onChange={(e) => setProfileForm((p: any) => ({ ...p, country: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Contact name</Label>
+                          <Input value={profileForm.contact_name} onChange={(e) => setProfileForm((p: any) => ({ ...p, contact_name: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Email</Label>
+                          <Input value={profileForm.contact_email} onChange={(e) => setProfileForm((p: any) => ({ ...p, contact_email: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Phone</Label>
+                          <Input value={profileForm.contact_phone} onChange={(e) => setProfileForm((p: any) => ({ ...p, contact_phone: e.target.value }))} />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Notes</Label>
+                        <Textarea value={profileForm.notes} onChange={(e) => setProfileForm((p: any) => ({ ...p, notes: e.target.value }))} rows={3} />
+                      </div>
                     </>
                   )}
                 </CardContent>
@@ -337,6 +804,201 @@ export default function BusinessDetail() {
                     </>
                   ) : (
                     <p className="text-muted-foreground">No owner record found.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {!isBranch && (
+            <TabsContent value="branches">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2"><GitBranch className="h-5 w-5" /> Branches</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">Branches use this business PACRA number but have their own certification records.</p>
+                  </div>
+                  <Button size="sm" onClick={() => openBranchDialog()}>
+                    <Plus className="h-4 w-4 mr-2" /> New Branch
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {branches.length === 0 ? <Empty icon={GitBranch} text="No branches yet." /> : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Branch</TableHead>
+                          <TableHead>Location</TableHead>
+                          <TableHead>Contact</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {branches.map((branch) => (
+                          <TableRow key={branch.id}>
+                            <TableCell>
+                              <div className="font-medium">{branch.branch_name || branch.entity_name}</div>
+                              <div className="text-xs text-muted-foreground font-mono">PACRA {biz.pacra_number}</div>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {[branch.address, branch.city, branch.country].filter(Boolean).join(', ') || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <div>{branch.contact_name || '—'}</div>
+                              <div className="text-xs text-muted-foreground">{branch.contact_email || branch.contact_phone || ''}</div>
+                            </TableCell>
+                            <TableCell><Badge variant={branch.status === 'active' ? 'default' : 'outline'} className="capitalize">{branch.status || 'active'}</Badge></TableCell>
+                            <TableCell className="text-right space-x-1">
+                              <Button variant="ghost" size="icon" title="Edit" onClick={() => openBranchDialog(branch)}><Pencil className="h-4 w-4" /></Button>
+                              <Button asChild variant="ghost" size="icon" title="Open"><Link to={`/admin/businesses/${branch.id}`}><Eye className="h-4 w-4" /></Link></Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Delete"
+                                className="text-destructive hover:text-destructive"
+                                disabled={deletingBranchId === branch.id}
+                                onClick={() => deleteBranch(branch)}
+                              >
+                                {deletingBranchId === branch.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          <TabsContent value="access">
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Business Access</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {isBranch ? 'Invited managers can manage this branch only.' : 'Invited managers can manage this business and all of its branches.'}
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                    <div className="space-y-2">
+                      <Label>Invite manager by email</Label>
+                      <Input
+                        type="email"
+                        placeholder="manager@company.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            void sendBusinessInvite();
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button onClick={() => sendBusinessInvite()} disabled={inviteLoading}>
+                        {inviteLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+                        Send Invite
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card>
+                  <CardHeader><CardTitle>Owner</CardTitle></CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    {owner ? (
+                      <>
+                        <Field label="Full Name" value={owner.full_name || '—'} />
+                        <Field icon={Mail} label="Email" value={owner.email} />
+                        <Field icon={Phone} label="Phone" value={owner.phone || '—'} />
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground">No owner record found.</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle>Pending Invitations</CardTitle></CardHeader>
+                  <CardContent>
+                    {businessInvites.filter((i) => i.status === 'pending').length === 0 ? (
+                      <Empty icon={Mail} text="No pending invitations." />
+                    ) : (
+                      <Table>
+                        <TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Expires</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                          {businessInvites.filter((i) => i.status === 'pending').map((invitation) => (
+                            <TableRow key={invitation.id}>
+                              <TableCell className="font-medium">{invitation.email}</TableCell>
+                              <TableCell className="text-xs">{format(new Date(invitation.expires_at), 'dd MMM yyyy')}</TableCell>
+                              <TableCell className="text-right space-x-1">
+                                <Button variant="ghost" size="sm" onClick={() => resendBusinessInvite(invitation)} disabled={accessActionId === invitation.id}>
+                                  <RotateCcw className="h-4 w-4 mr-2" /> Resend
+                                </Button>
+                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => cancelBusinessInvite(invitation)} disabled={accessActionId === invitation.id}>
+                                  <XCircle className="h-4 w-4 mr-2" /> Cancel
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader><CardTitle>Managers</CardTitle></CardHeader>
+                <CardContent>
+                  {businessMembers.length === 0 ? (
+                    <Empty icon={Users} text="No managers assigned." />
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Added</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {businessMembers.map((member) => (
+                          <TableRow key={member.id}>
+                            <TableCell>
+                              <div className="font-medium">{member.profile?.full_name || member.profile?.email || member.user_id}</div>
+                              <div className="text-xs text-muted-foreground">{member.profile?.email}</div>
+                            </TableCell>
+                            <TableCell className="capitalize">{member.role}</TableCell>
+                            <TableCell><Badge variant={member.status === 'active' ? 'default' : 'outline'}>{member.status}</Badge></TableCell>
+                            <TableCell className="text-xs">{format(new Date(member.created_at), 'dd MMM yyyy')}</TableCell>
+                            <TableCell className="text-right">
+                              {member.status === 'active' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => revokeMembership(member)}
+                                  disabled={accessActionId === member.id}
+                                >
+                                  {accessActionId === member.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldX className="h-4 w-4 mr-2" />}
+                                  Revoke
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   )}
                 </CardContent>
               </Card>
@@ -719,35 +1381,96 @@ export default function BusinessDetail() {
 
           {/* Documents */}
           <TabsContent value="documents">
-            <Card><CardContent className="pt-6">
-              {docs.length === 0 ? <Empty icon={FolderOpen} text="No documents uploaded." /> : (
-                <Table>
-                  <TableHeader><TableRow><TableHead>Document</TableHead><TableHead>Type</TableHead><TableHead>Version</TableHead><TableHead>Uploaded</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {docs.map((d) => (
-                      <TableRow key={d.id}>
-                        <TableCell>
-                          <button
-                            type="button"
-                            className="text-left hover:underline text-primary"
-                            onClick={() => setPreview({ filePath: d.file_path, fileName: d.file_name })}
-                          >
-                            {d.file_name}
-                          </button>
-                        </TableCell>
-                        <TableCell className="capitalize">{d.document_type?.replace(/_/g, ' ')}</TableCell>
-                        <TableCell>v{d.version}</TableCell>
-                        <TableCell className="text-xs">{format(new Date(d.uploaded_at), 'dd MMM yyyy')}</TableCell>
-                        <TableCell className="text-right space-x-1">
-                          <Button variant="ghost" size="icon" title="Preview" onClick={() => setPreview({ filePath: d.file_path, fileName: d.file_name })}><Eye className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" title="Download" onClick={() => downloadDocument(d)}><Download className="h-4 w-4" /></Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent></Card>
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2"><FolderOpen className="h-5 w-5" /> {isBranch ? 'Branch Documents' : 'Business Documents'}</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {isBranch ? 'PACRA documents are owned by the parent business.' : 'Reusable business compliance documents.'}
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={() => setDocDialog(true)}>
+                    <Upload className="h-4 w-4 mr-2" /> Upload Document
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {businessDocs.length === 0 ? <Empty icon={FolderOpen} text={isBranch ? 'No branch documents uploaded.' : 'No business documents uploaded.'} /> : (
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Document</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Expires</TableHead><TableHead>Uploaded</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {businessDocs.map((d) => (
+                          <TableRow key={d.id}>
+                            <TableCell>
+                              <button
+                                type="button"
+                                className="text-left hover:underline text-primary"
+                                onClick={() => setPreview({ filePath: d.file_path, fileName: d.file_name, bucket: 'business-documents' })}
+                              >
+                                {d.file_name}
+                              </button>
+                            </TableCell>
+                            <TableCell className="capitalize">{d.document_type?.replace(/_/g, ' ')}</TableCell>
+                            <TableCell>
+                              <Select value={d.status || 'active'} onValueChange={(value) => updateBusinessDocumentStatus(d, value)}>
+                                <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="active">Active</SelectItem>
+                                  <SelectItem value="expired">Expired</SelectItem>
+                                  <SelectItem value="archived">Archived</SelectItem>
+                                  <SelectItem value="rejected">Rejected</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell className="text-xs">{d.expires_at ? format(new Date(d.expires_at), 'dd MMM yyyy') : '—'}</TableCell>
+                            <TableCell className="text-xs">{format(new Date(d.uploaded_at), 'dd MMM yyyy')}</TableCell>
+                            <TableCell className="text-right space-x-1">
+                              <Button variant="ghost" size="icon" title="Preview" onClick={() => setPreview({ filePath: d.file_path, fileName: d.file_name, bucket: 'business-documents' })}><Eye className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" title="Download" onClick={() => downloadBusinessDocument(d)}><Download className="h-4 w-4" /></Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Application Documents</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {docs.length === 0 ? <Empty icon={FolderOpen} text="No application documents uploaded." /> : (
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Document</TableHead><TableHead>Type</TableHead><TableHead>Version</TableHead><TableHead>Uploaded</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {docs.map((d) => (
+                          <TableRow key={d.id}>
+                            <TableCell>
+                              <button
+                                type="button"
+                                className="text-left hover:underline text-primary"
+                                onClick={() => setPreview({ filePath: d.file_path, fileName: d.file_name })}
+                              >
+                                {d.file_name}
+                              </button>
+                            </TableCell>
+                            <TableCell className="capitalize">{d.document_type?.replace(/_/g, ' ')}</TableCell>
+                            <TableCell>v{d.version}</TableCell>
+                            <TableCell className="text-xs">{format(new Date(d.uploaded_at), 'dd MMM yyyy')}</TableCell>
+                            <TableCell className="text-right space-x-1">
+                              <Button variant="ghost" size="icon" title="Preview" onClick={() => setPreview({ filePath: d.file_path, fileName: d.file_name })}><Eye className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" title="Download" onClick={() => downloadDocument(d)}><Download className="h-4 w-4" /></Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Chats */}
@@ -868,11 +1591,131 @@ export default function BusinessDetail() {
         />
       )}
 
+      <Dialog open={branchDialog.open} onOpenChange={(open) => !open && setBranchDialog({ open: false })}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{branchDialog.branch ? 'Edit Branch' : 'Create Branch'}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Branch name *</Label>
+                <Input value={branchForm.branch_name || ''} onChange={(e) => setBranchForm((p: any) => ({ ...p, branch_name: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Parent PACRA</Label>
+                <Input value={biz?.pacra_number || ''} disabled />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Address</Label>
+              <Input value={branchForm.address || ''} onChange={(e) => setBranchForm((p: any) => ({ ...p, address: e.target.value }))} />
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>City</Label>
+                <Input value={branchForm.city || ''} onChange={(e) => setBranchForm((p: any) => ({ ...p, city: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Country</Label>
+                <Input value={branchForm.country || ''} onChange={(e) => setBranchForm((p: any) => ({ ...p, country: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={branchForm.status || 'active'} onValueChange={(value) => setBranchForm((p: any) => ({ ...p, status: value }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="suspended">Suspended</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Contact name</Label>
+                <Input value={branchForm.contact_name || ''} onChange={(e) => setBranchForm((p: any) => ({ ...p, contact_name: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input value={branchForm.contact_email || ''} onChange={(e) => setBranchForm((p: any) => ({ ...p, contact_email: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input value={branchForm.contact_phone || ''} onChange={(e) => setBranchForm((p: any) => ({ ...p, contact_phone: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea value={branchForm.notes || ''} onChange={(e) => setBranchForm((p: any) => ({ ...p, notes: e.target.value }))} rows={3} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBranchDialog({ open: false })}>Cancel</Button>
+            <Button onClick={saveBranch} disabled={savingBranch}>
+              {savingBranch ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Save Branch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={docDialog} onOpenChange={setDocDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload {isBranch ? 'Branch' : 'Business'} Document</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Document type *</Label>
+              <Select value={docForm.document_type} onValueChange={(value) => setDocForm((p) => ({ ...p, document_type: value }))}>
+                <SelectTrigger><SelectValue placeholder="Select document type" /></SelectTrigger>
+                <SelectContent>
+                  {(isBranch ? branchDocumentTypes : parentDocumentTypes).map((doc) => (
+                    <SelectItem key={doc.value} value={doc.value}>{doc.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Expiry date</Label>
+              <Input type="date" value={docForm.expires_at} onChange={(e) => setDocForm((p) => ({ ...p, expires_at: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={docForm.status} onValueChange={(value) => setDocForm((p) => ({ ...p, status: value }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>File *</Label>
+              <Input ref={docInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
+            </div>
+            {isBranch && <p className="text-xs text-muted-foreground">PACRA is intentionally unavailable for branches.</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDocDialog(false)}>Cancel</Button>
+            <Button onClick={uploadBusinessDocument} disabled={uploadingDoc}>
+              {uploadingDoc ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+              Upload
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Document preview */}
       {preview && (
         <DocumentPreviewDialog
           open={!!preview}
           onOpenChange={(o) => !o && setPreview(null)}
+          bucket={preview.bucket}
           filePath={preview.filePath}
           fileName={preview.fileName}
         />

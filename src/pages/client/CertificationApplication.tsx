@@ -106,7 +106,7 @@ export default function CertificationApplication() {
     const [submitted, setSubmitted] = useState<{ application_number: string } | null>(null);
     const [ingredientModalOpen, setIngredientModalOpen] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-    const [businesses, setBusinesses] = useState<{ id: string; entity_name: string; pacra_number: string }[]>([]);
+    const [businesses, setBusinesses] = useState<{ id: string; entity_name: string; branch_name: string | null; business_type: string; pacra_number: string }[]>([]);
     const [selectedBusinessId, setSelectedBusinessId] = useState("");
     const [draftId, setDraftId] = useState<string | null>(null);
     const { toast } = useToast();
@@ -115,7 +115,7 @@ export default function CertificationApplication() {
 
     useEffect(() => {
         const fetchBusinesses = async () => {
-            const { data } = await supabase.from('client_businesses').select('id, entity_name, pacra_number').order('entity_name');
+            const { data } = await supabase.from('client_businesses').select('id, entity_name, branch_name, business_type, pacra_number').order('entity_name');
             setBusinesses(data || []);
         };
         fetchBusinesses();
@@ -225,26 +225,34 @@ export default function CertificationApplication() {
     const ensureBusinessOrganization = async (businessId: string): Promise<string> => {
         const { data: biz, error: bizErr } = await supabase
             .from('client_businesses')
-            .select('id, entity_name, pacra_number, organization_id')
+            .select('id, entity_name, branch_name, business_type, pacra_number, organization_id')
             .eq('id', businessId)
             .single();
         if (bizErr || !biz) throw new Error('Selected business not found.');
 
         if (biz.organization_id) return biz.organization_id;
 
-        // Try to find an existing organization with the same registration number first
-        const { data: existingOrg } = await supabase
-            .from('organizations')
-            .select('id')
-            .eq('registration_number', biz.pacra_number)
-            .maybeSingle();
+        // A branch is a separate certification unit, even though it inherits its
+        // parent's PACRA number. Only a top-level business may reuse an existing
+        // organization; sharing the parent's organization would mix applications,
+        // certificates, invoices, and branch contact details.
+        const { data: existingBusiness } = biz.business_type === 'branch'
+            ? { data: null }
+            : await supabase
+                .from('client_businesses')
+                .select('organization_id')
+                .eq('business_type', 'business')
+                .eq('pacra_number', biz.pacra_number)
+                .not('organization_id', 'is', null)
+                .limit(1)
+                .maybeSingle();
 
-        let orgId = existingOrg?.id as string | undefined;
+        let orgId = existingBusiness?.organization_id as string | undefined;
         if (!orgId) {
             const newOrgId = crypto.randomUUID();
             const { error: orgErr } = await supabase.from('organizations').insert({
                 id: newOrgId,
-                name: biz.entity_name,
+                name: biz.branch_name || biz.entity_name,
                 registration_number: biz.pacra_number,
                 sector: formData.categories[0] || 'General',
                 address: formData.address,
@@ -737,7 +745,7 @@ export default function CertificationApplication() {
                                                 setSelectedBusinessId(v);
                                                 const biz = businesses.find(b => b.id === v);
                                                 if (biz) {
-                                                    updateFormData('entity_name', biz.entity_name);
+                                                    updateFormData('entity_name', biz.branch_name || biz.entity_name);
                                                     updateFormData('registration_number', biz.pacra_number);
                                                 }
                                             }}
@@ -749,7 +757,7 @@ export default function CertificationApplication() {
                                             <SelectContent>
                                                 {businesses.map(b => (
                                                     <SelectItem key={b.id} value={b.id}>
-                                                        {b.entity_name} — {b.pacra_number}
+                                                        {b.branch_name || b.entity_name} ({(b.business_type || 'business') === 'branch' ? 'Branch' : 'Business'}) - {b.pacra_number}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>

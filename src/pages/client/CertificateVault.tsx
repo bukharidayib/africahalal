@@ -58,7 +58,7 @@ export default function CertificateVault() {
         try {
             const { data, error } = await supabase
                 .from('certificates')
-                .select('*, organizations(name)')
+                .select('*, organizations(name, address, city)')
                 .order('issue_date', { ascending: false });
 
             if (error) throw error;
@@ -139,8 +139,9 @@ export default function CertificateVault() {
                                 <CertificateDownloader
                                     certificateId={activeCert.id}
                                     certificateNumber={activeCert.certificate_number}
-                                    institutionName={(activeCert as any).organizations?.name || "African Halal Certified Entity"}
+                                    institutionName={activeCert.certificate_business_name || (activeCert as any).organizations?.name || "African Halal Certified Entity"}
                                     scope={activeCert.scope}
+                                    location={activeCert.certificate_location || (activeCert as any).organizations?.address || (activeCert as any).organizations?.city || "Location not specified"}
                                     issueDate={format(new Date(activeCert.issue_date), 'dd MMM yyyy')}
                                     expiryDate={format(new Date(activeCert.expiry_date), 'dd MMM yyyy')}
                                     className="bg-white text-primary hover:bg-white/90 font-bold px-8 shadow-xl active:scale-95 transition-all text-sm h-10 px-6"
@@ -237,8 +238,9 @@ export default function CertificateVault() {
                                                 <CertificateDownloader
                                                     certificateId={cert.id}
                                                     certificateNumber={cert.certificate_number}
-                                                    institutionName={(cert as any).organizations?.name || "African Halal Institute"}
+                                                    institutionName={cert.certificate_business_name || (cert as any).organizations?.name || "African Halal Institute"}
                                                     scope={cert.scope}
+                                                    location={cert.certificate_location || (cert as any).organizations?.address || (cert as any).organizations?.city || "Location not specified"}
                                                     issueDate={format(new Date(cert.issue_date), 'dd MMM yyyy')}
                                                     expiryDate={format(new Date(cert.expiry_date), 'dd MMM yyyy')}
                                                     variant="ghost"

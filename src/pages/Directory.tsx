@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/SEO";
 import {
   Search,
@@ -58,7 +59,9 @@ interface CertifiedCompany {
 }
 
 export default function Directory() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchParams] = useSearchParams();
+  const certificateParam = searchParams.get("certificate") || searchParams.get("cert");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [selectedSector, setSelectedSector] = useState("All Sectors");
   const [selectedStatus, setSelectedStatus] = useState("All Status");
   const [selectedInstitution, setSelectedInstitution] = useState<CertifiedCompany | null>(null);
@@ -69,15 +72,28 @@ export default function Directory() {
     fetchInstitutions();
   }, []);
 
+  useEffect(() => {
+    if (!certificateParam || institutions.length === 0) return;
+    const match = institutions.find((inst) =>
+      inst.certificate_number.toLowerCase() === certificateParam.toLowerCase() ||
+      inst.id === certificateParam,
+    );
+    if (match) {
+      setSelectedInstitution(match);
+      setSearchQuery(match.certificate_number);
+    }
+  }, [certificateParam, institutions]);
+
   async function fetchInstitutions() {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('certificates')
         .select(`
           id,
           certificate_number,
           status,
+          directory_visible,
           scope,
           issue_date,
           expiry_date,
@@ -92,6 +108,8 @@ export default function Directory() {
             contact_phone
           )
         `)
+        .eq('status', 'active')
+        .eq('directory_visible', true)
         .order('issue_date', { ascending: false });
 
       if (error) throw error;
@@ -99,17 +117,8 @@ export default function Directory() {
       // Auto-expire any active certificates whose expiry has passed (best-effort, ignore errors)
       try { await supabase.rpc('expire_lapsed_applications' as any); } catch {}
 
-      // Dedup: keep only the most recent certificate per organization
       const rows = (data as any[]) || [];
-      const seen = new Set<string>();
-      const deduped: CertifiedCompany[] = [];
-      for (const r of rows) {
-        const orgKey = r.organizations?.name || r.id;
-        if (seen.has(orgKey)) continue;
-        seen.add(orgKey);
-        deduped.push(r);
-      }
-      setInstitutions(deduped);
+      setInstitutions(rows);
     } catch (error) {
       console.error('Error fetching directory:', error);
     } finally {

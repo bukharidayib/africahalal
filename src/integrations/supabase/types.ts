@@ -517,6 +517,8 @@ export type Database = {
           application_id: string
           approved_by: string
           certificate_number: string
+          certificate_business_name: string | null
+          certificate_location: string | null
           created_at: string
           expiry_date: string
           id: string
@@ -533,6 +535,8 @@ export type Database = {
           application_id: string
           approved_by: string
           certificate_number: string
+          certificate_business_name?: string | null
+          certificate_location?: string | null
           created_at?: string
           expiry_date: string
           id?: string
@@ -549,6 +553,8 @@ export type Database = {
           application_id?: string
           approved_by?: string
           certificate_number?: string
+          certificate_business_name?: string | null
+          certificate_location?: string | null
           created_at?: string
           expiry_date?: string
           id?: string
@@ -782,29 +788,206 @@ export type Database = {
           },
         ]
       }
-      client_businesses: {
+      business_user_invitations: {
         Row: {
+          accepted_at: string | null
+          business_id: string
           created_at: string
-          entity_name: string
+          email: string
+          expires_at: string
           id: string
-          organization_id: string | null
-          pacra_number: string
+          invited_by: string | null
+          role: string
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          business_id: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+          status?: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          business_id?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_user_invitations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "client_businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_user_memberships: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          invited_by: string | null
+          role: string
+          status: string
+          updated_at: string
           user_id: string
         }
         Insert: {
+          business_id: string
           created_at?: string
-          entity_name: string
           id?: string
-          organization_id?: string | null
-          pacra_number: string
+          invited_by?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
           user_id: string
         }
         Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_user_memberships_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "client_businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_documents: {
+        Row: {
+          business_id: string
+          document_type: string
+          expires_at: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          status: string
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          business_id: string
+          document_type: string
+          expires_at?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          status?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          business_id?: string
+          document_type?: string
+          expires_at?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          status?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_documents_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "client_businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_businesses: {
+        Row: {
+          address: string | null
+          branch_name: string | null
+          business_type: string
+          city: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          country: string | null
+          created_at: string
+          entity_name: string
+          id: string
+          notes: string | null
+          organization_id: string | null
+          parent_business_id: string | null
+          pacra_number: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          branch_name?: string | null
+          business_type?: string
+          city?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country?: string | null
+          created_at?: string
+          entity_name: string
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          parent_business_id?: string | null
+          pacra_number: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          branch_name?: string | null
+          business_type?: string
+          city?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country?: string | null
           created_at?: string
           entity_name?: string
           id?: string
+          notes?: string | null
           organization_id?: string | null
+          parent_business_id?: string | null
           pacra_number?: string
+          status?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -813,6 +996,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_businesses_parent_business_id_fkey"
+            columns: ["parent_business_id"]
+            isOneToOne: false
+            referencedRelation: "client_businesses"
             referencedColumns: ["id"]
           },
         ]

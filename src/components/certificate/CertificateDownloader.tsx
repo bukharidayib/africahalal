@@ -11,6 +11,7 @@ interface CertificateDownloaderProps {
     certificateNumber: string;
     institutionName: string;
     scope: string;
+    location: string;
     issueDate: string;
     expiryDate: string;
     standard?: string;
@@ -25,6 +26,7 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
     certificateNumber,
     institutionName,
     scope,
+    location,
     issueDate,
     expiryDate,
     standard = 'AHI-HALAL-2024',
@@ -42,8 +44,8 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
 
         setIsGenerating(true);
         try {
-            // Small delay to ensure any fonts/images are ready
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Small delay to ensure any fonts/images and styled QR assets are ready.
+            await new Promise(resolve => setTimeout(resolve, 900));
 
             const dataUrl = await toPng(templateRef.current, {
                 pixelRatio: 2, // Higher resolution
@@ -51,12 +53,12 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
             });
 
             const pdf = new jsPDF({
-                orientation: 'portrait',
+                orientation: 'landscape',
                 unit: 'px',
-                format: [800, 1131],
+                format: [1131, 800],
             });
 
-            pdf.addImage(dataUrl, 'PNG', 0, 0, 800, 1131);
+            pdf.addImage(dataUrl, 'PNG', 0, 0, 1131, 800);
             pdf.save(`Certificate-${certificateNumber}.pdf`);
 
             toast({
@@ -75,7 +77,7 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
         }
     };
 
-    const verificationUrl = `${window.location.origin}/verify?id=${certificateId}`;
+    const verificationUrl = `${window.location.origin}/directory?certificate=${encodeURIComponent(certificateNumber)}`;
 
     return (
         <>
@@ -100,6 +102,7 @@ export const CertificateDownloader: React.FC<CertificateDownloaderProps> = ({
                         certificateNumber={certificateNumber}
                         institutionName={institutionName}
                         scope={scope}
+                        location={location}
                         issueDate={issueDate}
                         expiryDate={expiryDate}
                         standard={standard}

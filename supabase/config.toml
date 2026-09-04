@@ -6,6 +6,12 @@ verify_jwt = false
 [functions.send-invitation]
 verify_jwt = false
 
+[functions.send-business-user-invitation]
+verify_jwt = false
+
+[functions.accept-business-user-invitation]
+verify_jwt = false
+
 [functions.send-status-notification]
 verify_jwt = false
 
@@ -37,4 +43,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-contact-email]
+verify_jwt = false
+
+[functions.manage-client-user]
+verify_jwt = false
+
+[functions.register-business]
 verify_jwt = false
