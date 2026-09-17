@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, FlaskConical, Brain, CheckCircle2, XCircle, AlertTriangle, HelpCircle, Search, Trash2 } from "lucide-react";
+import { Loader2, FlaskConical, CheckCircle2, XCircle, AlertTriangle, HelpCircle, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 const statusColors: Record<string, string> = {
@@ -32,7 +32,6 @@ export default function IngredientTracker() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCollection, setSelectedCollection] = useState<any>(null);
   const [ingredients, setIngredients] = useState<any[]>([]);
-  const [isAnalyzing, setIsAnalyzing] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const { toast } = useToast();
@@ -72,78 +71,6 @@ export default function IngredientTracker() {
       loadCollections();
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed to delete", description: err.message });
-    }
-  };
-
-  const analyzeWithAI = async (collection: any) => {
-    setIsAnalyzing(collection.id);
-    try {
-      // Fetch ingredients for this collection
-      const { data: ings } = await (supabase
-        .from("supervisor_collected_ingredients" as any)
-        .select("*")
-        .eq("collection_id", collection.id) as any);
-
-      if (!ings || ings.length === 0) {
-        toast({ variant: "destructive", title: "No Ingredients", description: "No ingredients to analyze." });
-        return;
-      }
-
-      // Format for the edge function
-      const products = [{
-        name: collection.product_name,
-        brand: collection.brand || "",
-        ingredients: (ings as any[]).map((i: any) => ({
-          ingredient_name: i.ingredient_name,
-          source: i.source || "Unknown",
-          supplier_name: i.supplier_name || "Unknown",
-          is_halal_certified: false,
-          percentage: i.percentage,
-        })),
-      }];
-
-      const { data: result, error } = await supabase.functions.invoke("analyze-ingredients", {
-        body: { products },
-      });
-
-      if (error) throw error;
-      if (result?.error) throw new Error(result.error);
-
-      // Update each ingredient with AI results
-      const results = result?.results || [];
-      for (const res of results) {
-        const matchingIng = (ings as any[]).find((i: any) =>
-          i.ingredient_name.toLowerCase() === res.ingredient_name.toLowerCase()
-        );
-        if (matchingIng) {
-          await (supabase
-            .from("supervisor_collected_ingredients" as any)
-            .update({
-              ai_classification: res.classification,
-              ai_reasoning: res.reasoning,
-              ai_risk_level: res.risk_level,
-            } as any)
-            .eq("id", matchingIng.id) as any);
-        }
-      }
-
-      // Update collection status
-      await (supabase
-        .from("supervisor_ingredient_collections" as any)
-        .update({ status: "analyzed" } as any)
-        .eq("id", collection.id) as any);
-
-      toast({ title: "Analysis Complete", description: `${results.length} ingredient(s) analyzed.` });
-      loadCollections();
-
-      // Refresh detail if open
-      if (selectedCollection?.id === collection.id) {
-        openDetail(collection);
-      }
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Analysis Failed", description: error.message });
-    } finally {
-      setIsAnalyzing(null);
     }
   };
 
@@ -194,7 +121,7 @@ export default function IngredientTracker() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Ingredient Tracker</h1>
-            <p className="text-muted-foreground mt-1">AI-powered Halal/Haram ingredient analysis from supervisor collections</p>
+            <p className="text-muted-foreground mt-1">Ingredient review from supervisor collections</p>
           </div>
         </div>
 
@@ -276,15 +203,6 @@ export default function IngredientTracker() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant={c.status === "pending" ? "default" : "outline"}
-                          onClick={(e) => { e.stopPropagation(); analyzeWithAI(c); }}
-                          disabled={isAnalyzing === c.id}
-                        >
-                          {isAnalyzing === c.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Brain className="mr-1 h-3 w-3" />}
-                          {c.status === "pending" ? "Analyze" : "Re-analyze"}
-                        </Button>
                         <Button
                           size="icon"
                           variant="ghost"

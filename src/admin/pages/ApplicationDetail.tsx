@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Calendar, FileText, Clock, CheckCircle2,
   XCircle, AlertCircle, User, MapPin, Loader2, Save, History,
-  Brain, ShieldAlert, ShieldCheck, HelpCircle, Lock, ExternalLink,
+  Lock, ExternalLink,
   Send, MessageSquare, Mail
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -126,9 +126,6 @@ export default function ApplicationDetail() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [aiResults, setAiResults] = useState<any>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [products, setProducts] = useState<any[]>([]);
 
   const [newStatus, setNewStatus] = useState<ApplicationStatus | ''>('');
   const [statusReason, setStatusReason] = useState('');
@@ -138,10 +135,6 @@ export default function ApplicationDetail() {
   const [messageBody, setMessageBody] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
 
-  // AI Ingredient Alert state
-  const [showIngredientAlert, setShowIngredientAlert] = useState(false);
-  const [ingredientAlertMessage, setIngredientAlertMessage] = useState('');
-  const [isSendingAlert, setIsSendingAlert] = useState(false);
 
   // Workflow permission: track which target statuses the current user can set
   const [allowedStatuses, setAllowedStatuses] = useState<Set<ApplicationStatus>>(new Set());
@@ -257,13 +250,6 @@ export default function ApplicationDetail() {
       if (!docsError) {
         setDocuments((docsData || []) as Document[]);
       }
-
-      // Fetch products with ingredients
-      const { data: prodsData } = await supabase
-        .from('application_products')
-        .select('id, name, brand, category, ingredients:product_ingredients(id, ingredient_name, percentage, source, is_halal_certified, supplier_name)')
-        .eq('application_id', id);
-      setProducts(prodsData || []);
 
     } catch (error: any) {
       toast({
@@ -457,34 +443,6 @@ export default function ApplicationDetail() {
     }
   }
 
-  const handleAnalyzeIngredients = async () => {
-    if (products.length === 0) {
-      toast({ variant: 'destructive', title: 'No Products', description: 'No products found for this application.' });
-      return;
-    }
-    setIsAnalyzing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('analyze-ingredients', {
-        body: { products },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      setAiResults(data);
-      setShowIngredientAlert(false);
-      // Pre-fill alert message when issues detected
-      if ((data.haram_count || 0) > 0 || (data.unknown_count || 0) > 0) {
-        setIngredientAlertMessage(
-          `Dear ${application?.organizations?.name || 'Applicant'},\n\nOur AI-powered ingredient analysis has detected one or more non-halal or unverified ingredients in your submitted products. Please review the flagged ingredients listed below.\n\nAction Required:\n• Replace any haram ingredients with certified halal alternatives\n• Provide updated Technical Specification Sheets (TSS) for affected products\n• Resubmit your documentation through the client portal\n\nPlease address these issues promptly to avoid delays in your certification process.`
-        );
-      }
-      toast({ title: 'Analysis Complete', description: data.summary || 'Ingredient analysis finished.' });
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Analysis Failed', description: e.message });
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
   async function handleSendMessage() {
     if (!application || !messageBody.trim()) return;
     setIsSendingMessage(true);
@@ -511,39 +469,6 @@ export default function ApplicationDetail() {
       toast({ variant: 'destructive', title: 'Failed to Send', description: e.message });
     } finally {
       setIsSendingMessage(false);
-    }
-  }
-
-  async function handleSendIngredientAlert() {
-    if (!application || !ingredientAlertMessage.trim()) return;
-    setIsSendingAlert(true);
-    try {
-      const contactEmail = application.organizations?.contact_email || clientProfile?.email;
-      if (!contactEmail) {
-        toast({ variant: 'destructive', title: 'No Email Found', description: 'No contact email found for this organization.' });
-        return;
-      }
-      const flaggedIngredients = (aiResults?.results || []).filter(
-        (r: any) => r.classification === 'haram' || r.classification === 'unknown'
-      );
-      const { error } = await supabase.functions.invoke('send-application-message', {
-        body: {
-          application_id: application.id,
-          application_number: application.application_number,
-          organization_name: application.organizations?.name || 'Applicant',
-          contact_email: contactEmail,
-          message_type: 'ingredient_issue',
-          message: ingredientAlertMessage,
-          flagged_ingredients: flaggedIngredients,
-        },
-      });
-      if (error) throw error;
-      toast({ title: 'Alert Sent', description: 'The applicant has been notified of the ingredient issues.' });
-      setShowIngredientAlert(false);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Failed to Send', description: e.message });
-    } finally {
-      setIsSendingAlert(false);
     }
   }
 
@@ -611,7 +536,6 @@ export default function ApplicationDetail() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="status">Status Update</TabsTrigger>
             <TabsTrigger value="send-message" className="gap-1"><MessageSquare className="h-4 w-4" />Send Message</TabsTrigger>
-            <TabsTrigger value="ai-analysis" className="gap-1"><Brain className="h-4 w-4" />AI Analysis</TabsTrigger>
             <TabsTrigger value="chat" className="gap-1"><MessageSquare className="h-4 w-4" />Chat</TabsTrigger>
             <TabsTrigger value="timeline" className="gap-1"><Clock className="h-4 w-4" />Timeline</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
@@ -887,128 +811,6 @@ export default function ApplicationDetail() {
                   {isSendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   {isSendingMessage ? 'Sending...' : 'Send to Applicant'}
                 </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* AI Analysis Tab */}
-          <TabsContent value="ai-analysis">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Brain className="h-5 w-5" />
-                  AI-Powered Ingredient Analysis
-                </CardTitle>
-                <CardDescription>
-                  Use AI to detect Haram or suspicious ingredients across all products in this application.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <Button onClick={handleAnalyzeIngredients} disabled={isAnalyzing} className="gap-2">
-                  {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-                  {isAnalyzing ? 'Analyzing...' : aiResults ? 'Re-Analyze Ingredients' : 'Analyze Ingredients'}
-                </Button>
-
-                {aiResults && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 text-center">
-                        <ShieldCheck className="h-6 w-6 text-green-600 mx-auto mb-1" />
-                        <p className="text-2xl font-bold text-green-700 dark:text-green-400">{aiResults.halal_count || 0}</p>
-                        <p className="text-xs text-green-600 font-medium">Halal</p>
-                      </div>
-                      <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-center">
-                        <ShieldAlert className="h-6 w-6 text-red-600 mx-auto mb-1" />
-                        <p className="text-2xl font-bold text-red-700 dark:text-red-400">{aiResults.haram_count || 0}</p>
-                        <p className="text-xs text-red-600 font-medium">Haram</p>
-                      </div>
-                      <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-center">
-                        <HelpCircle className="h-6 w-6 text-amber-600 mx-auto mb-1" />
-                        <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{aiResults.unknown_count || 0}</p>
-                        <p className="text-xs text-amber-600 font-medium">Unknown</p>
-                      </div>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">{aiResults.summary}</p>
-
-                    {/* Ingredient Issue Alert Banner */}
-                    {((aiResults.haram_count || 0) > 0 || (aiResults.unknown_count || 0) > 0) && (
-                      <div className="border border-destructive/40 rounded-lg overflow-hidden">
-                        <div className="flex items-center justify-between bg-destructive/10 px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <ShieldAlert className="h-4 w-4 text-destructive" />
-                            <span className="font-semibold text-sm text-destructive">
-                              {(aiResults.haram_count || 0) + (aiResults.unknown_count || 0)} ingredient(s) require applicant action
-                            </span>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="gap-1.5"
-                            onClick={() => setShowIngredientAlert(!showIngredientAlert)}
-                          >
-                            <Send className="h-3.5 w-3.5" />
-                            Notify Applicant
-                          </Button>
-                        </div>
-
-                        {showIngredientAlert && (
-                          <div className="p-4 space-y-3 bg-card border-t border-destructive/20">
-                            <Label className="text-sm font-medium">Notification Message (editable)</Label>
-                            <Textarea
-                              rows={6}
-                              value={ingredientAlertMessage}
-                              onChange={(e) => setIngredientAlertMessage(e.target.value)}
-                              className="text-sm"
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                disabled={isSendingAlert || !ingredientAlertMessage.trim()}
-                                onClick={handleSendIngredientAlert}
-                                className="gap-1.5"
-                              >
-                                {isSendingAlert ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                                {isSendingAlert ? 'Sending...' : 'Send Notification'}
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setShowIngredientAlert(false)}>
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted">
-                          <tr>
-                            <th className="px-4 py-2 text-left font-semibold">Product</th>
-                            <th className="px-4 py-2 text-left font-semibold">Ingredient</th>
-                            <th className="px-4 py-2 text-center font-semibold">Status</th>
-                            <th className="px-4 py-2 text-left font-semibold">Reasoning</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(aiResults.results || []).map((r: any, i: number) => (
-                            <tr key={i} className="border-t hover:bg-muted/50">
-                              <td className="px-4 py-2 font-medium">{r.product_name}</td>
-                              <td className="px-4 py-2">{r.ingredient_name}</td>
-                              <td className="px-4 py-2 text-center">
-                                <Badge variant={r.classification === 'halal' ? 'default' : r.classification === 'haram' ? 'destructive' : 'secondary'}>
-                                  {r.classification.toUpperCase()}
-                                </Badge>
-                              </td>
-                              <td className="px-4 py-2 text-muted-foreground text-xs">{r.reasoning}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>

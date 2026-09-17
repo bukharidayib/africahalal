@@ -24,9 +24,6 @@ verify_jwt = false
 [functions.send-confirmation-email]
 verify_jwt = false
 
-[functions.analyze-ingredients]
-verify_jwt = false
-
 [functions.send-supervisor-invitation]
 verify_jwt = false
 
